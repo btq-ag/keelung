@@ -171,3 +171,29 @@ instance GaloisField n => Ring (Expr 'Num n) where
 instance GaloisField n => Fractional (Expr 'Num n) where
   fromRational = Val . Number . fromRational
   (/) = Div
+
+--------------------------------------------------------------------------------
+
+-- | An synonym of 'ToNum' for converting booleans to numbers
+fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
+fromBool = ToNum
+
+-- | An synonym of 'ToBool' for converting numbers to booleans
+toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
+toBool = ToBool
+
+-- | Smart constructor for numbers as expressions 
+num :: n -> Expr 'Num n
+num = Val . Number
+
+-- | Smart constructor for 'True'
+true :: Expr 'Bool n
+true = Val (Boolean True)
+
+-- | Smart constructor for 'False'
+false :: Expr 'Bool n
+false = Val (Boolean False)
+
+-- | Helper function for negating a boolean expression 
+neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
+neq x y = IfThenElse (x `Eq` y) false true
