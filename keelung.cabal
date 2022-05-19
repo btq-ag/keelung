@@ -26,6 +26,10 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.Error
+      Keelung.Field
+      Keelung.Monad
+      Keelung.Syntax
   other-modules:
       Paths_keelung
   hs-source-dirs:
