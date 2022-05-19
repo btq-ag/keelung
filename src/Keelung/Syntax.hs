@@ -46,14 +46,17 @@ data RefKind
 data Value :: ValKind -> Type -> Type where
   Number :: n -> Value 'Num n -- Field numbers
   Boolean :: Bool -> Value 'Bool n -- Booleans
+  UnitVal :: Value 'Unit n -- Unit
 
 instance Show n => Show (Value ty n) where
   show (Number n) = show n
   show (Boolean b) = show b
+  show UnitVal = "unit"
 
 instance Eq n => Eq (Value ty n) where
   Number n == Number m = n == m
   Boolean b == Boolean c = b == c
+  UnitVal == UnitVal = True
 
 --------------------------------------------------------------------------------
 
@@ -100,6 +103,7 @@ instance Functor (Expr ty) where
     Val val -> Val $ case val of
       Number a -> Number (f a)
       Boolean b -> Boolean b
+      UnitVal -> UnitVal
     Var ref -> Var ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
@@ -182,7 +186,7 @@ fromBool = ToNum
 toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
 toBool = ToBool
 
--- | Smart constructor for numbers as expressions 
+-- | Smart constructor for numbers as expressions
 num :: n -> Expr 'Num n
 num = Val . Number
 
@@ -194,6 +198,10 @@ true = Val (Boolean True)
 false :: Expr 'Bool n
 false = Val (Boolean False)
 
--- | Helper function for negating a boolean expression 
+-- | Smart constructor for 'Unit'
+unit :: Expr 'Unit n
+unit = Val UnitVal
+
+-- | Helper function for negating a boolean expression
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
 neq x y = IfThenElse (x `Eq` y) false true
