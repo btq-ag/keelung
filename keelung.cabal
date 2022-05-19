@@ -4,14 +4,14 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           keelung-lang
+name:           keelung
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/keelung-lang#readme>
-homepage:       https://github.com/githubuser/keelung-lang#readme
-bug-reports:    https://github.com/githubuser/keelung-lang/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2022 Author name here
+description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
+homepage:       https://github.com/btq-ag/keelung#readme
+bug-reports:    https://github.com/btq-ag/keelung/issues
+author:         Ting-GIan LUA
+maintainer:     ty.lai@btq.li
+copyright:      2022 BTQ AG
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -21,13 +21,13 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/keelung-lang
+  location: https://github.com/btq-ag/keelung
 
 library
   exposed-modules:
       Keelung
   other-modules:
-      Paths_keelung_lang
+      Paths_keelung
   hs-source-dirs:
       src
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
@@ -40,11 +40,11 @@ library
     , semirings
   default-language: Haskell2010
 
-test-suite keelung-lang-test
+test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_keelung_lang
+      Paths_keelung
   hs-source-dirs:
       test
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans -threaded -rtsopts -with-rtsopts=-N
@@ -53,7 +53,7 @@ test-suite keelung-lang-test
     , base >=4.7 && <5
     , containers
     , galois-field
-    , keelung-lang
+    , keelung
     , mtl
     , semirings
   default-language: Haskell2010

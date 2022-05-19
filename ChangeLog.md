@@ -1,3 +1,3 @@
-# Changelog for keelung-lang
+# Changelog for keelung
 
 ## Unreleased changes
