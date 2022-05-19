@@ -21,9 +21,23 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- array 
+- mtl
+- containers
+- semirings
+- galois-field
+
 
 library:
   source-dirs: src
+
+ghc-options:
+  - -Wall
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+  - -Werror=incomplete-patterns
+  - -fno-warn-orphans
 
 tests:
   keelung-lang-test:
