@@ -8,14 +8,34 @@ module Keelung.Monad
     Computation (..),
     Elaborated (..),
     Assignment (..),
-    -- * Variable / Input Variable 
+
+    -- * Variable
     allocVar,
-    inputVar,
-    -- * Array / Input Array  
+
+    -- * Array
     allocArray,
+    access,
+    access2,
+    access3,
+    slice,
+    update,
+
+    -- * Input Variable & Array
+    inputVar,
     inputArray,
     inputArray2,
     inputArray3,
+
+    -- * Statement
+    ifThenElse,
+
+    -- * Assertion
+    assert,
+    assertArrayEqual,
+
+    -- * Other typeclasses
+    Referable (..),
+    Comparable (..),
   )
 where
 
@@ -114,9 +134,8 @@ elaborate_ prog = do
   ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated unit comp'
 
-
 --------------------------------------------------------------------------------
--- Variable & Input Variable 
+-- Variable & Input Variable
 --------------------------------------------------------------------------------
 
 -- | Allocate a fresh variable.
@@ -180,7 +199,34 @@ inputArray3 sizeM sizeN sizeO = do
   -- and allocate a new array with these references
   allocateArrayWithVars $ IntSet.fromList vars
 
+--------------------------------------------------------------------------------
 
+-- | "Slice" an array from a higher dimension array
+slice :: Int -> Ref ('A ('A ty)) -> Comp n (Ref ('A ty))
+slice i (Array addr) = Array <$> readHeap (addr, i)
+
+-- | Access a variable from a 1-D array
+access :: Int -> Ref ('A ('V ty)) -> Comp n (Ref ('V ty))
+access i (Array addr) = Variable <$> readHeap (addr, i)
+
+-- | Access a variable from a 2-D array
+access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> Comp n (Ref ('V ty))
+access2 addr (i, j) = slice i addr >>= access j
+
+-- | Access a variable from a 3-D array
+access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Comp n (Ref ('V ty))
+access3 addr (i, j, k) = slice i addr >>= slice j >>= access k
+
+-- | Update array 'addr' at position 'i' to expression 'expr'
+update :: Referable ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
+update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
+update (Array addr) i expr = do
+  ref <- allocVar
+  writeHeap addr [(i, ref)]
+  -- associate 'ref' with the expression
+  assign (Variable ref) expr
+
+--------------------------------------------------------------------------------
 
 -- | Internal helper function for generating multiple fresh variables.
 newVars :: Int -> Comp n IntSet
@@ -197,15 +243,14 @@ allocateArrayWithVars vars = do
   addr <- freshAddr
   writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
   return $ Array addr
+  where
+    freshAddr :: Comp n Addr
+    freshAddr = do
+      addr <- gets compNextAddr
+      modify (\st -> st {compNextAddr = succ addr})
+      return addr
 
--- | Internal helper function for allocating a fresh address
-freshAddr :: Comp n Addr
-freshAddr = do
-  addr <- gets compNextAddr
-  modify (\st -> st {compNextAddr = succ addr})
-  return addr
-
--- | Internal helper function for marking a variable as input. 
+-- | Internal helper function for marking a variable as input.
 markVarAsInput :: Var -> Comp n ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
@@ -233,34 +278,43 @@ readHeap (addr, i) = do
       Nothing -> throwError $ UnboundArrayError addr i heap
       Just n -> return n
 
-
---------------------------------------------------------------------------------
--- Inputs variables 
 --------------------------------------------------------------------------------
 
+-- | Typeclass for certain operations on references
+class Referable ty where
+  assign :: Ref ('V ty) -> Expr ty n -> Comp n ()
+
+instance Referable 'Num where
+  assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
+
+instance Referable 'Bool where
+  assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
+
+-- | Typeclass for comparing expressions
+class Comparable ty where
+  equal :: Expr ty n -> Expr ty n -> Expr 'Bool n
+
+instance Comparable 'Num where
+  equal x y = x `Eq` y
+
+instance Comparable 'Bool where
+  equal x y = x `BEq` y
+
 --------------------------------------------------------------------------------
--- Variables & Arrays 
+
+-- | Helper function for constructing the if...then...else expression
+ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n (Expr ty n)
+ifThenElse p x y = IfThenElse p <$> x <*> y
+
 --------------------------------------------------------------------------------
 
+-- | Assert that the given expression is true
+assert :: Expr 'Bool n -> Comp n ()
+assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 
-
--- --------------------------------------------------------------------------------
-
--- -- | Typeclass for certain operations on references
--- class Referable ty where
---   assign :: Ref ('V ty) -> Expr ty n -> Comp n ()
---   arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
-
--- instance Referable 'Num where
---   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
---   arrayEq len xs ys = forM_ [0 .. len - 1] $ \i -> do
---     a <- access xs i
---     b <- access ys i
---     assert (Var a `Eq` Var b)
-
--- instance Referable 'Bool where
---   assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
---   arrayEq len xs ys = forM_ [0 .. len - 1] $ \i -> do
---     a <- access xs i
---     b <- access ys i
---     assert (Var a `BEq` Var b)
+-- | Assert that two expressions are equal
+assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
+assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
+  a <- access i xs
+  b <- access i ys
+  assert (Var a `equal` Var b)
