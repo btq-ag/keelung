@@ -6,6 +6,7 @@
 module Keelung.Syntax where
 
 import Data.Field.Galois (GaloisField (..))
+import Data.IntMap.Strict (IntMap)
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 
@@ -16,6 +17,9 @@ type Var = Int
 
 -- | An "Address" is also just a integer.
 type Addr = Int
+
+-- | A Heap is an mapping of mappings of variables
+type Heap = IntMap (IntMap Int)
 
 --------------------------------------------------------------------------------
 
