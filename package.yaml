@@ -27,7 +27,6 @@ dependencies:
 - semirings
 - galois-field
 
-
 library:
   source-dirs: src
 

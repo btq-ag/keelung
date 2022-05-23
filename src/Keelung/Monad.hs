@@ -3,8 +3,9 @@
 
 module Keelung.Monad
   ( Comp,
-    elaborate,
+    runComp,
     elaborate_,
+    Elaborable(..),
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -26,8 +27,9 @@ module Keelung.Monad
     inputArray2,
     inputArray3,
 
-    -- * Statement
+    -- * Statements
     ifThenElse,
+    reduce,
 
     -- * Assertion
     assert,
@@ -48,6 +50,7 @@ import qualified Data.IntSet as IntSet
 import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
+import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -100,7 +103,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Expr ty n),
+    elabExpr :: !(Maybe (Expr ty n)),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
@@ -108,7 +111,7 @@ data Elaborated ty n = Elaborated
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap N expr)
+      ++ show (fmap (fmap N) expr)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
@@ -122,17 +125,43 @@ type Comp n = StateT (Computation n) (Except Error)
 runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
 
--- | Elaborates a Keelung program
-elaborate :: Comp n (Expr ty n) -> Either Error (Elaborated ty n)
-elaborate prog = do
-  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated expr comp'
+
+class Elaborable ty where
+  elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+
+instance Elaborable 'Num where 
+  elaborate prog = do
+    (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated (Just expr) comp'
+
+instance Elaborable 'Bool where 
+  elaborate prog = do
+    (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated (Just expr) comp'
+
+instance Elaborable 'Unit where 
+  elaborate prog = do
+    (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated Nothing comp'
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
-elaborate_ :: Comp n () -> Either Error (Elaborated 'Unit n)
+elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
 elaborate_ prog = do
-  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated unit comp'
+  ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated Nothing comp'
+
+
+-- -- | Elaborates a Keelung program
+-- elaborate :: Comp n (Expr ty n) -> Either Error (Elaborated ty n)
+-- elaborate prog = do
+--   (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+--   return $ Elaborated expr comp'
+
+-- -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
+-- elaborate_ :: Comp n () -> Either Error (Elaborated 'Unit n)
+-- elaborate_ prog = do
+--   ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+--   return $ Elaborated unit comp'
 
 --------------------------------------------------------------------------------
 -- Variable & Input Variable
@@ -206,16 +235,16 @@ slice :: Int -> Ref ('A ('A ty)) -> Comp n (Ref ('A ty))
 slice i (Array addr) = Array <$> readHeap (addr, i)
 
 -- | Access a variable from a 1-D array
-access :: Int -> Ref ('A ('V ty)) -> Comp n (Ref ('V ty))
-access i (Array addr) = Variable <$> readHeap (addr, i)
+access :: Ref ('A ('V ty)) -> Int -> Comp n (Ref ('V ty))
+access (Array addr) i = Variable <$> readHeap (addr, i)
 
 -- | Access a variable from a 2-D array
 access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> Comp n (Ref ('V ty))
-access2 addr (i, j) = slice i addr >>= access j
+access2 addr (i, j) = slice i addr >>= flip access j
 
 -- | Access a variable from a 3-D array
 access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Comp n (Ref ('V ty))
-access3 addr (i, j, k) = slice i addr >>= slice j >>= access k
+access3 addr (i, j, k) = slice i addr >>= slice j >>= flip access k
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Referable ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
@@ -306,6 +335,10 @@ instance Comparable 'Bool where
 ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n (Expr ty n)
 ifThenElse p x y = IfThenElse p <$> x <*> y
 
+-- | An alternative to 'foldM'
+reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
+reduce a xs f = foldM f a xs
+
 --------------------------------------------------------------------------------
 
 -- | Assert that the given expression is true
@@ -315,6 +348,7 @@ assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 -- | Assert that two expressions are equal
 assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
 assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
-  a <- access i xs
-  b <- access i ys
+  a <- access xs i
+  b <- access ys i
   assert (Var a `equal` Var b)
+
