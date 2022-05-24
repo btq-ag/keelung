@@ -9,6 +9,7 @@ import Data.Field.Galois (GaloisField (..))
 import Data.IntMap.Strict (IntMap)
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
+import Data.Serialize 
 
 --------------------------------------------------------------------------------
 
@@ -36,6 +37,8 @@ data ValKind
       Eq
     )
 
+
+
 -- | Data kind for annotating the type of references to variables and arrays.
 data RefKind
   = -- | Variables of some 'ValKind'
@@ -62,6 +65,30 @@ instance Eq n => Eq (Value ty n) where
   Boolean b == Boolean c = b == c
   UnitVal == UnitVal = True
 
+instance Serialize n => Serialize (Value 'Num n) where
+  put (Number n) = putWord8 0 >> put n
+  get = do
+    tag <- getWord8
+    case tag of
+      0 -> Number <$> get
+      _ -> error "Invalid value tag"
+
+instance Serialize n => Serialize (Value 'Bool n) where
+  put (Boolean n) = putWord8 1 >> put n
+  get = do
+    tag <- getWord8
+    case tag of
+      1 -> Boolean <$> get
+      _ -> error "Invalid value tag"
+
+instance Serialize n => Serialize (Value 'Unit n) where
+  put UnitVal = putWord8 2
+  get = do
+    tag <- getWord8
+    case tag of
+      2 -> pure UnitVal
+      _ -> error "Invalid value tag"
+
 --------------------------------------------------------------------------------
 
 -- | RefKind values are indexed by 'RefKind'
@@ -76,6 +103,22 @@ instance Show (Ref ref) where
 instance Eq (Ref ref) where
   Variable i == Variable j = i == j
   Array addr == Array addr' = addr == addr'
+
+instance Serialize (Ref ('V val)) where
+  put (Variable i) = putWord8 0 >> put i
+  get = do
+    tag <- getWord8
+    case tag of
+      0 -> Variable <$> get
+      _ -> error "Invalid ref tag"
+
+instance Serialize (Ref ('A val)) where
+  put (Array addr) = putWord8 1 >> put addr
+  get = do
+    tag <- getWord8
+    case tag of
+      1 -> Array <$> get
+      _ -> error "Invalid ref tag"
 
 --------------------------------------------------------------------------------
 
@@ -101,6 +144,64 @@ data Expr :: ValKind -> Type -> Type where
   -- Conversion between Booleans and Field numbers
   ToBool :: Expr 'Num n -> Expr 'Bool n
   ToNum :: Expr 'Bool n -> Expr 'Num n
+  
+instance Serialize n => Serialize (Expr 'Num n) where
+  put expr = case expr of 
+    Val val -> putWord8 0 >> put val
+    Var ref -> putWord8 1 >> put ref
+    Add x y -> putWord8 2 >> put x >> put y
+    Sub x y -> putWord8 3 >> put x >> put y
+    Mul x y -> putWord8 4 >> put x >> put y
+    Div x y -> putWord8 5 >> put x >> put y
+    IfThenElse x y z -> putWord8 11 >> put x >> put y >> put z
+    ToNum x -> putWord8 13 >> put x
+  get = do
+    tag <- getWord8
+    case tag of
+      0 -> Val <$> get
+      1 -> Var <$> get
+      2 -> Add <$> get <*> get
+      3 -> Sub <$> get <*> get
+      4 -> Mul <$> get <*> get
+      5 -> Div <$> get <*> get
+      11 -> IfThenElse <$> get <*> get <*> get
+      13 -> ToNum <$> get
+      _ -> error "Invalid expr tag"
+
+instance Serialize n => Serialize (Expr 'Bool n) where
+  put expr = case expr of 
+    Val val -> putWord8 0 >> put val
+    Var ref -> putWord8 1 >> put ref
+    Eq x y -> putWord8 6 >> put x >> put y
+    And x y -> putWord8 7 >> put x >> put y
+    Or x y -> putWord8 8 >> put x >> put y
+    Xor x y -> putWord8 9 >> put x >> put y
+    BEq x y -> putWord8 10 >> put x >> put y
+    IfThenElse x y z -> putWord8 11 >> put x >> put y >> put z
+    ToBool x -> putWord8 12 >> put x
+  get = do
+    tag <- getWord8
+    case tag of
+      0 -> Val <$> get
+      1 -> Var <$> get
+      6 -> Eq <$> get <*> get
+      7 -> And <$> get <*> get
+      8 -> Or <$> get <*> get
+      9 -> Xor <$> get <*> get
+      10 -> BEq <$> get <*> get
+      11 -> IfThenElse <$> get <*> get <*> get
+      12 -> ToBool <$> get
+      _ -> error "Invalid expr tag"
+
+instance Serialize n => Serialize (Expr 'Unit n) where
+  put (Val val) = putWord8 0 >> put val
+  put (Var ref) = putWord8 1 >> put ref
+  put (IfThenElse x y z) = putWord8 11 >> put x >> put y >> put z
+  get = do
+    tag <- getWord8
+    case tag of
+      0 -> pure (Val UnitVal)
+      _ -> error "Invalid expr tag"
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of

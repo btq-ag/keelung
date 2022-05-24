@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Keelung.Monad
   ( Comp,
@@ -51,17 +53,24 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
 import Control.Arrow (left)
+import Data.Serialize (Serialize, encode)
+import GHC.Generics (Generic)
+import Data.ByteString (ByteString)
 
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
 data Assignment ty n = Assignment (Ref ('V ty)) (Expr ty n)
+  deriving (Eq, Generic)
 
 instance Show n => Show (Assignment ty n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
 instance Functor (Assignment ty) where
   fmap f (Assignment var expr) = Assignment var (fmap f expr)
+
+instance Serialize n => Serialize (Assignment 'Num n) where 
+instance Serialize n => Serialize (Assignment 'Bool n) where 
 
 --------------------------------------------------------------------------------
 
@@ -81,6 +90,7 @@ data Computation n = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr 'Bool n]
   }
+  deriving (Generic)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
@@ -98,6 +108,8 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
       ++ "\n\
          \}"
 
+instance Serialize n => Serialize (Computation n)
+
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
@@ -107,6 +119,7 @@ data Elaborated ty n = Elaborated
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
+  deriving (Generic)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
@@ -115,6 +128,10 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
+
+instance Serialize n => Serialize (Elaborated 'Num n)
+instance Serialize n => Serialize (Elaborated 'Bool n)
+instance Serialize n => Serialize (Elaborated 'Unit n)
 
 --------------------------------------------------------------------------------
 
@@ -125,43 +142,35 @@ type Comp n = StateT (Computation n) (Except Error)
 runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
 
-
 class Elaborable ty where
+  -- | Elaborates a Keelung program
   elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+  -- | Encode a Keelung program
+  generate :: Serialize n => Comp n (Expr ty n) -> ByteString 
 
 instance Elaborable 'Num where 
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
+  generate prog = encode $ elaborate prog
 
 instance Elaborable 'Bool where 
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
+  generate prog = encode $ elaborate prog
 
 instance Elaborable 'Unit where 
   elaborate prog = do
     (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated Nothing comp'
+  generate prog = encode $ elaborate prog
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
 elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
 elaborate_ prog = do
   ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated Nothing comp'
-
-
--- -- | Elaborates a Keelung program
--- elaborate :: Comp n (Expr ty n) -> Either Error (Elaborated ty n)
--- elaborate prog = do
---   (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
---   return $ Elaborated expr comp'
-
--- -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
--- elaborate_ :: Comp n () -> Either Error (Elaborated 'Unit n)
--- elaborate_ prog = do
---   ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
---   return $ Elaborated unit comp'
 
 --------------------------------------------------------------------------------
 -- Variable & Input Variable

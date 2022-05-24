@@ -38,6 +38,8 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , galois-field
     , mtl
@@ -55,6 +57,8 @@ test-suite keelung-test
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , galois-field
     , keelung
