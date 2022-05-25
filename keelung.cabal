@@ -46,6 +46,25 @@ library
     , semirings
   default-language: Haskell2010
 
+executable tutorial
+  main-is: Tutorial.hs
+  other-modules:
+      Paths_keelung
+  hs-source-dirs:
+      examples/
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , cereal
+    , containers
+    , galois-field
+    , keelung
+    , mtl
+    , semirings
+  default-language: Haskell2010
+
 test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs

@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Keelung.Field where
 
@@ -8,6 +9,7 @@ import Data.Euclidean (Euclidean, GcdDomain)
 import Data.Field (Field)
 import Data.Field.Galois (Binary, Prime)
 import Data.Semiring (Ring, Semiring)
+import Data.Serialize (Serialize(..))
 
 --------------------------------------------------------------------------------
 
@@ -15,6 +17,14 @@ import Data.Semiring (Ring, Semiring)
 type GF64 = Binary 18446744073709551643
 
 type GF181 = Prime 1552511030102430251236801561344621993261920897571225601
+
+instance Serialize GF64 where
+  put = put . toInteger
+  get = fromInteger <$> get
+
+instance Serialize GF181 where
+  put = put . toInteger
+  get = fromInteger <$> get
 
 --------------------------------------------------------------------------------
 

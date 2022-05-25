@@ -55,7 +55,7 @@ import Keelung.Syntax
 import Control.Arrow (left)
 import Data.Serialize (Serialize, encode)
 import GHC.Generics (Generic)
-import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 
 --------------------------------------------------------------------------------
 
@@ -145,26 +145,28 @@ runComp comp f = runExcept (runStateT f comp)
 class Elaborable ty where
   -- | Elaborates a Keelung program
   elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-  -- | Encode a Keelung program
-  generate :: Serialize n => Comp n (Expr ty n) -> ByteString 
+  -- | Encode and encode a Keelung program as a binary blob
+  generateAs :: Serialize n => String -> Comp n (Expr ty n) -> IO ()
+  -- compile :: Serialize n => Comp n (Expr ty n) -> IO ()
 
 instance Elaborable 'Num where 
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
-  generate prog = encode $ elaborate prog
+  generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
+  -- compile prog = generateAs "program.keel" prog
 
 instance Elaborable 'Bool where 
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
-  generate prog = encode $ elaborate prog
+  generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
 
 instance Elaborable 'Unit where 
   elaborate prog = do
     (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated Nothing comp'
-  generate prog = encode $ elaborate prog
+  generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
 elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)

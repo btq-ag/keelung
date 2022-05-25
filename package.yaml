@@ -40,6 +40,23 @@ ghc-options:
   - -Werror=incomplete-patterns
   - -fno-warn-orphans
 
+executables:
+  tutorial:
+    main:                Tutorial.hs
+    source-dirs:        
+      - examples/
+    dependencies:
+    - keelung
+
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
+
+
 tests:
   keelung-test:
     main:                Spec.hs
