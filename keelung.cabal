@@ -43,6 +43,7 @@ library
     , containers
     , galois-field
     , mtl
+    , process
     , semirings
   default-language: Haskell2010
 
@@ -62,6 +63,7 @@ executable tutorial
     , galois-field
     , keelung
     , mtl
+    , process
     , semirings
   default-language: Haskell2010
 
@@ -82,5 +84,6 @@ test-suite keelung-test
     , galois-field
     , keelung
     , mtl
+    , process
     , semirings
   default-language: Haskell2010

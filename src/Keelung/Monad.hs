@@ -1,13 +1,13 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 
 module Keelung.Monad
   ( Comp,
     runComp,
     elaborate_,
-    Elaborable(..),
+    Elaborable (..),
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -43,19 +43,22 @@ module Keelung.Monad
   )
 where
 
+import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Serialize (Serialize, encode)
+import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
-import Control.Arrow (left)
-import Data.Serialize (Serialize, encode)
-import GHC.Generics (Generic)
-import qualified Data.ByteString as BS
+import System.IO.Error (catchIOError)
+import qualified System.Process as Process
 
 --------------------------------------------------------------------------------
 
@@ -69,8 +72,9 @@ instance Show n => Show (Assignment ty n) where
 instance Functor (Assignment ty) where
   fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
-instance Serialize n => Serialize (Assignment 'Num n) where 
-instance Serialize n => Serialize (Assignment 'Bool n) where 
+instance Serialize n => Serialize (Assignment 'Num n)
+
+instance Serialize n => Serialize (Assignment 'Bool n)
 
 --------------------------------------------------------------------------------
 
@@ -90,7 +94,7 @@ data Computation n = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr 'Bool n]
   }
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
@@ -119,7 +123,7 @@ data Elaborated ty n = Elaborated
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
@@ -130,7 +134,9 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n
       ++ "\n}"
 
 instance Serialize n => Serialize (Elaborated 'Num n)
+
 instance Serialize n => Serialize (Elaborated 'Bool n)
+
 instance Serialize n => Serialize (Elaborated 'Unit n)
 
 --------------------------------------------------------------------------------
@@ -145,28 +151,44 @@ runComp comp f = runExcept (runStateT f comp)
 class Elaborable ty where
   -- | Elaborates a Keelung program
   elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+
   -- | Encode and encode a Keelung program as a binary blob
   generateAs :: Serialize n => String -> Comp n (Expr ty n) -> IO ()
-  -- compile :: Serialize n => Comp n (Expr ty n) -> IO ()
 
-instance Elaborable 'Num where 
+  compile :: Serialize n => Comp n (Expr ty n) -> IO ()
+
+-- go :: (Show n, GaloisField n, Bounded n, Integral n, Elaborable ty) => Comp n (Expr ty n) -> IO ()
+-- go prog = Process.readProcess "keelungca" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn
+
+instance Elaborable 'Num where
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
-  -- compile prog = generateAs "program.keel" prog
+  compile prog =
+    catchIOError
+      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
+      print
 
-instance Elaborable 'Bool where 
+instance Elaborable 'Bool where
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
+  compile prog =
+    catchIOError
+      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
+      print
 
-instance Elaborable 'Unit where 
+instance Elaborable 'Unit where
   elaborate prog = do
     (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated Nothing comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
+  compile prog =
+    catchIOError
+      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
+      print
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
 elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
@@ -362,4 +384,3 @@ assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
   a <- access xs i
   b <- access ys i
   assert (Var a `equal` Var b)
-

@@ -28,6 +28,7 @@ dependencies:
 - containers
 - semirings
 - galois-field
+- process
 
 library:
   source-dirs: src
