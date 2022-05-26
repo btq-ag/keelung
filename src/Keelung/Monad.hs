@@ -46,6 +46,7 @@ where
 import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
@@ -152,43 +153,45 @@ class Elaborable ty where
   -- | Elaborates a Keelung program
   elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
 
-  -- | Encode and encode a Keelung program as a binary blob
+  -- | Encode a Keelung program into a binary blob
   generateAs :: Serialize n => String -> Comp n (Expr ty n) -> IO ()
 
+  -- | Compile a Keelung program to a ConstraintSystem with "keelungc" on PATH
   compile :: Serialize n => Comp n (Expr ty n) -> IO ()
 
--- go :: (Show n, GaloisField n, Bounded n, Integral n, Elaborable ty) => Comp n (Expr ty n) -> IO ()
--- go prog = Process.readProcess "keelungca" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn
+  -- | Compile a Keelung program to a R1CS with "keelungc" on PATH
+  compileAsR1CS :: Serialize n => Comp n (Expr ty n) -> IO ()
+
+-- | Internal function for invoking the Keelung compiler on PATH
+wrapper :: String -> ByteString -> IO ()
+wrapper command blob =
+  catchIOError
+    (Process.readProcess "keelungc" [command] (BSC.unpack blob) >>= putStrLn)
+    print
 
 instance Elaborable 'Num where
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
-  compile prog =
-    catchIOError
-      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
-      print
+  compile prog = wrapper "toCS" $ encode $ elaborate prog
+  compileAsR1CS prog = wrapper "toR1CS" $ encode $ elaborate prog
 
 instance Elaborable 'Bool where
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated (Just expr) comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
-  compile prog =
-    catchIOError
-      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
-      print
+  compile prog = wrapper "toCS" $ encode $ elaborate prog
+  compileAsR1CS prog = wrapper "toR1CS" $ encode $ elaborate prog
 
 instance Elaborable 'Unit where
   elaborate prog = do
     (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated Nothing comp'
   generateAs filepath prog = BS.writeFile filepath $ encode $ elaborate prog
-  compile prog =
-    catchIOError
-      (Process.readProcess "keelungc" ["stream"] (BSC.unpack $ encode (elaborate prog)) >>= putStrLn)
-      print
+  compile prog = wrapper "toCS" $ encode $ elaborate prog
+  compileAsR1CS prog = wrapper "toR1CS" $ encode $ elaborate prog
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
 elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
