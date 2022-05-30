@@ -50,6 +50,7 @@ library
 executable tutorial
   main-is: Tutorial.hs
   other-modules:
+      Main
       Paths_keelung
   hs-source-dirs:
       examples/

@@ -166,7 +166,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
       5 -> Div <$> get <*> get
       11 -> IfThenElse <$> get <*> get <*> get
       13 -> ToNum <$> get
-      _ -> error "Invalid expr tag"
+      _ -> error $ "Invalid expr tag 1 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Bool n) where
   put expr = case expr of 
@@ -191,7 +191,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
       10 -> BEq <$> get <*> get
       11 -> IfThenElse <$> get <*> get <*> get
       12 -> ToBool <$> get
-      _ -> error "Invalid expr tag"
+      _ -> error $ "Invalid expr tag 2 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Unit n) where
   put (Val val) = putWord8 0 >> put val
@@ -201,7 +201,7 @@ instance Serialize n => Serialize (Expr 'Unit n) where
     tag <- getWord8
     case tag of
       0 -> pure (Val UnitVal)
-      _ -> error "Invalid expr tag"
+      _ -> error $ "Invalid expr tag 3 " ++ show tag
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of

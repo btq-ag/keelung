@@ -45,7 +45,7 @@ where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import Control.Monad.State.Strict
+import Control.Monad.State.Strict hiding (get, put)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
@@ -53,7 +53,7 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Serialize (Serialize, encode)
+import Data.Serialize
 import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
