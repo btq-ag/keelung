@@ -9,7 +9,7 @@ import Data.Field.Galois (GaloisField (..))
 import Data.IntMap.Strict (IntMap)
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
-import Data.Serialize 
+import Data.Serialize
 
 --------------------------------------------------------------------------------
 
@@ -36,8 +36,6 @@ data ValKind
     ( Show,
       Eq
     )
-
-
 
 -- | Data kind for annotating the type of references to variables and arrays.
 data RefKind

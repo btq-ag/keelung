@@ -30,6 +30,7 @@ library
       Keelung.Field
       Keelung.Monad
       Keelung.Syntax
+      Keelung.Syntax.Unkinded
   other-modules:
       Paths_keelung
   hs-source-dirs:
@@ -48,9 +49,8 @@ library
   default-language: Haskell2010
 
 executable tutorial
-  main-is: Tutorial.hs
+  main-is: Main.hs
   other-modules:
-      Main
       Paths_keelung
   hs-source-dirs:
       examples/
