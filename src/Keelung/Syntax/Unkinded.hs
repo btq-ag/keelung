@@ -31,23 +31,43 @@ instance Flatten (S.Value kind n) (Value n) where
 
 instance Serialize n => Serialize (Value n)
 
-data Ref = Variable Var | Array Addr
+-- data Ref = Variable Var | Array Addr
+--   deriving (Generic)
+
+data VarRef
+  = NumVar Var
+  | BoolVar Var
+  | UnitVar Var
   deriving (Generic)
 
-data RefKind = NumVar | BoolVar | UnitVar | Arr RefKind
+instance Serialize VarRef
+
+data ArrRef = Arr Addr ArrKind
   deriving (Generic)
 
-instance Serialize RefKind
+instance Serialize ArrRef
 
-instance Flatten (S.Ref kind) Ref where
-  flatten (S.Variable v) = Variable v
-  flatten (S.Array a) = Array a
+data ArrKind = ArrOf | ArrOfNum | ArrOfBool | ArrOfUnit
+  deriving (Generic)
+
+instance Serialize ArrKind
+
+data Ref
+  = VarRef VarRef
+  | ArrRef ArrRef
+  deriving (Generic)
 
 instance Serialize Ref
 
+instance Flatten (S.Ref ('S.V kind)) VarRef where
+  flatten (S.Variable ref)
+    | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
+    | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
+    | otherwise = UnitVar ref
+
 data Expr n
   = Val (Value n)
-  | Var RefKind Ref
+  | Var VarRef
   | Add (Expr n) (Expr n)
   | Sub (Expr n) (Expr n)
   | Mul (Expr n) (Expr n)
@@ -62,15 +82,9 @@ data Expr n
   | ToNum (Expr n)
   deriving (Generic)
 
-kindOfVar :: Typeable kind => S.Ref ('S.V kind) -> RefKind
-kindOfVar (S.Variable ref)
-  | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar
-  | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar
-  | otherwise = UnitVar
-
 instance Typeable kind => Flatten (S.Expr kind n) (Expr n) where
-  flatten (S.Val v) = Val (flatten v)
-  flatten (S.Var r) = Var (kindOfVar r) (flatten r)
+  flatten (S.Val val) = Val (flatten val)
+  flatten (S.Var ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
@@ -100,7 +114,7 @@ instance Typeable kind => Flatten (S.Elaborated kind n) (Elaborated n) where
 instance Serialize n => Serialize (Elaborated n)
 
 -- | An Assignment associates an expression with a reference
-data Assignment n = Assignment Ref (Expr n)
+data Assignment n = Assignment VarRef (Expr n)
   deriving (Generic)
 
 instance Typeable kind => Flatten (S.Assignment kind n) (Assignment n) where
@@ -156,8 +170,8 @@ allocVar = do
   modify (\st -> st {compNextVar = succ index})
   return index
 
-assignNum :: Ref -> Expr n -> Comp n ()
+assignNum :: VarRef -> Expr n -> Comp n ()
 assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
 
-assignBool :: Ref -> Expr n -> Comp n ()
+assignBool :: VarRef -> Expr n -> Comp n ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}
