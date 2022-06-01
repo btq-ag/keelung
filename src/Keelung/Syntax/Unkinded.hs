@@ -1,21 +1,25 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Keelung.Syntax.Unkinded where
 
+import Control.Arrow (left)
+import Control.Monad.Except
+import Control.Monad.State
 import Data.IntSet (IntSet)
 import Data.Serialize
+import Data.Typeable
 import GHC.Generics (Generic)
+import Keelung.Error
 import qualified Keelung.Monad as S
 import Keelung.Syntax (Addr, Heap, Var)
 import qualified Keelung.Syntax as S
 
-class Flatten a b where 
-    flatten :: a -> b
-
+class Flatten a b where
+  flatten :: a -> b
 
 data Value n = Number n | Boolean Bool | Unit
   deriving (Generic)
@@ -30,6 +34,11 @@ instance Serialize n => Serialize (Value n)
 data Ref = Variable Var | Array Addr
   deriving (Generic)
 
+data RefKind = NumVar | BoolVar | UnitVar | Arr RefKind
+  deriving (Generic)
+
+instance Serialize RefKind
+
 instance Flatten (S.Ref kind) Ref where
   flatten (S.Variable v) = Variable v
   flatten (S.Array a) = Array a
@@ -38,7 +47,7 @@ instance Serialize Ref
 
 data Expr n
   = Val (Value n)
-  | Var Ref
+  | Var RefKind Ref
   | Add (Expr n) (Expr n)
   | Sub (Expr n) (Expr n)
   | Mul (Expr n) (Expr n)
@@ -53,9 +62,15 @@ data Expr n
   | ToNum (Expr n)
   deriving (Generic)
 
-instance Flatten (S.Expr kind n) (Expr n) where
+kindOfVar :: Typeable kind => S.Ref ('S.V kind) -> RefKind
+kindOfVar (S.Variable ref)
+  | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar
+  | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar
+  | otherwise = UnitVar
+
+instance Typeable kind => Flatten (S.Expr kind n) (Expr n) where
   flatten (S.Val v) = Val (flatten v)
-  flatten (S.Var r) = Var (flatten r)
+  flatten (S.Var r) = Var (kindOfVar r) (flatten r)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
@@ -76,12 +91,10 @@ data Elaborated n = Elaborated
     elabExpr :: !(Maybe (Expr n)),
     -- | The state of computation after elaboration
     elabComp :: Computation n
-    -- | The description of the underlying field
-    -- elabFieldType :: 
   }
   deriving (Generic)
 
-instance Flatten (S.Elaborated kind n) (Elaborated n) where
+instance Typeable kind => Flatten (S.Elaborated kind n) (Elaborated n) where
   flatten (S.Elaborated e c) = Elaborated (fmap flatten e) (flatten c)
 
 instance Serialize n => Serialize (Elaborated n)
@@ -90,7 +103,7 @@ instance Serialize n => Serialize (Elaborated n)
 data Assignment n = Assignment Ref (Expr n)
   deriving (Generic)
 
-instance Flatten (S.Assignment kind n) (Assignment n) where
+instance Typeable kind => Flatten (S.Assignment kind n) (Assignment n) where
   flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
 
 instance Serialize n => Serialize (Assignment n)
@@ -118,4 +131,33 @@ instance Flatten (S.Computation n) (Computation n) where
     Computation nextVar nextAddr inputVars heap (map flatten asgns) (map flatten bsgns) (map flatten asgns')
 
 instance Serialize n => Serialize (Computation n)
-  
+
+type Comp n = StateT (Computation n) (Except Error)
+
+-- | How to run the 'Comp' monad
+runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
+runComp comp f = runExcept (runStateT f comp)
+
+-- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
+elaborate_ :: Comp n () -> Either String (Elaborated n)
+elaborate_ prog = do
+  ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated Nothing comp'
+
+elaborate :: Comp n (Expr n) -> Either String (Elaborated n)
+elaborate prog = do
+  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated (Just expr) comp'
+
+-- | Allocate a fresh variable.
+allocVar :: Comp n Int
+allocVar = do
+  index <- gets compNextVar
+  modify (\st -> st {compNextVar = succ index})
+  return index
+
+assignNum :: Ref -> Expr n -> Comp n ()
+assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
+
+assignBool :: Ref -> Expr n -> Comp n ()
+assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}

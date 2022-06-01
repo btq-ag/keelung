@@ -6,6 +6,7 @@ module Keelung
     module Keelung.Error,
     module Keelung.Monad,
     elaborate,
+    elaborateAndFlatten,
     generateAs,
     compile,
     compileAsR1CS,
@@ -25,6 +26,7 @@ import Keelung.Syntax.Unkinded (flatten)
 import qualified Keelung.Syntax.Unkinded as U
 import System.IO.Error
 import qualified System.Process as Process
+import Data.Typeable
 
 -- class Elaborable kind where
 --   -- | Elaborates a Keelung program
@@ -51,19 +53,19 @@ elaborate prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated (Just expr) comp'
 
-elaborate2 :: Comp n (Expr kind n) -> Either String (U.Elaborated n)
-elaborate2 prog = do
+elaborateAndFlatten :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
+elaborateAndFlatten prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ flatten $ Elaborated (Just expr) comp'
 
-generateAs :: Serialize n => String -> Comp n (Expr kind n) -> IO ()
-generateAs filepath prog = BS.writeFile filepath $ encode (elaborate2 prog)
+generateAs :: (Serialize n, Typeable kind) => String -> Comp n (Expr kind n) -> IO ()
+generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
 
-compile :: Serialize n => Comp n (Expr kind n) -> IO ()
-compile prog = wrapper "toCS" (elaborate2 prog)
+compile :: (Serialize n, Typeable kind) => Comp n (Expr kind n) -> IO ()
+compile prog = wrapper "toCS" (elaborateAndFlatten prog)
 
-compileAsR1CS :: Serialize n => Comp n (Expr kind n) -> IO ()
-compileAsR1CS prog = wrapper "toR1CS" (elaborate2 prog)
+compileAsR1CS :: (Serialize n, Typeable kind) => Comp n (Expr kind n) -> IO ()
+compileAsR1CS prog = wrapper "toR1CS" (elaborateAndFlatten prog)
 
 -- instance Elaborable kind where
 --   elaborate prog = do
