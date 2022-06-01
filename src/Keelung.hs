@@ -6,11 +6,11 @@ module Keelung
     module Keelung.Error,
     module Keelung.Monad,
     elaborate,
+    -- elaborate_,
     elaborateAndFlatten,
     generateAs,
     compile,
     compileAsR1CS,
-    -- Elaborable (..),
   )
 where
 
@@ -18,6 +18,7 @@ import Control.Arrow (left)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Serialize
+import Data.Typeable
 import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
@@ -26,7 +27,6 @@ import Keelung.Syntax.Unkinded (flatten)
 import qualified Keelung.Syntax.Unkinded as U
 import System.IO.Error
 import qualified System.Process as Process
-import Data.Typeable
 
 -- class Elaborable kind where
 --   -- | Elaborates a Keelung program
@@ -52,6 +52,11 @@ elaborate :: Comp n (Expr kind n) -> Either String (Elaborated kind n)
 elaborate prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated (Just expr) comp'
+
+-- elaborate_ :: Comp n () -> Either String (Elaborated kind n)
+-- elaborate_ prog = do
+--   (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+--   return $ Elaborated Nothing comp'
 
 elaborateAndFlatten :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
 elaborateAndFlatten prog = do

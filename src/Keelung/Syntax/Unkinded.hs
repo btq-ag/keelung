@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -22,7 +23,12 @@ class Flatten a b where
   flatten :: a -> b
 
 data Value n = Number n | Boolean Bool | Unit
-  deriving (Generic)
+  deriving (Generic, Eq, Functor)
+
+instance Show n => Show (Value n) where
+  show (Number n) = show n
+  show (Boolean b) = show b
+  show Unit = "unit"
 
 instance Flatten (S.Value kind n) (Value n) where
   flatten (S.Number n) = Number n
@@ -38,17 +44,28 @@ data VarRef
   = NumVar Var
   | BoolVar Var
   | UnitVar Var
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance Serialize VarRef
 
+instance Show VarRef where
+  show ref = "$" ++ show (varRef ref)
+
+varRef :: VarRef -> Var
+varRef (NumVar ref) = ref
+varRef (BoolVar ref) = ref
+varRef (UnitVar ref) = ref
+
 data ArrRef = Arr Addr ArrKind
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance Serialize ArrRef
 
+instance Show ArrRef where
+  show (Arr addr _) = "@" ++ show addr
+
 data ArrKind = ArrOf | ArrOfNum | ArrOfBool | ArrOfUnit
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance Serialize ArrKind
 
@@ -56,6 +73,10 @@ data Ref
   = VarRef VarRef
   | ArrRef ArrRef
   deriving (Generic)
+
+instance Show Ref where
+  show (VarRef ref) = show ref 
+  show (ArrRef ref) = show ref 
 
 instance Serialize Ref
 
@@ -80,7 +101,41 @@ data Expr n
   | IfThenElse (Expr n) (Expr n) (Expr n)
   | ToBool (Expr n)
   | ToNum (Expr n)
-  deriving (Generic)
+  deriving (Generic, Eq, Functor)
+
+sizeOfExpr :: Expr n -> Int
+sizeOfExpr expr = case expr of
+  Val _ -> 1
+  Var _ -> 1
+  Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Div x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Eq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  And x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+  ToBool x -> 1 + sizeOfExpr x
+  ToNum x -> 1 + sizeOfExpr x
+
+instance Show n => Show (Expr n) where
+  showsPrec prec expr = case expr of
+    Val val -> shows val
+    Var var -> shows var
+    Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
+    Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
+    Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    ToBool x -> showString "ToBool " . showsPrec prec x
+    ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance Typeable kind => Flatten (S.Expr kind n) (Expr n) where
   flatten (S.Val val) = Val (flatten val)

@@ -6,7 +6,6 @@
 module Keelung.Monad
   ( Comp,
     runComp,
-    elaborate_,
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -42,7 +41,6 @@ module Keelung.Monad
   )
 where
 
-import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Field.Galois (GaloisField)
@@ -142,12 +140,6 @@ type Comp n = StateT (Computation n) (Except Error)
 -- | How to run the 'Comp' monad
 runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
-
--- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
-elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
-elaborate_ prog = do
-  ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated Nothing comp'
 
 --------------------------------------------------------------------------------
 -- Variable & Input Variable
