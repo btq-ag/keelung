@@ -122,6 +122,11 @@ sizeOfExpr expr = case expr of
   ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
 
+isOfUnit :: Expr n -> Bool
+isOfUnit (Val Unit) = True
+isOfUnit (Var (UnitVar _)) = True
+isOfUnit _ = False 
+
 instance Show n => Show (Expr n) where
   showsPrec prec expr = case expr of
     Val val -> shows val
@@ -159,7 +164,7 @@ instance Serialize n => Serialize (Expr n)
 
 data Elaborated n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Maybe (Expr n)),
+    elabExpr :: !(Expr n),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
@@ -168,13 +173,13 @@ data Elaborated n = Elaborated
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (Elaborated n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap (fmap N) expr)
+      ++ show (fmap N expr)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
 
 instance Typeable kind => Flatten (S.Elaborated kind n) (Elaborated n) where
-  flatten (S.Elaborated e c) = Elaborated (fmap flatten e) (flatten c)
+  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
 
 instance Serialize n => Serialize (Elaborated n)
 
@@ -237,15 +242,15 @@ runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
 
 -- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
-elaborate_ :: Comp n () -> Either String (Elaborated n)
-elaborate_ prog = do
-  ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated Nothing comp'
+-- elaborate_ :: Comp n () -> Either String (Elaborated n)
+-- elaborate_ prog = do
+--   ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+--   return $ Elaborated Nothing comp'
 
 elaborate :: Comp n (Expr n) -> Either String (Elaborated n)
 elaborate prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated (Just expr) comp'
+  return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
 allocVar :: Comp n Int

@@ -51,7 +51,7 @@ wrapper command elaborated =
 elaborate :: Comp n (Expr kind n) -> Either String (Elaborated kind n)
 elaborate prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated (Just expr) comp'
+  return $ Elaborated expr comp'
 
 -- elaborate_ :: Comp n () -> Either String (Elaborated kind n)
 -- elaborate_ prog = do
@@ -61,7 +61,7 @@ elaborate prog = do
 elaborateAndFlatten :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
 elaborateAndFlatten prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ flatten $ Elaborated (Just expr) comp'
+  return $ flatten $ Elaborated expr comp'
 
 generateAs :: (Serialize n, Typeable kind) => String -> Comp n (Expr kind n) -> IO ()
 generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)

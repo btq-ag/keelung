@@ -112,7 +112,7 @@ instance Serialize n => Serialize (Computation n)
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Maybe (Expr ty n)),
+    elabExpr :: !(Expr ty n),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
@@ -121,7 +121,7 @@ data Elaborated ty n = Elaborated
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap (fmap N) expr)
+      ++ show (fmap N expr)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
