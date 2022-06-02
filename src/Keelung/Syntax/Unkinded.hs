@@ -18,6 +18,8 @@ import Keelung.Error
 import qualified Keelung.Monad as S
 import Keelung.Syntax (Addr, Heap, Var)
 import qualified Keelung.Syntax as S
+import qualified Data.IntSet as IntSet
+import Keelung.Field (N(N))
 
 class Flatten a b where
   flatten :: a -> b
@@ -163,6 +165,14 @@ data Elaborated n = Elaborated
   }
   deriving (Generic)
 
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (Elaborated n) where
+  show (Elaborated expr comp) =
+    "{\n expression: "
+      ++ show (fmap (fmap N) expr)
+      ++ "\n  compuation state: \n"
+      ++ show comp
+      ++ "\n}"
+
 instance Typeable kind => Flatten (S.Elaborated kind n) (Elaborated n) where
   flatten (S.Elaborated e c) = Elaborated (fmap flatten e) (flatten c)
 
@@ -170,7 +180,10 @@ instance Serialize n => Serialize (Elaborated n)
 
 -- | An Assignment associates an expression with a reference
 data Assignment n = Assignment VarRef (Expr n)
-  deriving (Generic)
+  deriving (Generic, Functor)
+
+instance Show n => Show (Assignment n) where
+  show (Assignment var expr) = show var <> " := " <> show expr
 
 instance Typeable kind => Flatten (S.Assignment kind n) (Assignment n) where
   flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
@@ -194,6 +207,22 @@ data Computation n = Computation
     compAssertions :: [Expr n]
   }
   deriving (Generic)
+
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (Computation n) where
+  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+    "{\n  variable counter: " ++ show nextVar
+      ++ "\n  address counter: "
+      ++ show nextAddr
+      ++ "\n  input variables: "
+      ++ show (IntSet.toList inputVars)
+      ++ "\n  num assignments: "
+      ++ show (map (fmap N) numAsgns)
+      ++ "\n  bool assignments: "
+      ++ show (map (fmap N) boolAsgns)
+      ++ "\n  assertions: "
+      ++ show (map (fmap N) assertions)
+      ++ "\n\
+         \}"
 
 instance Flatten (S.Computation n) (Computation n) where
   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
