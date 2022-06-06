@@ -51,7 +51,9 @@ data VarRef
 instance Serialize VarRef
 
 instance Show VarRef where
-  show ref = "$" ++ show (varRef ref)
+  show (NumVar n) = "$N" ++ show n
+  show (BoolVar n) = "$B" ++ show n
+  show (UnitVar n) = "$U" ++ show n
 
 varRef :: VarRef -> Var
 varRef (NumVar ref) = ref
@@ -82,10 +84,10 @@ instance Show Ref where
 
 instance Serialize Ref
 
-instance Flatten (S.Ref ('S.V kind)) VarRef where
-  flatten (S.Variable ref)
-    | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
-    | typeOf ref == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
+instance Typeable kind => Flatten (S.Ref ('S.V kind)) VarRef where
+  flatten var@(S.Variable ref)
+    | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
+    | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
     | otherwise = UnitVar ref
 
 data Expr n
