@@ -23,8 +23,9 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Syntax.Unkinded (flatten)
-import qualified Keelung.Syntax.Unkinded as U
+-- import Keelung.Syntax.Unkinded (flatten)
+import Keelung.Syntax.Concrete (flatten)
+import qualified Keelung.Syntax.Concrete as C
 import System.IO.Error
 import qualified System.Process as Process
 
@@ -42,7 +43,7 @@ import qualified System.Process as Process
 --   compileAsR1CS :: Serialize n => Comp n (Expr kind n) -> IO ()
 
 -- | Internal function for invoking the Keelung compiler on PATH
-wrapper :: Serialize n => String -> Either String (U.Elaborated n) -> IO ()
+wrapper :: String -> Either String C.Elaborated -> IO ()
 wrapper command elaborated =
   catchIOError
     (Process.readProcess "keelungc" [command] (BSC.unpack $ encode elaborated) >>= putStrLn)
@@ -58,18 +59,18 @@ elaborate prog = do
 --   (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
 --   return $ Elaborated Nothing comp'
 
-elaborateAndFlatten :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
+elaborateAndFlatten :: (Integral n, Typeable kind, C.AcceptedField n) => Comp n (Expr kind n) -> Either String C.Elaborated
 elaborateAndFlatten prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ flatten $ Elaborated expr comp'
 
-generateAs :: (Serialize n, Typeable kind) => String -> Comp n (Expr kind n) -> IO ()
+generateAs :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => String -> Comp n (Expr kind n) -> IO ()
 generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
 
-compile :: (Serialize n, Typeable kind) => Comp n (Expr kind n) -> IO ()
+compile :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => Comp n (Expr kind n) -> IO ()
 compile prog = wrapper "toCS" (elaborateAndFlatten prog)
 
-compileAsR1CS :: (Serialize n, Typeable kind) => Comp n (Expr kind n) -> IO ()
+compileAsR1CS :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => Comp n (Expr kind n) -> IO ()
 compileAsR1CS prog = wrapper "toR1CS" (elaborateAndFlatten prog)
 
 -- instance Elaborable kind where

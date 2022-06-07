@@ -30,6 +30,7 @@ library
       Keelung.Field
       Keelung.Monad
       Keelung.Syntax
+      Keelung.Syntax.Concrete
       Keelung.Syntax.Unkinded
   other-modules:
       Paths_keelung

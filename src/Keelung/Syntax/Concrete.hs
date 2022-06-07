@@ -1,46 +1,43 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Syntax.Unkinded where
+module Keelung.Syntax.Concrete where
 
 import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State
 import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Serialize
 import Data.Typeable
 import GHC.Generics (Generic)
 import Keelung.Error
+import Keelung.Field (B64, BN128, GF181)
 import qualified Keelung.Monad as S
 import Keelung.Syntax (Addr, Heap, Var)
 import qualified Keelung.Syntax as S
-import qualified Data.IntSet as IntSet
-import Keelung.Field (N(N))
 
 class Flatten a b where
   flatten :: a -> b
 
-data Value n = Number n | Boolean Bool | Unit
-  deriving (Generic, Eq, Functor)
+data Value = Number Integer | Boolean Bool | Unit
+  deriving (Generic, Eq)
 
-instance Show n => Show (Value n) where
+instance Show Value where
   show (Number n) = show n
   show (Boolean b) = show b
   show Unit = "unit"
 
-instance Flatten (S.Value kind n) (Value n) where
-  flatten (S.Number n) = Number n
+instance Integral n => Flatten (S.Value kind n) Value where
+  flatten (S.Number n) = Number (toInteger n)
   flatten (S.Boolean b) = Boolean b
   flatten S.UnitVal = Unit
 
-instance Serialize n => Serialize (Value n)
-
--- data Ref = Variable Var | Array Addr
---   deriving (Generic)
+instance Serialize Value
 
 data VarRef
   = NumVar Var
@@ -79,8 +76,8 @@ data Ref
   deriving (Generic)
 
 instance Show Ref where
-  show (VarRef ref) = show ref 
-  show (ArrRef ref) = show ref 
+  show (VarRef ref) = show ref
+  show (ArrRef ref) = show ref
 
 instance Serialize Ref
 
@@ -90,24 +87,24 @@ instance Typeable kind => Flatten (S.Ref ('S.V kind)) VarRef where
     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
     | otherwise = UnitVar ref
 
-data Expr n
-  = Val (Value n)
+data Expr
+  = Val Value
   | Var VarRef
-  | Add (Expr n) (Expr n)
-  | Sub (Expr n) (Expr n)
-  | Mul (Expr n) (Expr n)
-  | Div (Expr n) (Expr n)
-  | Eq (Expr n) (Expr n)
-  | And (Expr n) (Expr n)
-  | Or (Expr n) (Expr n)
-  | Xor (Expr n) (Expr n)
-  | BEq (Expr n) (Expr n)
-  | IfThenElse (Expr n) (Expr n) (Expr n)
-  | ToBool (Expr n)
-  | ToNum (Expr n)
-  deriving (Generic, Eq, Functor)
+  | Add Expr Expr
+  | Sub Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  | Eq Expr Expr
+  | And Expr Expr
+  | Or Expr Expr
+  | Xor Expr Expr
+  | BEq Expr Expr
+  | IfThenElse Expr Expr Expr
+  | ToBool Expr
+  | ToNum Expr
+  deriving (Generic, Eq)
 
-sizeOfExpr :: Expr n -> Int
+sizeOfExpr :: Expr -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
@@ -124,12 +121,12 @@ sizeOfExpr expr = case expr of
   ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
 
-isOfUnit :: Expr n -> Bool
+isOfUnit :: Expr -> Bool
 isOfUnit (Val Unit) = True
 isOfUnit (Var (UnitVar _)) = True
-isOfUnit _ = False 
+isOfUnit _ = False
 
-instance Show n => Show (Expr n) where
+instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
     Var var -> shows var
@@ -146,7 +143,7 @@ instance Show n => Show (Expr n) where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance Typeable kind => Flatten (S.Expr kind n) (Expr n) where
+instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
   flatten (S.Val val) = Val (flatten val)
   flatten (S.Var ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
@@ -162,43 +159,66 @@ instance Typeable kind => Flatten (S.Expr kind n) (Expr n) where
   flatten (S.ToBool x) = ToBool (flatten x)
   flatten (S.ToNum x) = ToNum (flatten x)
 
-instance Serialize n => Serialize (Expr n)
+instance Serialize Expr
 
-data Elaborated n = Elaborated
+data FieldType
+  = B64 -- Binary field of 64 bits
+  | GF181 -- Prime field of order 181
+  | BN128 -- Barreto-Naehrig
+  deriving (Generic, Eq, Show)
+
+instance Serialize FieldType
+
+data Elaborated = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Expr n),
+    elabExpr :: !Expr,
     -- | The state of computation after elaboration
-    elabComp :: Computation n
+    elabComp :: Computation
   }
   deriving (Generic)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (Elaborated n) where
+instance Show Elaborated where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap N expr)
+      ++ show expr
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
 
-instance Typeable kind => Flatten (S.Elaborated kind n) (Elaborated n) where
+-- instance (Typeable kind, Integral n) => Flatten (S.Computation n) Elaborated where
+--   flatten (S.Computation e c) = Elaborated (flatten e) (flatten c)
+
+instance
+  (Typeable kind, Integral n, Flatten (S.Computation n) Computation) =>
+  Flatten (S.Elaborated kind n) Elaborated
+  where
   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
 
-instance Serialize n => Serialize (Elaborated n)
+-- instance (Typeable kind) => Flatten (S.Elaborated kind B64) Elaborated where
+--   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
+
+-- instance (Typeable kind) => Flatten (S.Elaborated kind GF181) Elaborated where
+--   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
+
+-- instance (Typeable kind) => Flatten (S.Elaborated kind BN128) Elaborated where
+--   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
+
+instance Serialize Elaborated
 
 -- | An Assignment associates an expression with a reference
-data Assignment n = Assignment VarRef (Expr n)
-  deriving (Generic, Functor)
+data Assignment = Assignment VarRef Expr
+  deriving (Generic)
 
-instance Show n => Show (Assignment n) where
+instance Show Assignment where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Typeable kind => Flatten (S.Assignment kind n) (Assignment n) where
+instance (Typeable kind, Integral n) => Flatten (S.Assignment kind n) Assignment where
   flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
 
-instance Serialize n => Serialize (Assignment n)
+instance Serialize Assignment
 
 -- | Data structure for elaboration bookkeeping
-data Computation n = Computation
+data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
     -- Counter for allocating fresh heap addresses
@@ -208,67 +228,108 @@ data Computation n = Computation
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
-    compNumAsgns :: [Assignment n],
-    compBoolAsgns :: [Assignment n],
+    compNumAsgns :: [Assignment],
+    compBoolAsgns :: [Assignment],
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Expr n]
+    compAssertions :: [Expr],
+    compFieldType :: FieldType
   }
   deriving (Generic)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (Computation n) where
-  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+instance Show Computation where
+  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions fieldType) =
     "{\n  variable counter: " ++ show nextVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
       ++ show (IntSet.toList inputVars)
       ++ "\n  num assignments: "
-      ++ show (map (fmap N) numAsgns)
+      ++ show numAsgns
       ++ "\n  bool assignments: "
-      ++ show (map (fmap N) boolAsgns)
+      ++ show boolAsgns
       ++ "\n  assertions: "
-      ++ show (map (fmap N) assertions)
+      ++ show assertions
+      ++ "\n  field type: "
+      ++ show fieldType
       ++ "\n\
          \}"
 
-instance Flatten (S.Computation n) (Computation n) where
+instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation where
   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
-    Computation nextVar nextAddr inputVars heap (map flatten asgns) (map flatten bsgns) (map flatten asgns')
+    Computation
+      nextVar
+      nextAddr
+      inputVars
+      heap
+      (map flatten asgns)
+      (map flatten bsgns)
+      (map flatten asgns')
+      (encodeFieldType asgns')
 
-instance Serialize n => Serialize (Computation n)
+-- instance Flatten (S.Computation B64) Computation where
+--   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+--     Computation
+--       nextVar
+--       nextAddr
+--       inputVars
+--       heap
+--       (map flatten asgns)
+--       (map flatten bsgns)
+--       (map flatten asgns')
+--       GF181
 
-type Comp n = StateT (Computation n) (Except Error)
+-- instance Flatten (S.Computation GF181) Computation where
+--   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+--     Computation
+--       nextVar
+--       nextAddr
+--       inputVars
+--       heap
+--       (map flatten asgns)
+--       (map flatten bsgns)
+--       (map flatten asgns')
+--       GF181
+
+-- instance Flatten (S.Computation BN128) Computation where
+--   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+--     Computation
+--       nextVar
+--       nextAddr
+--       inputVars
+--       heap
+--       (map flatten asgns)
+--       (map flatten bsgns)
+--       (map flatten asgns')
+--       BN128
+
+instance Serialize Computation
+
+type Comp = StateT Computation (Except Error)
 
 -- | How to run the 'Comp' monad
-runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
+runComp :: Computation -> Comp a -> Either Error (a, Computation)
 runComp comp f = runExcept (runStateT f comp)
 
--- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
--- elaborate_ :: Comp n () -> Either String (Elaborated n)
--- elaborate_ prog = do
---   ((), comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
---   return $ Elaborated Nothing comp'
-
-elaborate :: Comp n (Expr n) -> Either String (Elaborated n)
-elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+elaborate :: FieldType -> Comp Expr -> Either String Elaborated
+elaborate fieldType prog = do
+  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty fieldType) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
-allocVar :: Comp n Int
+allocVar :: Comp Int
 allocVar = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = succ index})
   return index
 
-assignNum :: VarRef -> Expr n -> Comp n ()
+assignNum :: VarRef -> Expr -> Comp ()
 assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
 
-assignBool :: VarRef -> Expr n -> Comp n ()
+assignBool :: VarRef -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}
 
 -- collect free variables of an expression
-freeVars :: Expr n -> IntSet
+freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
   Var (NumVar n) -> IntSet.singleton n
@@ -286,3 +347,17 @@ freeVars expr = case expr of
   IfThenElse x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x
+
+--------------------------------------------------------------------------------
+
+class AcceptedField n where
+  encodeFieldType :: [S.Expr kind n] -> FieldType 
+
+instance AcceptedField B64 where
+  encodeFieldType = const B64
+
+instance AcceptedField GF181 where
+  encodeFieldType = const GF181
+
+instance AcceptedField BN128 where
+  encodeFieldType = const BN128

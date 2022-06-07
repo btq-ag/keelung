@@ -14,15 +14,21 @@ import Data.Serialize (Serialize(..))
 --------------------------------------------------------------------------------
 
 -- | Common Galois fields
-type GF64 = Binary 18446744073709551643
+type B64 = Binary 18446744073709551643
 
 type GF181 = Prime 1552511030102430251236801561344621993261920897571225601
 
-instance Serialize GF64 where
+type BN128 = Prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+instance Serialize B64 where
   put = put . toInteger
   get = fromInteger <$> get
 
 instance Serialize GF181 where
+  put = put . toInteger
+  get = fromInteger <$> get
+
+instance Serialize BN128 where
   put = put . toInteger
   get = fromInteger <$> get
 
