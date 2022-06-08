@@ -59,18 +59,18 @@ elaborate prog = do
 --   (_, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
 --   return $ Elaborated Nothing comp'
 
-elaborateAndFlatten :: (Integral n, Typeable kind, C.AcceptedField n) => Comp n (Expr kind n) -> Either String C.Elaborated
+elaborateAndFlatten :: (Integral n, Typeable kind, AcceptedField n) => Comp n (Expr kind n) -> Either String C.Elaborated
 elaborateAndFlatten prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ flatten $ Elaborated expr comp'
 
-generateAs :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => String -> Comp n (Expr kind n) -> IO ()
+generateAs :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => String -> Comp n (Expr kind n) -> IO ()
 generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
 
-compile :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => Comp n (Expr kind n) -> IO ()
+compile :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> IO ()
 compile prog = wrapper "toCS" (elaborateAndFlatten prog)
 
-compileAsR1CS :: (Serialize n, Typeable kind, Integral n, C.AcceptedField n) => Comp n (Expr kind n) -> IO ()
+compileAsR1CS :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> IO ()
 compileAsR1CS prog = wrapper "toR1CS" (elaborateAndFlatten prog)
 
 -- instance Elaborable kind where

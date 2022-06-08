@@ -16,7 +16,7 @@ import Data.Serialize
 import Data.Typeable
 import GHC.Generics (Generic)
 import Keelung.Error
-import Keelung.Field (B64, BN128, GF181)
+import Keelung.Field
 import qualified Keelung.Monad as S
 import Keelung.Syntax (Addr, Heap, Var)
 import qualified Keelung.Syntax as S
@@ -161,12 +161,6 @@ instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
 
 instance Serialize Expr
 
-data FieldType
-  = B64 -- Binary field of 64 bits
-  | GF181 -- Prime field of order 181
-  | BN128 -- Barreto-Naehrig
-  deriving (Generic, Eq, Show)
-
 instance Serialize FieldType
 
 data Elaborated = Elaborated
@@ -254,6 +248,8 @@ instance Show Computation where
       ++ "\n\
          \}"
 
+
+
 instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation where
   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
     Computation
@@ -264,43 +260,10 @@ instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation 
       (map flatten asgns)
       (map flatten bsgns)
       (map flatten asgns')
-      (encodeFieldType asgns')
-
--- instance Flatten (S.Computation B64) Computation where
---   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
---     Computation
---       nextVar
---       nextAddr
---       inputVars
---       heap
---       (map flatten asgns)
---       (map flatten bsgns)
---       (map flatten asgns')
---       GF181
-
--- instance Flatten (S.Computation GF181) Computation where
---   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
---     Computation
---       nextVar
---       nextAddr
---       inputVars
---       heap
---       (map flatten asgns)
---       (map flatten bsgns)
---       (map flatten asgns')
---       GF181
-
--- instance Flatten (S.Computation BN128) Computation where
---   flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
---     Computation
---       nextVar
---       nextAddr
---       inputVars
---       heap
---       (map flatten asgns)
---       (map flatten bsgns)
---       (map flatten asgns')
---       BN128
+      (encodeFieldType $ toProxy asgns')
+    where 
+      toProxy :: [S.Expr kind n] -> Proxy n
+      toProxy = const Proxy 
 
 instance Serialize Computation
 
@@ -347,17 +310,3 @@ freeVars expr = case expr of
   IfThenElse x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x
-
---------------------------------------------------------------------------------
-
-class AcceptedField n where
-  encodeFieldType :: [S.Expr kind n] -> FieldType 
-
-instance AcceptedField B64 where
-  encodeFieldType = const B64
-
-instance AcceptedField GF181 where
-  encodeFieldType = const GF181
-
-instance AcceptedField BN128 where
-  encodeFieldType = const BN128

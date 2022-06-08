@@ -2,6 +2,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Field where
 
@@ -10,6 +12,7 @@ import Data.Field (Field)
 import Data.Field.Galois (Binary, Prime)
 import Data.Semiring (Ring, Semiring)
 import Data.Serialize (Serialize(..))
+import GHC.Generics
 
 --------------------------------------------------------------------------------
 
@@ -61,3 +64,32 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (N n) where
      in if coeff >= halfway
           then show (negate (toInteger (maxBound - coeff) + 1))
           else show (toInteger coeff)
+
+
+--------------------------------------------------------------------------------
+
+-- | Field types provided by the compiler 
+data FieldType
+  = B64 -- Binary field of 64 bits
+  | GF181 -- Prime field of order 181
+  | BN128 -- Barreto-Naehrig
+  deriving (Generic, Eq, Show)
+
+-- | Typeclass for reflecting the field type 
+class AcceptedField n where
+  encodeFieldType :: forall proxy. proxy n -> FieldType 
+
+instance AcceptedField B64 where
+  encodeFieldType = const B64
+
+instance AcceptedField GF181 where
+  encodeFieldType = const GF181
+
+instance AcceptedField BN128 where
+  encodeFieldType = const BN128
+
+-- | Restore the field type from an Integer
+realizeAs ::(AcceptedField n, Num n) => FieldType -> Integer -> n 
+realizeAs B64 n = fromInteger n
+realizeAs GF181 n = fromInteger n
+realizeAs BN128 n = fromInteger n
