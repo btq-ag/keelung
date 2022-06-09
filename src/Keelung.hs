@@ -23,7 +23,6 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
--- import Keelung.Syntax.Unkinded (flatten)
 import Keelung.Syntax.Concrete (flatten)
 import qualified Keelung.Syntax.Concrete as C
 import System.IO.Error

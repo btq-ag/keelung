@@ -35,10 +35,10 @@ assertArrayToBe42 = do
   return unit
 
 -- | A program that outputs the square of its input
--- square :: Comp GF181 (Expr 'Num GF181)
--- square = do
---   x <- inputVar
---   return $ Var x * Var x
+square :: Comp GF181 (Expr 'Num GF181)
+square = do
+  x <- inputVar
+  return $ Var x * Var x
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output (hence 'return unit')
