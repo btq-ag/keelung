@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Keelung.Field where
 
@@ -11,7 +11,7 @@ import Data.Euclidean (Euclidean, GcdDomain)
 import Data.Field (Field)
 import Data.Field.Galois (Binary, Prime)
 import Data.Semiring (Ring, Semiring)
-import Data.Serialize (Serialize(..))
+import Data.Serialize (Serialize (..))
 import GHC.Generics
 
 --------------------------------------------------------------------------------
@@ -57,6 +57,18 @@ deriving instance Semiring n => Semiring (N n)
 deriving instance Fractional n => Fractional (N n)
 
 deriving instance Num n => Num (N n)
+deriving instance Enum n => Enum (N n)
+deriving instance Real n => Real (N n)
+
+instance (Integral n, Bounded n, Fractional n) => Integral (N n) where 
+  quotRem n m = (N q, N r)
+    where
+      (q, r) = quotRem (unN n) (unN m)
+  toInteger (N x) =  
+    let halfway = maxBound / 2
+     in if x >= halfway
+          then negate (toInteger (maxBound - x) + 1)
+          else toInteger x
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (N n) where
   show (N coeff) =
@@ -65,19 +77,18 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (N n) where
           then show (negate (toInteger (maxBound - coeff) + 1))
           else show (toInteger coeff)
 
-
 --------------------------------------------------------------------------------
 
--- | Field types provided by the compiler 
+-- | Field types provided by the compiler
 data FieldType
   = B64 -- Binary field of 64 bits
   | GF181 -- Prime field of order 181
   | BN128 -- Barreto-Naehrig
   deriving (Generic, Eq, Show)
 
--- | Typeclass for reflecting the field type 
+-- | Typeclass for reflecting the field type
 class AcceptedField n where
-  encodeFieldType :: forall proxy. proxy n -> FieldType 
+  encodeFieldType :: forall proxy. proxy n -> FieldType
 
 instance AcceptedField B64 where
   encodeFieldType = const B64
@@ -89,7 +100,14 @@ instance AcceptedField BN128 where
   encodeFieldType = const BN128
 
 -- | Restore the field type from an Integer
-realizeAs ::(AcceptedField n, Num n) => FieldType -> Integer -> n 
+realizeAs :: Num n => FieldType -> Integer -> n
 realizeAs B64 n = fromInteger n
 realizeAs GF181 n = fromInteger n
 realizeAs BN128 n = fromInteger n
+
+-- | Utility function for normalizing an Integer as some field element
+-- the number will be negated if it is on the "upper half" of the field
+normalize :: FieldType -> Integer -> Integer
+normalize B64 n = toInteger (N (fromIntegral n :: B64))
+normalize GF181 n = toInteger (N (fromIntegral n :: GF181))
+normalize BN128 n = toInteger (N (fromIntegral n :: BN128))
