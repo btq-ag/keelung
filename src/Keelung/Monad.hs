@@ -11,7 +11,8 @@ module Keelung.Monad
     Assignment (..),
 
     -- * Variable
-    allocVar,
+
+    -- allocVar,
 
     -- * Array
     allocArray,
@@ -23,6 +24,8 @@ module Keelung.Monad
 
     -- * Input Variable & Array
     inputVar,
+    inputVarNum,
+    inputVarBool,
     inputArray,
     inputArray2,
     inputArray3,
@@ -30,6 +33,9 @@ module Keelung.Monad
     -- * Statements
     ifThenElse,
     reduce,
+    loop,
+    sum',
+    product',
 
     -- * Assertion
     assert,
@@ -52,6 +58,7 @@ import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
+import Prelude hiding (product, sum)
 
 --------------------------------------------------------------------------------
 
@@ -158,6 +165,14 @@ inputVar = do
   var <- allocVar
   markVarAsInput var
   return $ Variable var
+
+-- | Requests a fresh Num input variable
+inputVarNum :: Comp n (Ref ('V 'Num))
+inputVarNum = inputVar
+
+-- | Requests a fresh Bool input variable
+inputVarBool :: Comp n (Ref ('V 'Bool))
+inputVarBool = inputVar
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
@@ -314,8 +329,42 @@ ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n
 ifThenElse p x y = IfThenElse p <$> x <*> y
 
 -- | An alternative to 'foldM'
-reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
-reduce a xs f = foldM f a xs
+-- reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
+-- reduce a xs f = foldM f a xs
+
+-- | For aggregating some result of an array
+reduce ::
+  Ref ('A ('V kind)) ->
+  Int ->
+  a ->
+  (a -> Ref ('V kind) -> Comp n a) ->
+  Comp n a
+reduce xs len e f = foldM g e [0 .. pred len]
+  where
+    g acc i = do
+      x <- access xs i
+      f acc x
+
+-- | For iterating through an array
+loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
+loop xs len f = reduce xs len () $ \_acc x -> do
+  _ <- f x
+  return ()
+
+-- | For iterating through an array of array
+-- TODO: merge this with 'loop'
+-- loopArr :: GaloisField n => Ref ('A ('A ref)) -> Int -> (Ref ('A ref) -> Comp n (Expr kind n)) -> Comp n ()
+-- loopArr xs len f = forM_ [0 .. pred len] $ \i -> do
+--   x <- slice i xs
+--   f x
+
+sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
+sum' xs len = reduce xs len 0 $ \acc x -> do
+  return $ acc + Var x
+
+product' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
+product' xs len = reduce xs len 1 $ \acc x -> do
+  return $ acc * Var x
 
 --------------------------------------------------------------------------------
 
@@ -329,3 +378,5 @@ assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
   a <- access xs i
   b <- access ys i
   assert (Var a `equal` Var b)
+
+--------------------------------------------------------------------------------
