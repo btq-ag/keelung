@@ -19,7 +19,6 @@ module Keelung.Monad
     access,
     access2,
     access3,
-    slice,
     update,
 
     -- * Input Variable & Array
@@ -33,7 +32,9 @@ module Keelung.Monad
     -- * Statements
     ifThenElse,
     reduce,
-    loop,
+    reducei,
+    -- loop,s
+    loopi,
     sum',
     product',
 
@@ -223,21 +224,25 @@ inputArray3 sizeM sizeN sizeO = do
 
 --------------------------------------------------------------------------------
 
--- | "Slice" an array from a higher dimension array
-slice :: Int -> Ref ('A ('A ty)) -> Comp n (Ref ('A ty))
-slice i (Array addr) = Array <$> readHeap (addr, i)
+-- | Typeclass for retrieving the element of an array
+-- The reason why we need a typeclass for this is that
+-- the element may be a variable ('V) or another array ('A)
+class Accessible a where
+  access :: Int -> Ref ('A a) -> Comp n (Ref a)
 
--- | Access a variable from a 1-D array
-access :: Ref ('A ('V ty)) -> Int -> Comp n (Ref ('V ty))
-access (Array addr) i = Variable <$> readHeap (addr, i)
+instance Accessible ('A ref) where
+  access i (Array addr) = Array <$> readHeap (addr, i)
+
+instance Accessible ('V kind) where
+  access i (Array addr) = Variable <$> readHeap (addr, i)
 
 -- | Access a variable from a 2-D array
-access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> Comp n (Ref ('V ty))
-access2 addr (i, j) = slice i addr >>= flip access j
+access2 :: (Int, Int) -> Ref ('A ('A ('V ty))) -> Comp n (Ref ('V ty))
+access2 (i, j) addr = access i addr >>= access j
 
 -- | Access a variable from a 3-D array
-access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Comp n (Ref ('V ty))
-access3 addr (i, j, k) = slice i addr >>= slice j >>= flip access k
+access3 :: (Int, Int, Int) -> Ref ('A ('A ('A ('V ty)))) -> Comp n (Ref ('V ty))
+access3 (i, j, k) addr = access i addr >>= access j >>= access k
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Referable ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
@@ -329,26 +334,47 @@ ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n
 ifThenElse p x y = IfThenElse p <$> x <*> y
 
 -- | An alternative to 'foldM'
--- reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
--- reduce a xs f = foldM f a xs
+reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
+reduce a xs f = foldM f a xs
+
+-- reduce ::
+--   Ref ('A ('V kind)) ->
+--   Int ->
+--   a ->
+--   (a -> Ref ('V kind) -> Comp n a) ->
+--   Comp n a
+-- reduce xs len e f = reducei xs len e (const f)
 
 -- | For aggregating some result of an array
-reduce ::
+--   the supplied function will be given
+--      1. the current index
+--      1. the current accumulator
+--      3. the current element
+reducei ::
   Ref ('A ('V kind)) ->
   Int ->
   a ->
-  (a -> Ref ('V kind) -> Comp n a) ->
+  (Int -> a -> Ref ('V kind) -> Comp n a) ->
   Comp n a
-reduce xs len e f = foldM g e [0 .. pred len]
-  where
-    g acc i = do
-      x <- access xs i
-      f acc x
+reducei xs len e f =
+  foldM
+    ( \acc i -> do
+        x <- access i xs
+        f i acc x
+    )
+    e
+    [0 .. pred len]
 
 -- | For iterating through an array
-loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
-loop xs len f = reduce xs len () $ \_acc x -> do
-  _ <- f x
+-- loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
+-- loop xs len f = reduce xs len () $ \_acc x -> do
+--   _ <- f x
+--   return ()
+
+-- | For iterating through an array
+loopi :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Int -> Ref ('V kind) -> Comp n ()) -> Comp n ()
+loopi xs len f = reducei xs len () $ \i _acc x -> do
+  _ <- f i x
   return ()
 
 -- | For iterating through an array of array
@@ -357,13 +383,12 @@ loop xs len f = reduce xs len () $ \_acc x -> do
 -- loopArr xs len f = forM_ [0 .. pred len] $ \i -> do
 --   x <- slice i xs
 --   f x
-
 sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
-sum' xs len = reduce xs len 0 $ \acc x -> do
+sum' xs len = reducei xs len 0 $ \_ acc x -> do
   return $ acc + Var x
 
 product' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
-product' xs len = reduce xs len 1 $ \acc x -> do
+product' xs len = reducei xs len 1 $ \_ acc x -> do
   return $ acc * Var x
 
 --------------------------------------------------------------------------------
@@ -375,8 +400,8 @@ assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 -- | Assert that two expressions are equal
 assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
 assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
-  a <- access xs i
-  b <- access ys i
+  a <- access i xs
+  b <- access i ys
   assert (Var a `equal` Var b)
 
 --------------------------------------------------------------------------------
