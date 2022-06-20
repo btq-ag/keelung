@@ -1,10 +1,19 @@
 {-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 
 module Main where
 
 import Control.Monad (forM_)
 import Keelung
 
+-- | Outputs whether number is given.
+echo :: Comp GF181 (Expr 'Num GF181)
+echo = do
+    x <- inputVar  -- request for an input and bind it to 'x'
+    return $ Var x  -- return 'x'
+
+    
 -- |
 main :: IO ()
 main = do
