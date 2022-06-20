@@ -11,7 +11,7 @@ module Keelung
     generateAs,
     compile,
     compileAsR1CS,
-    interpret
+    interpret,
   )
 where
 
@@ -27,19 +27,42 @@ import Keelung.Syntax
 import Keelung.Syntax.Concrete (flatten)
 import qualified Keelung.Syntax.Concrete as C
 import System.IO.Error
+import qualified System.Info
 import qualified System.Process as Process
 
 -- | Internal function for invoking the Keelung compiler on PATH
 wrapper :: Serialize a => [String] -> a -> IO ()
-wrapper commands payload =
-  catchIOError
-    (Process.readProcess "keelungc" commands (BSC.unpack $ encode payload) >>= putStrLn)
-    handleError
+wrapper args' payload = do
+  result <- findKeelungc
+  case result of
+    Nothing -> putStrLn "Cannot find the Keelung compiler"
+    Just (cmd, args) -> do
+      print ("PATH", cmd, args ++ args')
+      Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload) >>= putStrLn
   where
-    handleError :: IOError -> IO ()
-    handleError e = do
-      putStrLn "Got this error when trying to invoke \"keelungc\" the Keelung compiler, please make sure that you have the compiler installed: "
-      putStrLn $ "  " ++ show e
+    findKeelungc :: IO (Maybe (String, [String]))
+    findKeelungc = do
+      keelungcExists <- checkCmd "keelungc"
+      if keelungcExists
+        then return $ Just ("keelungc", [])
+        else do
+          keelungExists <- checkCmd "docker"
+          if keelungExists
+            then return $ Just ("docker", ["run", "banacorn/keelung"])
+            else return Nothing
+
+    -- | decide the command for locating executables
+    whichCmd :: String
+    whichCmd = case System.Info.os of
+      "mingw32" -> "where" -- Windows uses "where"
+      _ -> "which" -- Unix uses "which"
+
+    -- | check if a command exists
+    checkCmd :: String -> IO Bool
+    checkCmd cmd =
+      catchIOError
+        (Process.readProcess whichCmd [cmd] mempty >> return True)
+        (\_ -> return False)
 
 elaborate :: Comp n (Expr kind n) -> Either String (Elaborated kind n)
 elaborate prog = do
