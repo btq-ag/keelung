@@ -11,6 +11,7 @@ module Keelung
     generateAs,
     compile,
     compileAsR1CS,
+    interpret
   )
 where
 
@@ -29,18 +30,16 @@ import System.IO.Error
 import qualified System.Process as Process
 
 -- | Internal function for invoking the Keelung compiler on PATH
-wrapper :: String -> Either String C.Elaborated -> IO ()
-wrapper command elaborated =
+wrapper :: Serialize a => [String] -> a -> IO ()
+wrapper commands payload =
   catchIOError
-    (Process.readProcess "keelungc" [command] (BSC.unpack $ encode elaborated) >>= putStrLn)
+    (Process.readProcess "keelungc" commands (BSC.unpack $ encode payload) >>= putStrLn)
     handleError
-
-  where 
+  where
     handleError :: IOError -> IO ()
-    handleError e = do 
-      putStrLn "Got this error when trying to invoke \"keelungc\" the Keelung compiler, please make sure that you have the compiler installed: " 
-      putStrLn $ "  " ++ show e 
-
+    handleError e = do
+      putStrLn "Got this error when trying to invoke \"keelungc\" the Keelung compiler, please make sure that you have the compiler installed: "
+      putStrLn $ "  " ++ show e
 
 elaborate :: Comp n (Expr kind n) -> Either String (Elaborated kind n)
 elaborate prog = do
@@ -56,7 +55,10 @@ generateAs :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Strin
 generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
 
 compile :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> IO ()
-compile prog = wrapper "toCS" (elaborateAndFlatten prog)
+compile prog = wrapper ["protocol", "toCS"] (elaborateAndFlatten prog)
 
 compileAsR1CS :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> IO ()
-compileAsR1CS prog = wrapper "toR1CS" (elaborateAndFlatten prog)
+compileAsR1CS prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
+
+interpret :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> [n] -> IO ()
+interpret prog inputs = wrapper ["protocol", "interpret"] (elaborateAndFlatten prog, map toInteger inputs)
