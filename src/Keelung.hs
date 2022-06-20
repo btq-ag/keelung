@@ -31,13 +31,12 @@ import qualified System.Info
 import qualified System.Process as Process
 
 -- | Internal function for invoking the Keelung compiler on PATH
-wrapper :: Serialize a => [String] -> a -> IO ()
+wrapper :: Serialize a => [String] -> Either String a -> IO ()
 wrapper args' payload = do
   result <- findKeelungc
   case result of
     Nothing -> putStrLn "Cannot find the Keelung compiler"
     Just (cmd, args) -> do
-      print ("PATH", cmd, args ++ args')
       Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload) >>= putStrLn
   where
     findKeelungc :: IO (Maybe (String, [String]))
@@ -46,18 +45,21 @@ wrapper args' payload = do
       if keelungcExists
         then return $ Just ("keelungc", [])
         else do
-          keelungExists <- checkCmd "docker"
-          if keelungExists
-            then return $ Just ("docker", ["run", "banacorn/keelung"])
+          dockerExists <- checkCmd "docker"
+          if dockerExists
+            then -- insert "--platform=linux/amd64" when we are not on a x86 machine
+            case System.Info.arch of
+              "x86_64" -> return $ Just ("docker", ["run", "-i", "banacorn/keelung"])
+              _ -> return $ Just ("docker", ["run", "-i", "--platform=linux/amd64", "banacorn/keelung"])
             else return Nothing
 
-    -- | decide the command for locating executables
+    -- decide the command for locating executables
     whichCmd :: String
     whichCmd = case System.Info.os of
       "mingw32" -> "where" -- Windows uses "where"
       _ -> "which" -- Unix uses "which"
 
-    -- | check if a command exists
+    -- check if a command exists
     checkCmd :: String -> IO Bool
     checkCmd cmd =
       catchIOError
@@ -84,4 +86,6 @@ compileAsR1CS :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Co
 compileAsR1CS prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
 
 interpret :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> [n] -> IO ()
-interpret prog inputs = wrapper ["protocol", "interpret"] (elaborateAndFlatten prog, map toInteger inputs)
+interpret prog inputs = wrapper ["protocol", "interpret"] $ case elaborateAndFlatten prog of
+  Left err -> Left err
+  Right elab -> Right (elab, map toInteger inputs)
