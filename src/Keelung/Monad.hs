@@ -206,7 +206,7 @@ inputArray2 sizeM sizeN = do
   innerArrays <- replicateM sizeM (inputArray sizeN)
   -- collect references of these arrays
   vars <- forM innerArrays $ \array -> do
-    case array of Array addr -> return addr
+    case array of Array _ addr -> return addr
   -- and allocate a new array with these references
   allocateArrayWithVars $ IntSet.fromList vars
 
@@ -218,7 +218,7 @@ inputArray3 sizeM sizeN sizeO = do
   innerArrays <- replicateM sizeM (inputArray2 sizeN sizeO)
   -- collect references of these arrays
   vars <- forM innerArrays $ \array -> do
-    case array of Array addr -> return addr
+    case array of Array _ addr -> return addr
   -- and allocate a new array with these references
   allocateArrayWithVars $ IntSet.fromList vars
 
@@ -231,10 +231,18 @@ class Accessible a where
   access :: Int -> Ref ('A a) -> Comp n (Ref a)
 
 instance Accessible ('A ref) where
-  access i (Array addr) = Array <$> readHeap (addr, i)
+  access i (Array len addr) = Array len <$> readHeap (addr, i)
+
+-- if 0 <= i && i < len
+--   then Array len <$> readHeap (addr, i)
+--   else throwError $ IndexOutOfBoundsError i len
 
 instance Accessible ('V kind) where
-  access i (Array addr) = Variable <$> readHeap (addr, i)
+  access i (Array _len addr) = Variable <$> readHeap (addr, i)
+
+-- if 0 <= i && i < len
+--   then Variable <$> readHeap (addr, i)
+--   else throwError $ IndexOutOfBoundsError i len
 
 -- | Access a variable from a 2-D array
 access2 :: (Int, Int) -> Ref ('A ('A ('V ty))) -> Comp n (Ref ('V ty))
@@ -246,8 +254,8 @@ access3 (i, j, k) addr = access i addr >>= access j >>= access k
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Referable ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
-update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
-update (Array addr) i expr = do
+update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
+update (Array _ addr) i expr = do
   ref <- allocVar
   writeHeap addr [(i, ref)]
   -- associate 'ref' with the expression
@@ -269,7 +277,7 @@ allocateArrayWithVars vars = do
   let size = IntSet.size vars
   addr <- freshAddr
   writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
-  return $ Array addr
+  return $ Array size addr
   where
     freshAddr :: Comp n Addr
     freshAddr = do
@@ -352,18 +360,20 @@ reduce a xs f = foldM f a xs
 --      3. the current element
 reducei ::
   Ref ('A ('V kind)) ->
-  Int ->
   a ->
   (Int -> a -> Ref ('V kind) -> Comp n a) ->
   Comp n a
-reducei xs len e f =
+reducei xs e f =
   foldM
     ( \acc i -> do
         x <- access i xs
         f i acc x
     )
     e
-    [0 .. pred len]
+    [0 .. pred (lengthOf xs)]
+
+lengthOf :: Ref ('A kind) -> Int 
+lengthOf (Array n _) = n
 
 -- | For iterating through an array
 -- loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
@@ -372,8 +382,8 @@ reducei xs len e f =
 --   return ()
 
 -- | For iterating through an array
-loopi :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Int -> Ref ('V kind) -> Comp n ()) -> Comp n ()
-loopi xs len f = reducei xs len () $ \i _acc x -> do
+loopi :: GaloisField n => Ref ('A ('V kind)) -> (Int -> Ref ('V kind) -> Comp n ()) -> Comp n ()
+loopi xs f = reducei xs () $ \i _acc x -> do
   _ <- f i x
   return ()
 
@@ -383,12 +393,12 @@ loopi xs len f = reducei xs len () $ \i _acc x -> do
 -- loopArr xs len f = forM_ [0 .. pred len] $ \i -> do
 --   x <- slice i xs
 --   f x
-sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
-sum' xs len = reducei xs len 0 $ \_ acc x -> do
+sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Expr 'Num n)
+sum' xs = reducei xs 0 $ \_ acc x -> do
   return $ acc + Var x
 
-product' :: GaloisField n => Ref ('A ('V 'Num)) -> Int -> Comp n (Expr 'Num n)
-product' xs len = reducei xs len 1 $ \_ acc x -> do
+product' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Expr 'Num n)
+product' xs = reducei xs 1 $ \_ acc x -> do
   return $ acc * Var x
 
 --------------------------------------------------------------------------------

@@ -108,14 +108,14 @@ loop3 :: Comp GF181 (Expr 'Unit GF181)
 loop3 = do
   xs <- inputArray 4
   -- iterate through the array and assert them all to be 0
-  loopi xs 4 $ \_ x -> do
+  loopi xs $ \_ x -> do
     assert (Var x `Eq` 0)
 
   return unit
 
-reduce1 :: Comp GF181 (Expr 'Num GF181)
-reduce1 = do
-  xs <- inputArray 4
-  -- aggregate all variables in xs
-  reducei xs 4 8 $ \_ acc x -> do
-    return (acc + Var x)
+-- reduce1 :: Comp GF181 (Expr 'Num GF181)
+-- reduce1 = do
+--   xs <- inputArray 4
+--   -- aggregate all variables in xs
+--   reducei xs 4 8 $ \_ acc x -> do
+--     return (acc + Var x)

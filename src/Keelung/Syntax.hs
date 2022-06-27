@@ -92,15 +92,15 @@ instance Serialize n => Serialize (Value 'Unit n) where
 -- | RefKind values are indexed by 'RefKind'
 data Ref :: RefKind -> Type where
   Variable :: Var -> Ref ('V val) -- RefKinds to variables
-  Array :: Addr -> Ref ('A val) -- RefKinds to arrays
+  Array :: Int -> Addr -> Ref ('A val) -- RefKinds to arrays
 
 instance Show (Ref ref) where
   show (Variable i) = "$" <> show i
-  show (Array addr) = "@" <> show addr
+  show (Array _ addr) = "@" <> show addr
 
 instance Eq (Ref ref) where
   Variable i == Variable j = i == j
-  Array addr == Array addr' = addr == addr'
+  Array _ addr == Array _ addr' = addr == addr'
 
 instance Serialize (Ref ('V val)) where
   put (Variable i) = putWord8 0 >> put i
@@ -111,11 +111,11 @@ instance Serialize (Ref ('V val)) where
       _ -> error "Invalid ref tag"
 
 instance Serialize (Ref ('A val)) where
-  put (Array addr) = putWord8 1 >> put addr
+  put (Array len addr) = putWord8 1 >> put len >> put addr
   get = do
     tag <- getWord8
     case tag of
-      1 -> Array <$> get
+      1 -> Array <$> get <*> get
       _ -> error "Invalid ref tag"
 
 --------------------------------------------------------------------------------
@@ -142,9 +142,9 @@ data Expr :: ValKind -> Type -> Type where
   -- Conversion between Booleans and Field numbers
   ToBool :: Expr 'Num n -> Expr 'Bool n
   ToNum :: Expr 'Bool n -> Expr 'Num n
-  
+
 instance Serialize n => Serialize (Expr 'Num n) where
-  put expr = case expr of 
+  put expr = case expr of
     Val val -> putWord8 0 >> put val
     Var ref -> putWord8 1 >> put ref
     Add x y -> putWord8 2 >> put x >> put y
@@ -167,7 +167,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
       _ -> error $ "Invalid expr tag 1 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Bool n) where
-  put expr = case expr of 
+  put expr = case expr of
     Val val -> putWord8 0 >> put val
     Var ref -> putWord8 1 >> put ref
     Eq x y -> putWord8 6 >> put x >> put y
