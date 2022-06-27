@@ -99,7 +99,7 @@ data Expr
   | Or Expr Expr
   | Xor Expr Expr
   | BEq Expr Expr
-  | IfThenElse Expr Expr Expr
+  | If Expr Expr Expr
   | ToBool Expr
   | ToNum Expr
   deriving (Generic, Eq)
@@ -117,7 +117,7 @@ sizeOfExpr expr = case expr of
   Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
   BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+  If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
   ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
 
@@ -139,7 +139,7 @@ instance Show Expr where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
@@ -155,7 +155,7 @@ instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
   flatten (S.Or x y) = Or (flatten x) (flatten y)
   flatten (S.Xor x y) = Xor (flatten x) (flatten y)
   flatten (S.BEq x y) = BEq (flatten x) (flatten y)
-  flatten (S.IfThenElse c t e) = IfThenElse (flatten c) (flatten t) (flatten e)
+  flatten (S.If c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.ToBool x) = ToBool (flatten x)
   flatten (S.ToNum x) = ToNum (flatten x)
 
@@ -307,6 +307,6 @@ freeVars expr = case expr of
   Or x y -> freeVars x <> freeVars y
   Xor x y -> freeVars x <> freeVars y
   BEq x y -> freeVars x <> freeVars y
-  IfThenElse x y z -> freeVars x <> freeVars y <> freeVars z
+  If x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x

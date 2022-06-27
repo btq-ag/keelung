@@ -331,7 +331,7 @@ instance Comparable 'Bool where
 
 -- | Helper function for constructing the if...then...else expression
 ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n (Expr ty n)
-ifThenElse p x y = IfThenElse p <$> x <*> y
+ifThenElse p x y = If p <$> x <*> y
 
 -- | An alternative to 'foldM'
 reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)

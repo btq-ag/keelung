@@ -138,7 +138,7 @@ data Expr :: ValKind -> Type -> Type where
   Xor :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   BEq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   -- if...then...else clause
-  IfThenElse :: Expr 'Bool n -> Expr ty n -> Expr ty n -> Expr ty n
+  If :: Expr 'Bool n -> Expr val n -> Expr val n -> Expr val n
   -- Conversion between Booleans and Field numbers
   ToBool :: Expr 'Num n -> Expr 'Bool n
   ToNum :: Expr 'Bool n -> Expr 'Num n
@@ -151,7 +151,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
     Sub x y -> putWord8 3 >> put x >> put y
     Mul x y -> putWord8 4 >> put x >> put y
     Div x y -> putWord8 5 >> put x >> put y
-    IfThenElse x y z -> putWord8 11 >> put x >> put y >> put z
+    If x y z -> putWord8 11 >> put x >> put y >> put z
     ToNum x -> putWord8 13 >> put x
   get = do
     tag <- getWord8
@@ -162,7 +162,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
       3 -> Sub <$> get <*> get
       4 -> Mul <$> get <*> get
       5 -> Div <$> get <*> get
-      11 -> IfThenElse <$> get <*> get <*> get
+      11 -> If <$> get <*> get <*> get
       13 -> ToNum <$> get
       _ -> error $ "Invalid expr tag 1 " ++ show tag
 
@@ -175,7 +175,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
     Or x y -> putWord8 8 >> put x >> put y
     Xor x y -> putWord8 9 >> put x >> put y
     BEq x y -> putWord8 10 >> put x >> put y
-    IfThenElse x y z -> putWord8 11 >> put x >> put y >> put z
+    If x y z -> putWord8 11 >> put x >> put y >> put z
     ToBool x -> putWord8 12 >> put x
   get = do
     tag <- getWord8
@@ -187,14 +187,14 @@ instance Serialize n => Serialize (Expr 'Bool n) where
       8 -> Or <$> get <*> get
       9 -> Xor <$> get <*> get
       10 -> BEq <$> get <*> get
-      11 -> IfThenElse <$> get <*> get <*> get
+      11 -> If <$> get <*> get <*> get
       12 -> ToBool <$> get
       _ -> error $ "Invalid expr tag 2 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Unit n) where
   put (Val val) = putWord8 0 >> put val
   put (Var ref) = putWord8 1 >> put ref
-  put (IfThenElse x y z) = putWord8 11 >> put x >> put y >> put z
+  put (If x y z) = putWord8 11 >> put x >> put y >> put z
   get = do
     tag <- getWord8
     case tag of
@@ -217,7 +217,7 @@ instance Functor (Expr ty) where
     Or x y -> Or (fmap f x) (fmap f y)
     Xor x y -> Xor (fmap f x) (fmap f y)
     BEq x y -> BEq (fmap f x) (fmap f y)
-    IfThenElse p x y -> IfThenElse (fmap f p) (fmap f x) (fmap f y)
+    If p x y -> If (fmap f p) (fmap f x) (fmap f y)
     ToBool x -> ToBool (fmap f x)
     ToNum x -> ToNum (fmap f x)
 
@@ -234,7 +234,7 @@ instance Show n => Show (Expr ty n) where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
@@ -251,7 +251,7 @@ instance Eq n => Eq (Expr ty n) where
     (Or x y, Or z w) -> x == z && y == w
     (Xor x y, Xor z w) -> x == z && y == w
     (BEq x y, BEq z w) -> x == z && y == w
-    (IfThenElse x y z, IfThenElse u v w) -> x == u && y == v && z == w
+    (If x y z, If u v w) -> x == u && y == v && z == w
     (ToBool x, ToBool y) -> x == y
     (ToNum x, ToNum y) -> x == y
     _ -> False
@@ -305,6 +305,17 @@ false = Val (Boolean False)
 unit :: Expr 'Unit n
 unit = Val UnitVal
 
--- | Helper function for negating a boolean expression
+-- | Helper function for not-`Eq`
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
-neq x y = IfThenElse (x `Eq` y) false true
+neq x y = If (x `Eq` y) false true
+
+-- | Helper function for not-`BEq`
+nbeq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+nbeq x y = If (x `BEq` y) false true
+
+-- | Helper function for negating a boolean expression
+neg :: Expr 'Bool n -> Expr 'Bool n
+neg x = true `Xor` x
+
+cond :: Expr 'Bool n -> Expr kind n -> Expr kind n -> Expr kind n
+cond = If

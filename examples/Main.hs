@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+-- {-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use <$>" #-}
 
 module Main where
@@ -10,10 +12,27 @@ import Keelung
 -- | Outputs whether number is given.
 echo :: Comp GF181 (Expr 'Num GF181)
 echo = do
-    x <- inputVar  -- request for an input and bind it to 'x'
-    return $ Var x  -- return 'x'
+  x <- inputVar -- request for an input and bind it to 'x'
+  return $ Var x -- return 'x'
 
-    
+-- | A program that expects 2 inputs and returns no output
+useless :: Comp GF181 (Expr 'Unit GF181)
+useless = do
+  _x <- inputVar -- request for an input and bind it to 'x'
+  _y <- inputVar -- request for an input and bind it to 'y'
+  return unit -- return nothing
+
+-- Formula: (0°C × 9/5) + 32 = 32°F
+tempConvert :: Comp GF181 (Expr 'Num GF181)
+tempConvert = do
+  toFahrenheit <- inputVar
+  degree <- inputVar
+  return $
+    If
+      (Var toFahrenheit)
+      (Var degree * 9 / 5 + 32)
+      (Var degree - 32 * 5 / 9)
+
 -- |
 main :: IO ()
 main = do
@@ -47,7 +66,7 @@ assertToBe42 :: Comp GF181 (Expr 'Unit GF181)
 assertToBe42 = do
   x <- inputVar
   assert (Var x `Eq` 42)
-  return unit 
+  return unit
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output (hence 'return unit')
@@ -58,24 +77,22 @@ assertSquare = do
   assert ((Var x * Var x) `Eq` Var y)
   -- return unit
 
---------------------------------------------------------------------------------
+  --------------------------------------------------------------------------------
 
+  -- loop1 :: Comp GF181 (Expr 'Unit GF181)
+  -- loop1 = do
+  --   xs <- allocArray 4
+  --   -- iterate through the array and assert them all to be 0
+  --   forM_ [0 .. 3] $ \i -> do
+  --     update xs i 43
+  --     x <- access xs i
+  --     assert (Var x `Eq` 42)
 
--- loop1 :: Comp GF181 (Expr 'Unit GF181)
--- loop1 = do
---   xs <- allocArray 4
---   -- iterate through the array and assert them all to be 0
---   forM_ [0 .. 3] $ \i -> do
---     update xs i 43
---     x <- access xs i 
---     assert (Var x `Eq` 42)
-  
   -- forM_ [0 .. 3] $ \i -> do
   --   update xs i 43
-    -- assert (Var x `Eq` 43)
+  -- assert (Var x `Eq` 43)
 
-  return unit 
-
+  return unit
 
 loop2 :: Comp GF181 (Expr 'Unit GF181)
 loop2 = do
@@ -85,21 +102,20 @@ loop2 = do
   forM_ [0 .. 3] $ \i -> do
     update ys i (Var x)
 
-  return unit 
+  return unit
 
 loop3 :: Comp GF181 (Expr 'Unit GF181)
 loop3 = do
   xs <- inputArray 4
   -- iterate through the array and assert them all to be 0
-  loopi xs 4 $ \_ x -> do 
+  loopi xs 4 $ \_ x -> do
     assert (Var x `Eq` 0)
-  
-  return unit 
+
+  return unit
 
 reduce1 :: Comp GF181 (Expr 'Num GF181)
 reduce1 = do
   xs <- inputArray 4
-  -- aggregate all variables in xs 
-  reducei xs 4 8 $ \_ acc x -> do 
+  -- aggregate all variables in xs
+  reducei xs 4 8 $ \_ acc x -> do
     return (acc + Var x)
-
