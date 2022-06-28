@@ -25,6 +25,8 @@ module Keelung.Monad
     update2,
     update3,
 
+    lengthOf,
+
     -- * Input Variable & Array
     inputVar,
     inputVarNum,
