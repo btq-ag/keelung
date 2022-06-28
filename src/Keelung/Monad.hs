@@ -16,10 +16,14 @@ module Keelung.Monad
 
     -- * Array
     allocArray,
+    allocArray2,
+    allocArray3,
     access,
     access2,
     access3,
     update,
+    update2,
+    update3,
 
     -- * Input Variable & Array
     inputVar,
@@ -179,7 +183,7 @@ inputVarBool = inputVar
 -- Array & Input Array
 --------------------------------------------------------------------------------
 
--- | Allocate a fresh array
+-- | Allocates a 1D-array of fresh variables
 allocArray :: Int -> Comp n (Ref ('A ty))
 allocArray 0 = throwError EmptyArrayError
 allocArray size = do
@@ -187,6 +191,35 @@ allocArray size = do
   vars <- newVars size
   -- allocate a new array and associate it's content with the new variables
   allocateArrayWithVars vars
+
+-- | Allocates a 2D-array of fresh variables
+allocArray2 :: Int -> Int -> Comp n (Ref ('A ('A ty)))
+allocArray2 0 _ = throwError EmptyArrayError
+allocArray2 _ 0 = throwError EmptyArrayError
+allocArray2 sizeM sizeN = do
+  -- allocate `sizeM` arrays each of size `sizeN`
+  innerArrays <- replicateM sizeM (allocArray sizeN)
+  -- collect references of these arrays
+  vars <- forM innerArrays $ \array -> do
+    case array of Array _ addr -> return addr
+  -- and allocate a new array with these references
+  allocateArrayWithVars $ IntSet.fromList vars
+
+-- | Allocates a 3D-array of fresh variables
+allocArray3 :: Int -> Int -> Int -> Comp n (Ref ('A ('A ty)))
+allocArray3 0 _ _ = throwError EmptyArrayError
+allocArray3 _ 0 _ = throwError EmptyArrayError
+allocArray3 _ _ 0 = throwError EmptyArrayError
+allocArray3 sizeM sizeN sizeO = do
+  -- allocate `sizeM` arrays each of size `sizeN * sizeO`
+  innerArrays <- replicateM sizeM (allocArray2 sizeN sizeO)
+  -- collect references of these arrays
+  vars <- forM innerArrays $ \array -> do
+    case array of Array _ addr -> return addr
+  -- and allocate a new array with these references
+  allocateArrayWithVars $ IntSet.fromList vars
+
+--------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
 inputArray :: Int -> Comp n (Ref ('A ty))
@@ -201,6 +234,7 @@ inputArray size = do
 -- | Requests a 2D-array of fresh input variables
 inputArray2 :: Int -> Int -> Comp n (Ref ('A ('A ty)))
 inputArray2 0 _ = throwError EmptyArrayError
+inputArray2 _ 0 = throwError EmptyArrayError
 inputArray2 sizeM sizeN = do
   -- allocate `sizeM` input arrays each of size `sizeN`
   innerArrays <- replicateM sizeM (inputArray sizeN)
@@ -213,6 +247,8 @@ inputArray2 sizeM sizeN = do
 -- | Requests a 3D-array of fresh input variables
 inputArray3 :: Int -> Int -> Int -> Comp n (Ref ('A ('A ('A ty))))
 inputArray3 0 _ _ = throwError EmptyArrayError
+inputArray3 _ 0 _ = throwError EmptyArrayError
+inputArray3 _ _ 0 = throwError EmptyArrayError
 inputArray3 sizeM sizeN sizeO = do
   -- allocate `sizeM` input arrays each of size `sizeN * sizeO`
   innerArrays <- replicateM sizeM (inputArray2 sizeN sizeO)
@@ -233,16 +269,8 @@ class Accessible a where
 instance Accessible ('A ref) where
   access i (Array len addr) = Array len <$> readHeap (addr, i)
 
--- if 0 <= i && i < len
---   then Array len <$> readHeap (addr, i)
---   else throwError $ IndexOutOfBoundsError i len
-
 instance Accessible ('V kind) where
   access i (Array _len addr) = Variable <$> readHeap (addr, i)
-
--- if 0 <= i && i < len
---   then Variable <$> readHeap (addr, i)
---   else throwError $ IndexOutOfBoundsError i len
 
 -- | Access a variable from a 2-D array
 access2 :: (Int, Int) -> Ref ('A ('A ('V ty))) -> Comp n (Ref ('V ty))
@@ -252,6 +280,8 @@ access2 (i, j) addr = access i addr >>= access j
 access3 :: (Int, Int, Int) -> Ref ('A ('A ('A ('V ty)))) -> Comp n (Ref ('V ty))
 access3 (i, j, k) addr = access i addr >>= access j >>= access k
 
+--------------------------------------------------------------------------------
+
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Referable ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
 update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
@@ -260,6 +290,18 @@ update (Array _ addr) i expr = do
   writeHeap addr [(i, ref)]
   -- associate 'ref' with the expression
   assign (Variable ref) expr
+
+-- | Update array 'addr' at position '(j, i)' to expression 'expr'
+update2 :: Referable ty => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr ty n -> Comp n ()
+update2 ref (j, i) expr = do 
+  ref' <- access i ref 
+  update ref' j expr
+
+-- | Update array 'addr' at position '(k, j, i)' to expression 'expr'
+update3 :: Referable ty => Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Expr ty n -> Comp n ()
+update3 ref (k, j, i) expr = do 
+  ref' <- access i ref >>= access j
+  update ref' k expr
 
 --------------------------------------------------------------------------------
 
