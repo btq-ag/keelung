@@ -119,3 +119,26 @@ loop3 = do
 --   -- aggregate all variables in xs
 --   reducei xs 4 8 $ \_ acc x -> do
 --     return (acc + Var x)
+
+--------------------------------------------------------------------------------
+
+loop1 :: Comp GF181 (Expr 'Unit GF181)
+loop1 = do
+  -- xs <- inputArray 2  :: Comp GF181 (Ref ('A ('V 'Num)))
+  -- ys <- inputArray 2  :: Comp GF181 (Ref ('A ('V 'Num)))
+  -- zs <- allocArray' [4, 5] :: Comp GF181 (Ref ('A ('V 'Num)))
+  -- ws <- expose zs >>= allocArray'
+
+
+  -- iterate through the array and assert them all to be 0
+  -- forM_ [0 .. 2] $ \_ -> do
+    -- update (xs :: Ref ('A ('V 'Num))) i 43
+    -- x <- access i xs
+    -- y <- access i ys
+    -- assert 
+
+    -- assertArrayEqual 2 xs zs  
+  -- assertArrayEqual 2 xs ws  
+  -- assertArrayEqual 2 ws ys  
+
+  return unit

@@ -10,12 +10,13 @@ module Keelung.Monad
     Elaborated (..),
     Assignment (..),
 
-    -- * Variable
-
-    -- allocVar,
+    -- * Experimental
+    allocArray',
+    expose,
 
     -- * Array
     allocArray,
+
     allocArray2,
     allocArray3,
     access,
@@ -184,6 +185,37 @@ inputVarBool = inputVar
 --------------------------------------------------------------------------------
 -- Array & Input Array
 --------------------------------------------------------------------------------
+
+-- | Allocates a 1D-array of fresh variables
+allocArray' :: Referable kind => [Expr kind n] -> Comp n (Ref ('A ('V kind)))
+allocArray' xs = do 
+  let size = length xs
+  when (size == 0) $ throwError EmptyArrayError
+  -- declare new variables
+  vars <- newVars size
+  -- allocate a new array and associate it's content with the new variables
+  array <- allocateArrayWithVars vars
+
+  forM_ (zip [0 .. ] xs) $ \(i, x) -> do 
+    update array i x 
+
+  return array 
+
+-- | Convert an array into a list of expressions 
+expose :: Ref ('A ('V kind)) -> Comp n [Expr kind n]
+expose (Array len addr) = do 
+  forM [0 .. len - 1] $ \i -> do 
+    Var . Variable <$> readHeap (addr, i)
+
+
+
+
+-- allocArray' 0 = throwError EmptyArrayError
+-- allocArray' size = do
+--   -- declare new variables
+--   vars <- newVars size
+--   -- allocate a new array and associate it's content with the new variables
+--   allocateArrayWithVars vars
 
 -- | Allocates a 1D-array of fresh variables
 allocArray :: Int -> Comp n (Ref ('A ty))
