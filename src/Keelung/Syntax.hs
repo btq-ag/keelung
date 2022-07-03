@@ -47,48 +47,6 @@ data RefKind
 
 --------------------------------------------------------------------------------
 
--- | Values are indexed by 'ValKind' and parameterised by some field
-data Value :: ValKind -> Type -> Type where
-  Number :: n -> Value 'Num n -- Field numbers
-  Boolean :: Bool -> Value 'Bool n -- Booleans
-  UnitVal :: Value 'Unit n -- Unit
-
-instance Show n => Show (Value ty n) where
-  show (Number n) = show n
-  show (Boolean b) = show b
-  show UnitVal = "unit"
-
-instance Eq n => Eq (Value ty n) where
-  Number n == Number m = n == m
-  Boolean b == Boolean c = b == c
-  UnitVal == UnitVal = True
-
-instance Serialize n => Serialize (Value 'Num n) where
-  put (Number n) = putWord8 0 >> put n
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> Number <$> get
-      _ -> error "Invalid value tag"
-
-instance Serialize n => Serialize (Value 'Bool n) where
-  put (Boolean n) = putWord8 1 >> put n
-  get = do
-    tag <- getWord8
-    case tag of
-      1 -> Boolean <$> get
-      _ -> error "Invalid value tag"
-
-instance Serialize n => Serialize (Value 'Unit n) where
-  put UnitVal = putWord8 2
-  get = do
-    tag <- getWord8
-    case tag of
-      2 -> pure UnitVal
-      _ -> error "Invalid value tag"
-
---------------------------------------------------------------------------------
-
 -- | RefKind values are indexed by 'RefKind'
 data Ref :: RefKind -> Type where
   Variable :: Var -> Ref ('V val) -- RefKinds to variables
@@ -123,7 +81,9 @@ instance Serialize (Ref ('A val)) where
 -- | Expressions are indexed by 'ValKind' and parameterised by some field
 data Expr :: ValKind -> Type -> Type where
   -- Value
-  Val :: Value val n -> Expr val n
+  Number :: n -> Expr 'Num n -- Field numbers
+  Boolean :: Bool -> Expr 'Bool n -- Booleans
+  UnitVal :: Expr 'Unit n -- Unit
   -- Variable
   Var :: Ref ('V val) -> Expr val n
   -- Operators on numbers
@@ -145,68 +105,68 @@ data Expr :: ValKind -> Type -> Type where
 
 instance Serialize n => Serialize (Expr 'Num n) where
   put expr = case expr of
-    Val val -> putWord8 0 >> put val
-    Var ref -> putWord8 1 >> put ref
-    Add x y -> putWord8 2 >> put x >> put y
-    Sub x y -> putWord8 3 >> put x >> put y
-    Mul x y -> putWord8 4 >> put x >> put y
-    Div x y -> putWord8 5 >> put x >> put y
-    If x y z -> putWord8 11 >> put x >> put y >> put z
-    ToNum x -> putWord8 13 >> put x
+    Number n -> putWord8 0 >> put n
+    Var ref -> putWord8 10 >> put ref
+    Add x y -> putWord8 20 >> put x >> put y
+    Sub x y -> putWord8 21 >> put x >> put y
+    Mul x y -> putWord8 22 >> put x >> put y
+    Div x y -> putWord8 23 >> put x >> put y
+    If x y z -> putWord8 40 >> put x >> put y >> put z
+    ToNum x -> putWord8 51 >> put x
   get = do
     tag <- getWord8
     case tag of
-      0 -> Val <$> get
-      1 -> Var <$> get
-      2 -> Add <$> get <*> get
-      3 -> Sub <$> get <*> get
-      4 -> Mul <$> get <*> get
-      5 -> Div <$> get <*> get
-      11 -> If <$> get <*> get <*> get
-      13 -> ToNum <$> get
+      0 -> Number <$> get
+      10 -> Var <$> get
+      20 -> Add <$> get <*> get
+      21 -> Sub <$> get <*> get
+      22 -> Mul <$> get <*> get
+      23 -> Div <$> get <*> get
+      40 -> If <$> get <*> get <*> get
+      51 -> ToNum <$> get
       _ -> error $ "Invalid expr tag 1 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Bool n) where
   put expr = case expr of
-    Val val -> putWord8 0 >> put val
-    Var ref -> putWord8 1 >> put ref
-    Eq x y -> putWord8 6 >> put x >> put y
-    And x y -> putWord8 7 >> put x >> put y
-    Or x y -> putWord8 8 >> put x >> put y
-    Xor x y -> putWord8 9 >> put x >> put y
-    BEq x y -> putWord8 10 >> put x >> put y
-    If x y z -> putWord8 11 >> put x >> put y >> put z
-    ToBool x -> putWord8 12 >> put x
+    Boolean b -> putWord8 1 >> put b
+    Var ref -> putWord8 10 >> put ref
+    Eq x y -> putWord8 30 >> put x >> put y
+    And x y -> putWord8 31 >> put x >> put y
+    Or x y -> putWord8 32 >> put x >> put y
+    Xor x y -> putWord8 33 >> put x >> put y
+    BEq x y -> putWord8 34 >> put x >> put y
+    If x y z -> putWord8 40 >> put x >> put y >> put z
+    ToBool x -> putWord8 50 >> put x
   get = do
     tag <- getWord8
     case tag of
-      0 -> Val <$> get
-      1 -> Var <$> get
-      6 -> Eq <$> get <*> get
-      7 -> And <$> get <*> get
-      8 -> Or <$> get <*> get
-      9 -> Xor <$> get <*> get
-      10 -> BEq <$> get <*> get
-      11 -> If <$> get <*> get <*> get
-      12 -> ToBool <$> get
+      1 -> Boolean <$> get
+      10 -> Var <$> get
+      30 -> Eq <$> get <*> get
+      31 -> And <$> get <*> get
+      32 -> Or <$> get <*> get
+      33 -> Xor <$> get <*> get
+      34 -> BEq <$> get <*> get
+      40 -> If <$> get <*> get <*> get
+      50 -> ToBool <$> get
       _ -> error $ "Invalid expr tag 2 " ++ show tag
 
 instance Serialize n => Serialize (Expr 'Unit n) where
-  put (Val val) = putWord8 0 >> put val
-  put (Var ref) = putWord8 1 >> put ref
-  put (If x y z) = putWord8 11 >> put x >> put y >> put z
+  put expr = case expr of
+    UnitVal -> putWord8 2
+    Var ref -> putWord8 10 >> put ref
+    If x y z -> putWord8 40 >> put x >> put y >> put z
   get = do
     tag <- getWord8
     case tag of
-      0 -> pure (Val UnitVal)
+      2 -> pure UnitVal
       _ -> error $ "Invalid expr tag 3 " ++ show tag
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of
-    Val val -> Val $ case val of
-      Number a -> Number (f a)
-      Boolean b -> Boolean b
-      UnitVal -> UnitVal
+    Number n -> Number (f n)
+    Boolean b -> Boolean b
+    UnitVal -> UnitVal
     Var ref -> Var ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
@@ -223,7 +183,9 @@ instance Functor (Expr ty) where
 
 instance Show n => Show (Expr ty n) where
   showsPrec prec expr = case expr of
-    Val val -> shows val
+    Number n -> showsPrec prec n
+    Boolean b -> showsPrec prec b
+    UnitVal -> showString "unit"
     Var var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
@@ -240,7 +202,9 @@ instance Show n => Show (Expr ty n) where
 
 instance Eq n => Eq (Expr ty n) where
   a == b = case (a, b) of
-    (Val x, Val y) -> x == y
+    (Number n, Number m) -> n == m
+    (Boolean x, Boolean y) -> x == y 
+    (UnitVal, UnitVal) -> True
     (Var x, Var y) -> x == y
     (Add x y, Add z w) -> x == z && y == w
     (Sub x y, Sub z w) -> x == z && y == w
@@ -263,20 +227,20 @@ instance GaloisField n => Num (Expr 'Num n) where
   abs = id
 
   -- law of `signum`: abs x * signum x == x
-  signum = const (Val (Number 1))
-  fromInteger = Val . Number . fromNatural . fromInteger
+  signum = const (Number 1)
+  fromInteger = Number . fromNatural . fromInteger
 
 instance GaloisField n => Semiring (Expr 'Num n) where
   plus = Add
   times = Mul
-  zero = Val (Number 0)
-  one = Val (Number 1)
+  zero = Number 0
+  one = Number 1
 
 instance GaloisField n => Ring (Expr 'Num n) where
   negate = id
 
 instance GaloisField n => Fractional (Expr 'Num n) where
-  fromRational = Val . Number . fromRational
+  fromRational = Number . fromRational
   (/) = Div
 
 --------------------------------------------------------------------------------
@@ -289,21 +253,17 @@ fromBool = ToNum
 toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
 toBool = ToBool
 
--- | Smart constructor for numbers as expressions
-num :: n -> Expr 'Num n
-num = Val . Number
-
 -- | Smart constructor for 'True'
 true :: Expr 'Bool n
-true = Val (Boolean True)
+true = Boolean True
 
 -- | Smart constructor for 'False'
 false :: Expr 'Bool n
-false = Val (Boolean False)
+false = Boolean False
 
 -- | Smart constructor for 'Unit'
 unit :: Expr 'Unit n
-unit = Val UnitVal
+unit = UnitVal
 
 -- | Helper function for not-`Eq`
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n

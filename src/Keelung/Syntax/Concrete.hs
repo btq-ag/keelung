@@ -32,11 +32,6 @@ instance Show Value where
   show (Boolean b) = show b
   show Unit = "unit"
 
-instance Integral n => Flatten (S.Value kind n) Value where
-  flatten (S.Number n) = Number (toInteger n)
-  flatten (S.Boolean b) = Boolean b
-  flatten S.UnitVal = Unit
-
 instance Serialize Value
 
 data VarRef
@@ -144,7 +139,9 @@ instance Show Expr where
     ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
-  flatten (S.Val val) = Val (flatten val)
+  flatten (S.Number n) = Val (Number (toInteger n))
+  flatten (S.Boolean b) = Val (Boolean b)
+  flatten S.UnitVal = Val Unit
   flatten (S.Var ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
