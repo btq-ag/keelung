@@ -16,7 +16,6 @@ module Keelung.Monad
 
     -- * Array
     allocArray,
-
     allocArray2,
     allocArray3,
     access,
@@ -25,7 +24,6 @@ module Keelung.Monad
     update,
     update2,
     update3,
-
     lengthOf,
 
     -- * Input Variable & Array
@@ -188,7 +186,7 @@ inputVarBool = inputVar
 
 -- | Allocates a 1D-array of fresh variables
 allocArray' :: Referable kind => [Expr kind n] -> Comp n (Ref ('A ('V kind)))
-allocArray' xs = do 
+allocArray' xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
   -- declare new variables
@@ -196,19 +194,16 @@ allocArray' xs = do
   -- allocate a new array and associate it's content with the new variables
   array <- allocateArrayWithVars vars
 
-  forM_ (zip [0 .. ] xs) $ \(i, x) -> do 
-    update array i x 
+  forM_ (zip [0 ..] xs) $ \(i, x) -> do
+    update array i x
 
-  return array 
+  return array
 
--- | Convert an array into a list of expressions 
+-- | Convert an array into a list of expressions
 expose :: Ref ('A ('V kind)) -> Comp n [Expr kind n]
-expose (Array len addr) = do 
-  forM [0 .. len - 1] $ \i -> do 
+expose (Array len addr) = do
+  forM [0 .. len - 1] $ \i -> do
     Var . Variable <$> readHeap (addr, i)
-
-
-
 
 -- allocArray' 0 = throwError EmptyArrayError
 -- allocArray' size = do
@@ -298,21 +293,21 @@ inputArray3 sizeM sizeN sizeO = do
 -- The reason why we need a typeclass for this is that
 -- the element may be a variable ('V) or another array ('A)
 class Accessible a where
-  access :: Int -> Ref ('A a) -> Comp n (Ref a)
+  access :: Ref ('A a) -> Int -> Comp n (Ref a)
 
 instance Accessible ('A ref) where
-  access i (Array len addr) = Array len <$> readHeap (addr, i)
+  access (Array len addr) i = Array len <$> readHeap (addr, i)
 
 instance Accessible ('V kind) where
-  access i (Array _len addr) = Variable <$> readHeap (addr, i)
+  access (Array _len addr) i = Variable <$> readHeap (addr, i)
 
 -- | Access a variable from a 2-D array
-access2 :: (Int, Int) -> Ref ('A ('A ('V ty))) -> Comp n (Ref ('V ty))
-access2 (i, j) addr = access i addr >>= access j
+access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> Comp n (Ref ('V ty))
+access2 addr (i, j) = access addr i >>= flip access j
 
 -- | Access a variable from a 3-D array
-access3 :: (Int, Int, Int) -> Ref ('A ('A ('A ('V ty)))) -> Comp n (Ref ('V ty))
-access3 (i, j, k) addr = access i addr >>= access j >>= access k
+access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Comp n (Ref ('V ty))
+access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
 
@@ -327,14 +322,14 @@ update (Array _ addr) i expr = do
 
 -- | Update array 'addr' at position '(j, i)' to expression 'expr'
 update2 :: Referable ty => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr ty n -> Comp n ()
-update2 ref (j, i) expr = do 
-  ref' <- access i ref 
+update2 ref (j, i) expr = do
+  ref' <- access ref i
   update ref' j expr
 
 -- | Update array 'addr' at position '(k, j, i)' to expression 'expr'
 update3 :: Referable ty => Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Expr ty n -> Comp n ()
-update3 ref (k, j, i) expr = do 
-  ref' <- access i ref >>= access j
+update3 ref (k, j, i) expr = do
+  ref' <- access ref i >>= flip access j
   update ref' k expr
 
 --------------------------------------------------------------------------------
@@ -442,13 +437,13 @@ reducei ::
 reducei xs e f =
   foldM
     ( \acc i -> do
-        x <- access i xs
+        x <- access xs i
         f i acc x
     )
     e
     [0 .. pred (lengthOf xs)]
 
-lengthOf :: Ref ('A kind) -> Int 
+lengthOf :: Ref ('A kind) -> Int
 lengthOf (Array n _) = n
 
 -- | For iterating through an array
@@ -486,8 +481,8 @@ assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 -- | Assert that two expressions are equal
 assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
 assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
-  a <- access i xs
-  b <- access i ys
+  a <- access xs i 
+  b <- access ys i 
   assert (Var a `equal` Var b)
 
 --------------------------------------------------------------------------------
