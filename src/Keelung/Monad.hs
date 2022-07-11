@@ -177,14 +177,14 @@ inputVarNum :: Comp n (Ref 'Num)
 inputVarNum = do
   var <- allocVar
   markVarAsInput var
-  return $ Variable2Num var
+  return $ NumVar var
 
 -- -- | Requests a fresh Bool input variable
 -- inputVarBool :: Comp n (Ref 'Bool)
 -- inputVarBool =  do
 --   var <- allocVar
 --   markVarAsInput var
---   return $ Variable2Bool var
+--   return $ BoolVar var
 
 --------------------------------------------------------------------------------
 -- Array & Input Array

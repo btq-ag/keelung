@@ -24,33 +24,33 @@ import qualified Keelung.Syntax as S
 class Flatten a b where
   flatten :: a -> b
 
-data Value
+data Val
   = Number Integer
   | Boolean Bool
   | Unit
   deriving (Generic, Eq)
 
-instance Show Value where
+instance Show Val where
   show (Number n) = show n
   show (Boolean b) = show b
   show Unit = "unit"
 
-instance Serialize Value
+instance Serialize Val
 
 --------------------------------------------------------------------------------
 
-data VarRef
+data Ref
   = NumVar Var
   | BoolVar Var
-  | ArrVar Int Addr 
+  | Array Int Addr
   deriving (Generic, Eq)
 
-instance Serialize VarRef
+instance Serialize Ref
 
-instance Show VarRef where
+instance Show Ref where
   show (NumVar n) = "$N" ++ show n
   show (BoolVar n) = "$B" ++ show n
-  show (ArrVar _ n) = "$A" ++ show n
+  show (Array _ n) = "$A" ++ show n
 
 --------------------------------------------------------------------------------
 data ArrRef = Arr Addr ArrKind
@@ -66,21 +66,25 @@ data ArrKind = ArrOf | ArrOfNum | ArrOfBool | ArrOfUnit
 
 instance Serialize ArrKind
 
--- instance Typeable kind => Flatten (S.Ref ('S.V kind)) VarRef where
+-- instance Typeable kind => Flatten (S.Ref ('S.V kind)) Ref where
 --   flatten var@(S.Variable ref)
 --     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
 --     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
 --     | otherwise = UnitVar ref
 
-instance Typeable kind => Flatten (S.Ref kind) VarRef where
-  flatten (S.Variable2Bool i) = BoolVar i
-  flatten (S.Variable2Num i) = NumVar i 
-  flatten (S.Array2 n i) = ArrVar n i 
+instance Integral n => Flatten (S.Val t n) Val where
+  flatten (S.Number n) = Number (toInteger n)
+  flatten (S.Boolean b) = Boolean b
+  flatten S.UnitVal = Unit
 
+instance Flatten (S.Ref kind) Ref where
+  flatten (S.BoolVar i) = BoolVar i
+  flatten (S.NumVar i) = NumVar i
+  flatten (S.Array n i) = Array n i
 
 data Expr
-  = Val Value
-  | Var VarRef 
+  = Val Val
+  | Var Ref
   | Add Expr Expr
   | Sub Expr Expr
   | Mul Expr Expr
@@ -120,7 +124,6 @@ isOfUnit _ = False
 instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
-    -- Var var -> shows var
     Var var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
@@ -136,9 +139,7 @@ instance Show Expr where
     ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
-  flatten (S.Number n) = Val (Number (toInteger n))
-  flatten (S.Boolean b) = Val (Boolean b)
-  flatten S.UnitVal = Val Unit
+  flatten (S.Val val) = Val (flatten val)
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
@@ -194,7 +195,7 @@ instance
 instance Serialize Elaborated
 
 -- | An Assignment associates an expression with a reference
-data Assignment = Assignment VarRef Expr
+data Assignment = Assignment Ref Expr
   deriving (Generic)
 
 instance Show Assignment where
@@ -277,10 +278,10 @@ allocVar = do
   modify (\st -> st {compNextVar = succ index})
   return index
 
-assignNum :: VarRef -> Expr -> Comp ()
+assignNum :: Ref -> Expr -> Comp ()
 assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
 
-assignBool :: VarRef -> Expr -> Comp ()
+assignBool :: Ref -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}
 
 -- collect free variables of an expression
@@ -292,7 +293,7 @@ freeVars expr = case expr of
   -- Var (UnitVar n) -> IntSet.singleton n
   Var (NumVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
-  Var (ArrVar _ n) -> IntSet.singleton n
+  Var (Array _ n) -> IntSet.singleton n
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y
