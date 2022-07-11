@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -25,21 +26,21 @@ type Heap = IntMap (IntMap Int)
 --------------------------------------------------------------------------------
 
 -- | Data kind for annotating the type of expressions.
-data ValKind
+data Kind
   = Num -- Field numbers
   | Bool -- Booleans
   | Unit -- Unit
-  | Arr ValKind -- Arrays
-  deriving
-    ( Show,
-      Eq
-    )
+  | Arr Kind -- Arrays
+  deriving (Show, Eq)
 
-data Ref :: ValKind -> Type where
+--------------------------------------------------------------------------------
+
+-- | References to variables or arrays 
+data Ref :: Kind -> Type where
   Variable2Bool :: Var -> Ref 'Bool
   Variable2Num :: Var -> Ref 'Num
   Array2 :: Int -> Addr -> Ref ('Arr val) -- RefKinds to arrays
-   
+
 instance Eq (Ref kind) where
   Variable2Bool i == Variable2Bool j = i == j
   Variable2Num i == Variable2Num j = i == j
@@ -76,16 +77,15 @@ instance Show (Ref ref) where
 
 --------------------------------------------------------------------------------
 
--- | Expressions are indexed by 'ValKind' and parameterised by some field
-data Expr :: ValKind -> Type -> Type where
+-- | Expressions are indexed by 'Kind' and parameterised by some field
+data Expr :: Kind -> Type -> Type where
   -- Value
   Number :: n -> Expr 'Num n -- Field numbers
   Boolean :: Bool -> Expr 'Bool n -- Booleans
   UnitVal :: Expr 'Unit n -- Unit
   -- Variable
-  VarNum :: Ref 'Num -> Expr 'Num n
-  VarBool :: Ref 'Bool -> Expr 'Bool n
-  Arr2 :: Ref ('Arr val) -> Expr ('Arr val) n
+  -- Arr2 :: Ref ('Arr val) -> Expr ('Arr val) n
+  Ref :: Ref t -> Expr t n
   -- Operators on numbers
   Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
   Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
@@ -106,7 +106,7 @@ data Expr :: ValKind -> Type -> Type where
 instance Serialize n => Serialize (Expr 'Num n) where
   put expr = case expr of
     Number n -> putWord8 0 >> put n
-    VarNum ref -> putWord8 11 >> put ref
+    Ref ref -> putWord8 10 >> put ref
     Add x y -> putWord8 20 >> put x >> put y
     Sub x y -> putWord8 21 >> put x >> put y
     Mul x y -> putWord8 22 >> put x >> put y
@@ -117,7 +117,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
     tag <- getWord8
     case tag of
       0 -> Number <$> get
-      11 -> VarNum <$> get
+      10 -> Ref <$> get
       20 -> Add <$> get <*> get
       21 -> Sub <$> get <*> get
       22 -> Mul <$> get <*> get
@@ -129,7 +129,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
 instance Serialize n => Serialize (Expr 'Bool n) where
   put expr = case expr of
     Boolean b -> putWord8 1 >> put b
-    VarBool ref -> putWord8 12 >> put ref
+    Ref ref -> putWord8 10 >> put ref
     Eq x y -> putWord8 30 >> put x >> put y
     And x y -> putWord8 31 >> put x >> put y
     Or x y -> putWord8 32 >> put x >> put y
@@ -141,7 +141,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
     tag <- getWord8
     case tag of
       1 -> Boolean <$> get
-      12 -> VarBool <$> get
+      10 -> Ref <$> get
       30 -> Eq <$> get <*> get
       31 -> And <$> get <*> get
       32 -> Or <$> get <*> get
@@ -154,6 +154,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
 instance Serialize n => Serialize (Expr 'Unit n) where
   put expr = case expr of
     UnitVal -> putWord8 2
+    Ref ref -> case ref of
     If x y z -> putWord8 40 >> put x >> put y >> put z
   get = do
     tag <- getWord8
@@ -166,9 +167,7 @@ instance Functor (Expr ty) where
     Number n -> Number (f n)
     Boolean b -> Boolean b
     UnitVal -> UnitVal
-    VarNum ref -> VarNum ref
-    VarBool ref -> VarBool ref
-    Arr2 ref -> Arr2 ref
+    Ref ref -> Ref ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
     Mul x y -> Mul (fmap f x) (fmap f y)
@@ -187,10 +186,7 @@ instance Show n => Show (Expr ty n) where
     Number n -> showsPrec prec n
     Boolean b -> showsPrec prec b
     UnitVal -> showString "unit"
-    -- Var var -> shows var
-    VarNum var -> shows var
-    VarBool var -> shows var
-    Arr2 var -> shows var
+    Ref ref -> shows ref 
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
