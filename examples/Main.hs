@@ -51,7 +51,7 @@ assertArrayToBe42 = do
   xs <- inputArray len
 
   forM_ [0 .. len - 1] $ \i -> do
-    x <- access i xs
+    x <- access xs i 
     assert $ Var x `Eq` 3210
 
   return unit

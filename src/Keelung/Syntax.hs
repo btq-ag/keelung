@@ -26,55 +26,53 @@ type Heap = IntMap (IntMap Int)
 
 -- | Data kind for annotating the type of expressions.
 data ValKind
-  = -- | Field numbers
-    Num
-  | -- | Booleans
-    Bool
-  | -- | Unit
-    Unit
+  = Num -- Field numbers
+  | Bool -- Booleans
+  | Unit -- Unit
+  | Arr ValKind -- Arrays
   deriving
     ( Show,
       Eq
     )
 
--- | Data kind for annotating the type of references to variables and arrays.
-data RefKind
-  = -- | Variables of some 'ValKind'
-    V ValKind
-  | -- | Arrays of some 'RefKind'
-    A RefKind
-  deriving (Show)
+data Ref2 :: ValKind -> Type where
+  Variable2Bool :: Var -> Ref2 'Bool
+  Variable2Num :: Var -> Ref2 'Num
+  Array2 :: Int -> Addr -> Ref2 ('Arr val) -- RefKinds to arrays
+   
+instance Eq (Ref2 kind) where
+  Variable2Bool i == Variable2Bool j = i == j
+  Variable2Num i == Variable2Num j = i == j
+  Array2 _ addr == Array2 _ addr' = addr == addr'
 
---------------------------------------------------------------------------------
-
--- | RefKind values are indexed by 'RefKind'
-data Ref :: RefKind -> Type where
-  Variable :: Var -> Ref ('V val) -- RefKinds to variables
-  Array :: Int -> Addr -> Ref ('A val) -- RefKinds to arrays
-
-instance Show (Ref ref) where
-  show (Variable i) = "$" <> show i
-  show (Array _ addr) = "@" <> show addr
-
-instance Eq (Ref ref) where
-  Variable i == Variable j = i == j
-  Array _ addr == Array _ addr' = addr == addr'
-
-instance Serialize (Ref ('V val)) where
-  put (Variable i) = putWord8 0 >> put i
+instance Serialize (Ref2 'Num) where
+  put (Variable2Num v) = putWord8 0 >> put v
   get = do
     tag <- getWord8
     case tag of
-      0 -> Variable <$> get
-      _ -> error "Invalid ref tag"
+      0 -> Variable2Num <$> get
+      _ -> fail "Invalid tag"
 
-instance Serialize (Ref ('A val)) where
-  put (Array len addr) = putWord8 1 >> put len >> put addr
+instance Serialize (Ref2 'Bool) where
+  put (Variable2Bool v) = putWord8 1 >> put v
   get = do
     tag <- getWord8
     case tag of
-      1 -> Array <$> get <*> get
-      _ -> error "Invalid ref tag"
+      1 -> Variable2Bool <$> get
+      _ -> fail "Invalid tag"
+
+instance Serialize (Ref2 ('Arr val)) where
+  put (Array2 n a) = putWord8 2 >> put n >> put a
+  get = do
+    tag <- getWord8
+    case tag of
+      2 -> Array2 <$> get <*> get
+      _ -> fail "Invalid tag"
+
+instance Show (Ref2 ref) where
+  show (Variable2Bool v) = "$B" ++ show v
+  show (Variable2Num v) = "$N" ++ show v
+  show (Array2 n a) = "$A" ++ show n ++ ":" ++ show a
 
 --------------------------------------------------------------------------------
 
@@ -85,7 +83,9 @@ data Expr :: ValKind -> Type -> Type where
   Boolean :: Bool -> Expr 'Bool n -- Booleans
   UnitVal :: Expr 'Unit n -- Unit
   -- Variable
-  Var :: Ref ('V val) -> Expr val n
+  VarNum :: Ref2 'Num -> Expr 'Num n
+  VarBool :: Ref2 'Bool -> Expr 'Bool n
+  Arr2 :: Ref2 ('Arr val) -> Expr ('Arr val) n
   -- Operators on numbers
   Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
   Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
@@ -106,7 +106,7 @@ data Expr :: ValKind -> Type -> Type where
 instance Serialize n => Serialize (Expr 'Num n) where
   put expr = case expr of
     Number n -> putWord8 0 >> put n
-    Var ref -> putWord8 10 >> put ref
+    VarNum ref -> putWord8 11 >> put ref
     Add x y -> putWord8 20 >> put x >> put y
     Sub x y -> putWord8 21 >> put x >> put y
     Mul x y -> putWord8 22 >> put x >> put y
@@ -117,7 +117,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
     tag <- getWord8
     case tag of
       0 -> Number <$> get
-      10 -> Var <$> get
+      11 -> VarNum <$> get
       20 -> Add <$> get <*> get
       21 -> Sub <$> get <*> get
       22 -> Mul <$> get <*> get
@@ -129,7 +129,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
 instance Serialize n => Serialize (Expr 'Bool n) where
   put expr = case expr of
     Boolean b -> putWord8 1 >> put b
-    Var ref -> putWord8 10 >> put ref
+    VarBool ref -> putWord8 12 >> put ref
     Eq x y -> putWord8 30 >> put x >> put y
     And x y -> putWord8 31 >> put x >> put y
     Or x y -> putWord8 32 >> put x >> put y
@@ -141,7 +141,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
     tag <- getWord8
     case tag of
       1 -> Boolean <$> get
-      10 -> Var <$> get
+      12 -> VarBool <$> get
       30 -> Eq <$> get <*> get
       31 -> And <$> get <*> get
       32 -> Or <$> get <*> get
@@ -154,7 +154,6 @@ instance Serialize n => Serialize (Expr 'Bool n) where
 instance Serialize n => Serialize (Expr 'Unit n) where
   put expr = case expr of
     UnitVal -> putWord8 2
-    Var ref -> putWord8 10 >> put ref
     If x y z -> putWord8 40 >> put x >> put y >> put z
   get = do
     tag <- getWord8
@@ -167,7 +166,9 @@ instance Functor (Expr ty) where
     Number n -> Number (f n)
     Boolean b -> Boolean b
     UnitVal -> UnitVal
-    Var ref -> Var ref
+    VarNum ref -> VarNum ref
+    VarBool ref -> VarBool ref
+    Arr2 ref -> Arr2 ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
     Mul x y -> Mul (fmap f x) (fmap f y)
@@ -186,7 +187,10 @@ instance Show n => Show (Expr ty n) where
     Number n -> showsPrec prec n
     Boolean b -> showsPrec prec b
     UnitVal -> showString "unit"
-    Var var -> shows var
+    -- Var var -> shows var
+    VarNum var -> shows var
+    VarBool var -> shows var
+    Arr2 var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -203,9 +207,9 @@ instance Show n => Show (Expr ty n) where
 instance Eq n => Eq (Expr ty n) where
   a == b = case (a, b) of
     (Number n, Number m) -> n == m
-    (Boolean x, Boolean y) -> x == y 
+    (Boolean x, Boolean y) -> x == y
     (UnitVal, UnitVal) -> True
-    (Var x, Var y) -> x == y
+    -- (Var x, Var y) -> x == y
     (Add x y, Add z w) -> x == z && y == w
     (Sub x y, Sub z w) -> x == z && y == w
     (Mul x y, Mul z w) -> x == z && y == w
