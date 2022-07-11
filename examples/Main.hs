@@ -3,57 +3,57 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use <$>" #-}
+{-# HLINT ignore "Redundant return" #-}
 
 module Main where
 
-import Control.Monad (forM_)
+-- import Control.Monad (forM_)
 import Keelung
+import Control.Monad
 
-main = return ()
+-- | Outputs whether number is given.
+echo :: Comp GF181 (Expr 'Num GF181)
+echo = do
+  x <- input -- request for an input and bind it to 'x'
+  return x -- return 'x'
 
--- -- | Outputs whether number is given.
--- echo :: Comp GF181 (Expr 'Num GF181)
--- echo = do
---   x <- inputVar -- request for an input and bind it to 'x'
---   return $ Var x -- return 'x'
+-- | A program that expects 2 inputs and returns no output
+useless :: Comp GF181 (Expr 'Unit GF181)
+useless = do
+  _x <- inputNum -- request for an input and bind it to 'x'
+  _y <- inputBool -- request for an input and bind it to 'y'
+  return unit -- return nothing
 
--- -- | A program that expects 2 inputs and returns no output
--- useless :: Comp GF181 (Expr 'Unit GF181)
--- useless = do
---   _x <- inputVar -- request for an input and bind it to 'x'
---   _y <- inputVar -- request for an input and bind it to 'y'
---   return unit -- return nothing
+-- Formula: (0°C × 9/5) + 32 = 32°F
+tempConvert :: Comp GF181 (Expr 'Num GF181)
+tempConvert = do
+  toFahrenheit <- input
+  degree <- input
+  return $
+    If
+      toFahrenheit
+      (degree * 9 / 5 + 32)
+      (degree - 32 * 5 / 9)
 
--- -- Formula: (0°C × 9/5) + 32 = 32°F
--- tempConvert :: Comp GF181 (Expr 'Num GF181)
--- tempConvert = do
---   toFahrenheit <- inputVar
---   degree <- inputVar
---   return $
---     If
---       (Var toFahrenheit)
---       (Var degree * 9 / 5 + 32)
---       (Var degree - 32 * 5 / 9)
+-- |
+main :: IO ()
+main = do
+  -- here goes the program you want to compile
+  let program = assertToBe42
 
--- -- |
--- main :: IO ()
--- main = do
---   -- here goes the program you want to compile
---   let program = assertToBe42
-
---   let toR1CS = False
---   if toR1CS
---     then compileAsR1CS program -- compile as a R1CS
---     else compile program -- compile as a ConstraintSystem
+  let toR1CS = False
+  if toR1CS
+    then compileAsR1CS program -- compile as a R1CS
+    else compile program -- compile as a ConstraintSystem
 
 -- assertArrayToBe42 :: Comp GF181 (Expr 'Unit GF181)
 -- assertArrayToBe42 = do
 --   let len = 8
 
---   xs <- inputArray len
+--   xs <- inputs len
 
 --   forM_ [0 .. len - 1] $ \i -> do
---     x <- access xs i 
+--     x <- access xs i
 --     assert $ Var x `Eq` 3210
 
 --   return unit
@@ -61,23 +61,23 @@ main = return ()
 -- -- | A program that outputs the square of its input
 -- square :: Comp GF181 (Expr 'Num GF181)
 -- square = do
---   x <- inputVar
+--   x <- input
 --   return (Var x * Var x)
 
--- assertToBe42 :: Comp GF181 (Expr 'Unit GF181)
--- assertToBe42 = do
---   x <- inputVar
---   assert (Var x `Eq` 42)
---   return unit
+assertToBe42 :: Comp GF181 (Expr 'Unit GF181)
+assertToBe42 = do
+  x <- input
+  assert (x `Eq` 42)
+  return unit
 
--- -- | A program that expects the second input to be the square of the first input
--- -- This program returns no output (hence 'return unit')
--- assertSquare :: Comp GF181 (Expr 'Unit GF181)
--- assertSquare = do
---   x <- inputVar
---   y <- inputVar
---   assert ((Var x * Var x) `Eq` Var y)
---   -- return unit
+-- | A program that expects the second input to be the square of the first input
+-- This program returns no output (hence 'return unit')
+assertSquare :: Comp GF181 (Expr 'Unit GF181)
+assertSquare = do
+  x <- input
+  y <- input
+  assert ((x * x) `Eq` y)
+  return unit
 
 --   --------------------------------------------------------------------------------
 
@@ -98,7 +98,7 @@ main = return ()
 
 -- loop2 :: Comp GF181 (Expr 'Unit GF181)
 -- loop2 = do
---   x <- inputVarNum
+--   x <- inputNum
 --   ys <- inputArray 4
 --   -- iterate through the array and reassign their value to 'x'
 --   forM_ [0 .. 3] $ \i -> do
@@ -131,16 +131,15 @@ main = return ()
 --   -- zs <- allocArray' [4, 5] :: Comp GF181 (Ref ('A ('V 'Num)))
 --   -- ws <- expose zs >>= allocArray'
 
-
 --   -- iterate through the array and assert them all to be 0
 --   -- forM_ [0 .. 2] $ \_ -> do
 --     -- update (xs :: Ref ('A ('V 'Num))) i 43
 --     -- x <- access i xs
 --     -- y <- access i ys
---     -- assert 
+--     -- assert
 
---     -- assertArrayEqual 2 xs zs  
---   -- assertArrayEqual 2 xs ws  
---   -- assertArrayEqual 2 ws ys  
+--     -- assertArrayEqual 2 xs zs
+--   -- assertArrayEqual 2 xs ws
+--   -- assertArrayEqual 2 ws ys
 
 --   return unit

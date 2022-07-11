@@ -105,6 +105,6 @@ compileAsR1CS :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Co
 compileAsR1CS prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
 
 interpret :: (Serialize n, Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> [n] -> IO (Maybe n)
-interpret prog inputs = wrapper2 ["protocol", "interpret"] $ case elaborateAndFlatten prog of
+interpret prog xs = wrapper2 ["protocol", "interpret"] $ case elaborateAndFlatten prog of
   Left err -> Left err
-  Right elab -> Right (elab, inputs)
+  Right elab -> Right (elab, xs)

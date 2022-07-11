@@ -10,11 +10,15 @@ module Keelung.Monad
     Elaborated (..),
     Assignment (..),
 
+    -- 
+
     -- * Experimental
+
     -- allocArray',
     -- expose,
 
     -- * Array
+
     -- allocArray,
     -- allocArray2,
     -- allocArray3,
@@ -25,9 +29,13 @@ module Keelung.Monad
     -- update2,
     -- update3,
     -- lengthOf,
+    Accessible(..),
 
     -- * Input Variable & Array
-    -- inputVar,
+    Input(..),
+    inputNum,
+    inputBool,
+    inputs,
     -- inputVarNum,
     -- inputVarBool,
     -- inputArray,
@@ -35,6 +43,8 @@ module Keelung.Monad
     -- inputArray3,
 
     -- * Statements
+    assert
+
     -- ifThenElse,
     -- reduce,
     -- reducei,
@@ -172,19 +182,32 @@ allocVar = do
 --   markVarAsInput var
 --   return $ Variable2 var
 
+--------------------------------------------------------------------------------
+
+-- | Typeclass for requesting inputs
+class Input t where
+  -- | Request a fresh input
+  input :: Comp n (Expr t n)
+
+instance Input 'Num where
+  input = inputNum
+
+instance Input 'Bool where
+  input = inputBool
+
 -- | Requests a fresh Num input variable
-inputVarNum :: Comp n (Ref 'Num)
-inputVarNum = do
+inputNum :: Comp n (Expr 'Num n)
+inputNum = do
   var <- allocVar
   markVarAsInput var
-  return $ NumVar var
+  return $ Ref $ NumVar var
 
--- -- | Requests a fresh Bool input variable
--- inputVarBool :: Comp n (Ref 'Bool)
--- inputVarBool =  do
---   var <- allocVar
---   markVarAsInput var
---   return $ BoolVar var
+-- | Requests a fresh Bool input variable
+inputBool :: Comp n (Expr 'Bool n)
+inputBool = do
+  var <- allocVar
+  markVarAsInput var
+  return $ Ref $ BoolVar var
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
@@ -254,17 +277,17 @@ inputVarNum = do
 --   -- and allocate a new array with these references
 --   allocateArrayWithVars $ IntSet.fromList vars
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Requests a 1D-array of fresh input variables
--- inputArray :: Int -> Comp n (Ref ('Arr kind))
--- inputArray 0 = throwError EmptyArrayError
--- inputArray size = do
---   -- draw new variables and mark them as inputs
---   vars <- newVars size
---   markVarsAsInput vars
---   -- allocate a new array and associate it's content with the new variables
---   allocateArrayWithVars vars
+-- | Requests a 1D-array of fresh input variables
+inputs :: Int -> Comp n (Expr ('Arr t) n)
+inputs 0 = throwError EmptyArrayError
+inputs size = do
+  -- draw new variables and mark them as inputs
+  vars <- newVars size
+  markVarsAsInput vars
+  -- allocate a new array and associate it's content with the new variables
+  Ref <$> allocateArrayWithVars vars
 
 -- -- | Requests a 2D-array of fresh input variables
 -- inputArray2 :: Int -> Int -> Comp n (Ref ('Arr ('Arr kind)))
@@ -293,22 +316,25 @@ inputVarNum = do
 --   -- and allocate a new array with these references
 --   allocateArrayWithVars $ IntSet.fromList vars
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Typeclass for retrieving the element of an array
--- -- The reason why we need a typeclass for this is that
--- -- the element may be a variable ('V) or another array ('A)
--- class Accessible a where
---   access :: Ref ('Arr a) -> Int -> Comp n (Ref a)
+-- | Typeclass for retrieving the element of an array
+class Accessible t where
+  access :: Ref ('Arr t) -> Int -> Comp n (Expr t n)
 
--- instance Accessible ('Arr ref) where
---   access (Array2 len addr) i = Array len <$> readHeap (addr, i)
+-- access :: Ref ('Arr t) -> Int -> Comp n (Expr t n)
+-- access (Array len addr) i = do
+--   when (i < 0 || i >= len) $ throwError $ IndexOutOfBoundsError i len
+--   Var . Variable <$> readHeap (addr, i)
 
--- instance Accessible 'Num where
---   access (Array2 _len addr) i = Variable <$> readHeap (addr, i)
+instance Accessible ('Arr ref) where
+  access (Array len addr) i = Ref . Array len <$> readHeap (addr, i)
 
--- instance Accessible 'Bool where
---   access (Array2 _len addr) i = Variable <$> readHeap (addr, i)
+instance Accessible 'Num where
+  access (Array _len addr) i = Ref . NumVar <$> readHeap (addr, i)
+
+instance Accessible 'Bool where
+  access (Array _len addr) i = Ref . BoolVar <$> readHeap (addr, i)
 
 -- -- | Access a variable from a 2-D array
 -- access2 :: Ref ('Arr ('Arr kind)) -> (Int, Int) -> Comp n (Ref kind)
@@ -343,27 +369,27 @@ inputVarNum = do
 
 -- --------------------------------------------------------------------------------
 
--- -- | Internal helper function for generating multiple fresh variables.
--- newVars :: Int -> Comp n IntSet
--- newVars n = do
---   index <- gets compNextVar
---   modify (\st -> st {compNextVar = n + index})
---   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
+-- | Internal helper function for generating multiple fresh variables.
+newVars :: Int -> Comp n IntSet
+newVars n = do
+  index <- gets compNextVar
+  modify (\st -> st {compNextVar = n + index})
+  return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
--- -- | Internal helper function for allocating an array
--- -- and associate the address with a set of variables
--- allocateArrayWithVars :: IntSet -> Comp n (Ref ('A ty))
--- allocateArrayWithVars vars = do
---   let size = IntSet.size vars
---   addr <- freshAddr
---   writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
---   return $ Array size addr
---   where
---     freshAddr :: Comp n Addr
---     freshAddr = do
---       addr <- gets compNextAddr
---       modify (\st -> st {compNextAddr = succ addr})
---       return addr
+-- | Internal helper function for allocating an array
+-- and associate the address with a set of variables
+allocateArrayWithVars :: IntSet -> Comp n (Ref ('Arr ty))
+allocateArrayWithVars vars = do
+  let size = IntSet.size vars
+  addr <- freshAddr
+  writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
+  return $ Array size addr
+  where
+    freshAddr :: Comp n Addr
+    freshAddr = do
+      addr <- gets compNextAddr
+      modify (\st -> st {compNextAddr = succ addr})
+      return addr
 
 -- | Internal helper function for marking a variable as input.
 markVarAsInput :: Var -> Comp n ()
@@ -374,24 +400,24 @@ markVarsAsInput :: IntSet -> Comp n ()
 markVarsAsInput vars =
   modify (\st -> st {compInputVars = vars <> compInputVars st})
 
--- -- | Internal helper function for allocating an array on the heap
--- writeHeap :: Addr -> [(Int, Var)] -> Comp n ()
--- writeHeap addr array = do
---   let bindings = IntMap.fromList array
---   heap <- gets compHeap
---   let heap' = IntMap.insertWith (<>) addr bindings heap
---   modify (\st -> st {compHeap = heap'})
+-- | Internal helper function for allocating an array on the heap
+writeHeap :: Addr -> [(Int, Var)] -> Comp n ()
+writeHeap addr array = do
+  let bindings = IntMap.fromList array
+  heap <- gets compHeap
+  let heap' = IntMap.insertWith (<>) addr bindings heap
+  modify (\st -> st {compHeap = heap'})
 
--- -- | Internal helper function for access an array on the heap
--- readHeap :: (Addr, Int) -> Comp n Int
--- readHeap (addr, i) = do
---   heap <- gets compHeap
---   case IntMap.lookup addr heap of
---     Nothing ->
---       throwError $ UnboundArrayError addr i heap
---     Just array -> case IntMap.lookup i array of
---       Nothing -> throwError $ UnboundArrayError addr i heap
---       Just n -> return n
+-- | Internal helper function for access an array on the heap
+readHeap :: (Addr, Int) -> Comp n Int
+readHeap (addr, i) = do
+  heap <- gets compHeap
+  case IntMap.lookup addr heap of
+    Nothing ->
+      throwError $ UnboundArrayError addr i heap
+    Just array -> case IntMap.lookup i array of
+      Nothing -> throwError $ UnboundArrayError addr i heap
+      Just n -> return n
 
 -- --------------------------------------------------------------------------------
 
@@ -481,11 +507,11 @@ markVarsAsInput vars =
 -- product' xs = reducei xs 1 $ \_ acc x -> do
 --   return $ acc * Var x
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Assert that the given expression is true
--- assert :: Expr 'Bool n -> Comp n ()
--- assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
+-- | Assert that the given expression is true
+assert :: Expr 'Bool n -> Comp n ()
+assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 
 -- -- | Assert that two expressions are equal
 -- assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()

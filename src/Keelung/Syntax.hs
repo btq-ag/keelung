@@ -126,7 +126,7 @@ instance Show (Ref ref) where
 
 -- | Expressions are indexed by 'Kind' and parameterised by some field
 data Expr :: Kind -> Type -> Type where
-  -- Value
+  -- Value & Reference 
   Val :: Val t n -> Expr t n
   Ref :: Ref t -> Expr t n
   -- Operators on numbers
