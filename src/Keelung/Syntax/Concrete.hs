@@ -37,10 +37,12 @@ instance Show Value where
 
 instance Serialize Value
 
+--------------------------------------------------------------------------------
+
 data VarRef
   = NumVar Var
   | BoolVar Var
-  | UnitVar Var
+  | ArrVar Int Addr 
   deriving (Generic, Eq)
 
 instance Serialize VarRef
@@ -48,31 +50,7 @@ instance Serialize VarRef
 instance Show VarRef where
   show (NumVar n) = "$N" ++ show n
   show (BoolVar n) = "$B" ++ show n
-  show (UnitVar n) = "$U" ++ show n
-
-varRef :: VarRef -> Var
-varRef (NumVar ref) = ref
-varRef (BoolVar ref) = ref
-varRef (UnitVar ref) = ref
---------------------------------------------------------------------------------
-
-data VarRef2
-  = NumVar2 Var
-  | BoolVar2 Var
-  | ArrVar Int Addr 
-  deriving (Generic, Eq)
-
-instance Serialize VarRef2
-
-instance Show VarRef2 where
-  show (NumVar2 n) = "$N" ++ show n
-  show (BoolVar2 n) = "$B" ++ show n
   show (ArrVar _ n) = "$A" ++ show n
-
-  -- flatten var@(S.Variable ref)
-  --   | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
-  --   | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
-  --   | otherwise = UnitVar ref
 
 --------------------------------------------------------------------------------
 data ArrRef = Arr Addr ArrKind
@@ -88,34 +66,21 @@ data ArrKind = ArrOf | ArrOfNum | ArrOfBool | ArrOfUnit
 
 instance Serialize ArrKind
 
-data Ref
-  = VarRef VarRef
-  | ArrRef ArrRef
-  deriving (Generic)
-
-instance Show Ref where
-  show (VarRef ref) = show ref
-  show (ArrRef ref) = show ref
-
-instance Serialize Ref
-
 -- instance Typeable kind => Flatten (S.Ref ('S.V kind)) VarRef where
 --   flatten var@(S.Variable ref)
 --     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
 --     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
 --     | otherwise = UnitVar ref
 
-
-instance Typeable kind => Flatten (S.Ref2 kind) VarRef2 where
-  flatten (S.Variable2Bool i) = BoolVar2 i
-  flatten (S.Variable2Num i) = NumVar2 i 
+instance Typeable kind => Flatten (S.Ref kind) VarRef where
+  flatten (S.Variable2Bool i) = BoolVar i
+  flatten (S.Variable2Num i) = NumVar i 
   flatten (S.Array2 n i) = ArrVar n i 
 
 
 data Expr
   = Val Value
-  | Var VarRef
-  | Var2 VarRef2 
+  | Var VarRef 
   | Add Expr Expr
   | Sub Expr Expr
   | Mul Expr Expr
@@ -133,8 +98,8 @@ data Expr
 sizeOfExpr :: Expr -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
+  -- Var _ -> 1
   Var _ -> 1
-  Var2 _ -> 1
   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
@@ -150,14 +115,13 @@ sizeOfExpr expr = case expr of
 
 isOfUnit :: Expr -> Bool
 isOfUnit (Val Unit) = True
-isOfUnit (Var (UnitVar _)) = True
 isOfUnit _ = False
 
 instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
+    -- Var var -> shows var
     Var var -> shows var
-    Var2 var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -175,9 +139,9 @@ instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
   flatten (S.Number n) = Val (Number (toInteger n))
   flatten (S.Boolean b) = Val (Boolean b)
   flatten S.UnitVal = Val Unit
-  flatten (S.VarNum (S.Variable2Num n)) = Var2 (NumVar2 n) 
-  flatten (S.VarBool (S.Variable2Bool n)) = Var2 (BoolVar2 n)
-  flatten (S.Arr2 (S.Array2 n i)) = Var2 (ArrVar n i)
+  flatten (S.VarNum (S.Variable2Num n)) = Var (NumVar n) 
+  flatten (S.VarBool (S.Variable2Bool n)) = Var (BoolVar n)
+  flatten (S.Arr2 (S.Array2 n i)) = Var (ArrVar n i)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
@@ -232,7 +196,7 @@ instance
 instance Serialize Elaborated
 
 -- | An Assignment associates an expression with a reference
-data Assignment = Assignment VarRef2 Expr
+data Assignment = Assignment VarRef Expr
   deriving (Generic)
 
 instance Show Assignment where
@@ -315,22 +279,22 @@ allocVar = do
   modify (\st -> st {compNextVar = succ index})
   return index
 
-assignNum :: VarRef2 -> Expr -> Comp ()
+assignNum :: VarRef -> Expr -> Comp ()
 assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
 
-assignBool :: VarRef2 -> Expr -> Comp ()
+assignBool :: VarRef -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}
 
 -- collect free variables of an expression
 freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
+  -- Var (NumVar n) -> IntSet.singleton n
+  -- Var (BoolVar n) -> IntSet.singleton n
+  -- Var (UnitVar n) -> IntSet.singleton n
   Var (NumVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
-  Var (UnitVar n) -> IntSet.singleton n
-  Var2 (NumVar2 n) -> IntSet.singleton n
-  Var2 (BoolVar2 n) -> IntSet.singleton n
-  Var2 (ArrVar _ n) -> IntSet.singleton n
+  Var (ArrVar _ n) -> IntSet.singleton n
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y

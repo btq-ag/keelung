@@ -69,7 +69,7 @@ import Prelude hiding (product, sum)
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
-data Assignment ty n = Assignment (Ref2 ty) (Expr ty n)
+data Assignment ty n = Assignment (Ref ty) (Expr ty n)
   deriving (Eq, Generic)
 
 instance Show n => Show (Assignment ty n) where
@@ -166,32 +166,32 @@ allocVar = do
   return index
 
 -- | Requests a fresh input variable
--- inputVar :: Comp n (Ref2 ty)
+-- inputVar :: Comp n (Ref ty)
 -- inputVar = do
 --   var <- allocVar
 --   markVarAsInput var
 --   return $ Variable2 var
 
 -- | Requests a fresh Num input variable
-inputVarNum :: Comp n (Ref2 'Num)
+inputVarNum :: Comp n (Ref 'Num)
 inputVarNum = do
   var <- allocVar
   markVarAsInput var
   return $ Variable2Num var
 
--- | Requests a fresh Bool input variable
-inputVarBool :: Comp n (Ref2 'Bool)
-inputVarBool =  do
-  var <- allocVar
-  markVarAsInput var
-  return $ Variable2Bool var
+-- -- | Requests a fresh Bool input variable
+-- inputVarBool :: Comp n (Ref 'Bool)
+-- inputVarBool =  do
+--   var <- allocVar
+--   markVarAsInput var
+--   return $ Variable2Bool var
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
 --------------------------------------------------------------------------------
 
 -- -- | Allocates a 1D-array of fresh variables
--- allocArray' :: Referable kind => [Expr kind n] -> Comp n (Ref2 ('Arr kind))
+-- allocArray' :: Referable kind => [Expr kind n] -> Comp n (Ref ('Arr kind))
 -- allocArray' xs = do
 --   let size = length xs
 --   when (size == 0) $ throwError EmptyArrayError
@@ -206,7 +206,7 @@ inputVarBool =  do
 --   return array
 
 -- | Convert an array into a list of expressions
--- expose :: Ref2 ('Arr kind) -> Comp n [Expr kind n]
+-- expose :: Ref ('Arr kind) -> Comp n [Expr kind n]
 -- expose (Array2 len addr) = do
 --   forM [0 .. len - 1] $ \i -> do
 --     Var . Variable <$> readHeap (addr, i)
@@ -219,7 +219,7 @@ inputVarBool =  do
 --   allocateArrayWithVars vars
 
 -- | Allocates a 1D-array of fresh variables
--- allocArray :: Int -> Comp n (Ref2 ('Arr kind))
+-- allocArray :: Int -> Comp n (Ref ('Arr kind))
 -- allocArray 0 = throwError EmptyArrayError
 -- allocArray size = do
 --   -- declare new variables
@@ -228,7 +228,7 @@ inputVarBool =  do
 --   allocateArrayWithVars vars
 
 -- -- | Allocates a 2D-array of fresh variables
--- allocArray2 :: Int -> Int -> Comp n (Ref2 ('Arr ('Arr kind)))
+-- allocArray2 :: Int -> Int -> Comp n (Ref ('Arr ('Arr kind)))
 -- allocArray2 0 _ = throwError EmptyArrayError
 -- allocArray2 _ 0 = throwError EmptyArrayError
 -- allocArray2 sizeM sizeN = do
@@ -241,7 +241,7 @@ inputVarBool =  do
 --   allocateArrayWithVars $ IntSet.fromList vars
 
 -- -- | Allocates a 3D-array of fresh variables
--- allocArray3 :: Int -> Int -> Int -> Comp n (Ref2 ('Arr ('Arr ('Arr kind))))
+-- allocArray3 :: Int -> Int -> Int -> Comp n (Ref ('Arr ('Arr ('Arr kind))))
 -- allocArray3 0 _ _ = throwError EmptyArrayError
 -- allocArray3 _ 0 _ = throwError EmptyArrayError
 -- allocArray3 _ _ 0 = throwError EmptyArrayError
@@ -257,7 +257,7 @@ inputVarBool =  do
 -- --------------------------------------------------------------------------------
 
 -- -- | Requests a 1D-array of fresh input variables
--- inputArray :: Int -> Comp n (Ref2 ('Arr kind))
+-- inputArray :: Int -> Comp n (Ref ('Arr kind))
 -- inputArray 0 = throwError EmptyArrayError
 -- inputArray size = do
 --   -- draw new variables and mark them as inputs
@@ -267,7 +267,7 @@ inputVarBool =  do
 --   allocateArrayWithVars vars
 
 -- -- | Requests a 2D-array of fresh input variables
--- inputArray2 :: Int -> Int -> Comp n (Ref2 ('Arr ('Arr kind)))
+-- inputArray2 :: Int -> Int -> Comp n (Ref ('Arr ('Arr kind)))
 -- inputArray2 0 _ = throwError EmptyArrayError
 -- inputArray2 _ 0 = throwError EmptyArrayError
 -- inputArray2 sizeM sizeN = do
@@ -280,7 +280,7 @@ inputVarBool =  do
 --   allocateArrayWithVars $ IntSet.fromList vars
 
 -- -- | Requests a 3D-array of fresh input variables
--- inputArray3 :: Int -> Int -> Int -> Comp n (Ref2 ('Arr ('Arr ('Arr kind))))
+-- inputArray3 :: Int -> Int -> Int -> Comp n (Ref ('Arr ('Arr ('Arr kind))))
 -- inputArray3 0 _ _ = throwError EmptyArrayError
 -- inputArray3 _ 0 _ = throwError EmptyArrayError
 -- inputArray3 _ _ 0 = throwError EmptyArrayError
@@ -299,7 +299,7 @@ inputVarBool =  do
 -- -- The reason why we need a typeclass for this is that
 -- -- the element may be a variable ('V) or another array ('A)
 -- class Accessible a where
---   access :: Ref2 ('Arr a) -> Int -> Comp n (Ref2 a)
+--   access :: Ref ('Arr a) -> Int -> Comp n (Ref a)
 
 -- instance Accessible ('Arr ref) where
 --   access (Array2 len addr) i = Array len <$> readHeap (addr, i)
@@ -311,17 +311,17 @@ inputVarBool =  do
 --   access (Array2 _len addr) i = Variable <$> readHeap (addr, i)
 
 -- -- | Access a variable from a 2-D array
--- access2 :: Ref2 ('Arr ('Arr kind)) -> (Int, Int) -> Comp n (Ref2 kind)
+-- access2 :: Ref ('Arr ('Arr kind)) -> (Int, Int) -> Comp n (Ref kind)
 -- access2 addr (i, j) = access addr i >>= flip access j
 
 -- -- | Access a variable from a 3-D array
--- access3 :: Ref2 ('Arr ('Arr ('Arr kind))) -> (Int, Int, Int) -> Comp n (Ref2 kind)
+-- access3 :: Ref ('Arr ('Arr ('Arr kind))) -> (Int, Int, Int) -> Comp n (Ref kind)
 -- access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
--- update :: Referable ty => Ref2 ('Arr kind) -> Int -> Expr kind n -> Comp n ()
+-- update :: Referable ty => Ref ('Arr kind) -> Int -> Expr kind n -> Comp n ()
 -- update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
 -- update (Array _ addr) i expr = do
 --   ref <- allocVar

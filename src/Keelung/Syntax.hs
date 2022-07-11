@@ -35,17 +35,17 @@ data ValKind
       Eq
     )
 
-data Ref2 :: ValKind -> Type where
-  Variable2Bool :: Var -> Ref2 'Bool
-  Variable2Num :: Var -> Ref2 'Num
-  Array2 :: Int -> Addr -> Ref2 ('Arr val) -- RefKinds to arrays
+data Ref :: ValKind -> Type where
+  Variable2Bool :: Var -> Ref 'Bool
+  Variable2Num :: Var -> Ref 'Num
+  Array2 :: Int -> Addr -> Ref ('Arr val) -- RefKinds to arrays
    
-instance Eq (Ref2 kind) where
+instance Eq (Ref kind) where
   Variable2Bool i == Variable2Bool j = i == j
   Variable2Num i == Variable2Num j = i == j
   Array2 _ addr == Array2 _ addr' = addr == addr'
 
-instance Serialize (Ref2 'Num) where
+instance Serialize (Ref 'Num) where
   put (Variable2Num v) = putWord8 0 >> put v
   get = do
     tag <- getWord8
@@ -53,7 +53,7 @@ instance Serialize (Ref2 'Num) where
       0 -> Variable2Num <$> get
       _ -> fail "Invalid tag"
 
-instance Serialize (Ref2 'Bool) where
+instance Serialize (Ref 'Bool) where
   put (Variable2Bool v) = putWord8 1 >> put v
   get = do
     tag <- getWord8
@@ -61,7 +61,7 @@ instance Serialize (Ref2 'Bool) where
       1 -> Variable2Bool <$> get
       _ -> fail "Invalid tag"
 
-instance Serialize (Ref2 ('Arr val)) where
+instance Serialize (Ref ('Arr val)) where
   put (Array2 n a) = putWord8 2 >> put n >> put a
   get = do
     tag <- getWord8
@@ -69,7 +69,7 @@ instance Serialize (Ref2 ('Arr val)) where
       2 -> Array2 <$> get <*> get
       _ -> fail "Invalid tag"
 
-instance Show (Ref2 ref) where
+instance Show (Ref ref) where
   show (Variable2Bool v) = "$B" ++ show v
   show (Variable2Num v) = "$N" ++ show v
   show (Array2 n a) = "$A" ++ show n ++ ":" ++ show a
@@ -83,9 +83,9 @@ data Expr :: ValKind -> Type -> Type where
   Boolean :: Bool -> Expr 'Bool n -- Booleans
   UnitVal :: Expr 'Unit n -- Unit
   -- Variable
-  VarNum :: Ref2 'Num -> Expr 'Num n
-  VarBool :: Ref2 'Bool -> Expr 'Bool n
-  Arr2 :: Ref2 ('Arr val) -> Expr ('Arr val) n
+  VarNum :: Ref 'Num -> Expr 'Num n
+  VarBool :: Ref 'Bool -> Expr 'Bool n
+  Arr2 :: Ref ('Arr val) -> Expr ('Arr val) n
   -- Operators on numbers
   Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
   Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
