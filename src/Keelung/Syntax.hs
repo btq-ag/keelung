@@ -141,7 +141,8 @@ data Expr :: Kind -> Type -> Type where
   Xor :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   BEq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   -- if...then...else clause
-  If :: Expr 'Bool n -> Expr val n -> Expr val n -> Expr val n
+  IfNum :: Expr 'Bool n -> Expr 'Num n -> Expr 'Num n -> Expr 'Num n
+  IfBool :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   -- Conversion between Booleans and Field numbers
   ToBool :: Expr 'Num n -> Expr 'Bool n
   ToNum :: Expr 'Bool n -> Expr 'Num n
@@ -154,7 +155,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
     Sub x y -> putWord8 21 >> put x >> put y
     Mul x y -> putWord8 22 >> put x >> put y
     Div x y -> putWord8 23 >> put x >> put y
-    If x y z -> putWord8 40 >> put x >> put y >> put z
+    IfNum x y z -> putWord8 40 >> put x >> put y >> put z
     ToNum x -> putWord8 51 >> put x
   get = do
     tag <- getWord8
@@ -165,7 +166,7 @@ instance Serialize n => Serialize (Expr 'Num n) where
       21 -> Sub <$> get <*> get
       22 -> Mul <$> get <*> get
       23 -> Div <$> get <*> get
-      40 -> If <$> get <*> get <*> get
+      40 -> IfNum <$> get <*> get <*> get
       51 -> ToNum <$> get
       _ -> error $ "Invalid expr tag 1 " ++ show tag
 
@@ -178,7 +179,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
     Or x y -> putWord8 32 >> put x >> put y
     Xor x y -> putWord8 33 >> put x >> put y
     BEq x y -> putWord8 34 >> put x >> put y
-    If x y z -> putWord8 40 >> put x >> put y >> put z
+    IfBool x y z -> putWord8 41 >> put x >> put y >> put z
     ToBool x -> putWord8 50 >> put x
   get = do
     tag <- getWord8
@@ -190,7 +191,7 @@ instance Serialize n => Serialize (Expr 'Bool n) where
       32 -> Or <$> get <*> get
       33 -> Xor <$> get <*> get
       34 -> BEq <$> get <*> get
-      40 -> If <$> get <*> get <*> get
+      41 -> IfBool <$> get <*> get <*> get
       50 -> ToBool <$> get
       _ -> error $ "Invalid expr tag 2 " ++ show tag
 
@@ -198,7 +199,8 @@ instance Serialize n => Serialize (Expr 'Unit n) where
   put expr = case expr of
     Val val -> putWord8 0 >> put val
     Ref ref -> case ref of {}
-    If x y z -> putWord8 40 >> put x >> put y >> put z
+    -- IfNum x y z -> putWord8 40 >> put x >> put y >> put z
+    -- IfBool x y z -> putWord8 41 >> put x >> put y >> put z
   get = do
     tag <- getWord8
     case tag of
@@ -221,7 +223,8 @@ instance Functor (Expr ty) where
     Or x y -> Or (fmap f x) (fmap f y)
     Xor x y -> Xor (fmap f x) (fmap f y)
     BEq x y -> BEq (fmap f x) (fmap f y)
-    If p x y -> If (fmap f p) (fmap f x) (fmap f y)
+    IfNum p x y -> IfNum (fmap f p) (fmap f x) (fmap f y)
+    IfBool p x y -> IfBool (fmap f p) (fmap f x) (fmap f y)
     ToBool x -> ToBool (fmap f x)
     ToNum x -> ToNum (fmap f x)
 
@@ -241,7 +244,8 @@ instance Show n => Show (Expr ty n) where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    IfBool p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
@@ -258,7 +262,8 @@ instance Eq n => Eq (Expr ty n) where
     (Or x y, Or z w) -> x == z && y == w
     (Xor x y, Xor z w) -> x == z && y == w
     (BEq x y, BEq z w) -> x == z && y == w
-    (If x y z, If u v w) -> x == u && y == v && z == w
+    (IfNum x y z, IfNum u v w) -> x == u && y == v && z == w
+    (IfBool x y z, IfBool u v w) -> x == u && y == v && z == w
     (ToBool x, ToBool y) -> x == y
     (ToNum x, ToNum y) -> x == y
     _ -> False
@@ -310,15 +315,14 @@ unit = Val UnitVal
 
 -- | Helper function for not-`Eq`
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
-neq x y = If (x `Eq` y) false true
+neq x y = IfBool (x `Eq` y) false true
 
 -- | Helper function for not-`BEq`
 nbeq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
-nbeq x y = If (x `BEq` y) false true
+nbeq x y = IfBool (x `BEq` y) false true
 
 -- | Helper function for negating a boolean expression
 neg :: Expr 'Bool n -> Expr 'Bool n
 neg x = true `Xor` x
 
-cond :: Expr 'Bool n -> Expr kind n -> Expr kind n -> Expr kind n
-cond = If
+

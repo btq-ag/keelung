@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
@@ -25,14 +26,14 @@ module Keelung.Monad
     -- access,
     -- access2,
     -- access3,
-    -- update,
+    update,
     -- update2,
     -- update3,
     -- lengthOf,
     Accessible(..),
 
     -- * Input Variable & Array
-    Input(..),
+    input,
     inputNum,
     inputBool,
     inputs,
@@ -41,6 +42,7 @@ module Keelung.Monad
     -- inputArray,
     -- inputArray2,
     -- inputArray3,
+    cond,
 
     -- * Statements
     assert
@@ -185,15 +187,49 @@ allocVar = do
 --------------------------------------------------------------------------------
 
 -- | Typeclass for requesting inputs
-class Input t where
+class Proper t where
   -- | Request a fresh input
   input :: Comp n (Expr t n)
+  -- | Update an entry of an array 
+  update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
+  -- | Conditional clause 
+  cond :: Expr 'Bool n -> Expr t n -> Expr t n -> Expr t n
 
-instance Input 'Num where
+-- update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
+-- update (Val val) _ _ = case val of {}
+-- update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
+-- update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
+-- update (Ref (Array _ addr)) i expr = do 
+--   ref <- allocVar
+--   writeHeap addr [(i, ref)]
+--   -- associate 'ref' with the expression
+--   assign (Var ref) expr
+
+
+instance Proper 'Num where
   input = inputNum
+  update (Val val) _ _ = case val of {}
+  update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
+  update (Ref (Array _ addr)) i expr = do 
+    ref <- allocVar
+    writeHeap addr [(i, ref)]
+    -- associate 'ref' with the expression
+    modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
 
-instance Input 'Bool where
+  cond = IfNum 
+
+instance Proper 'Bool where
   input = inputBool
+
+  update (Val val) _ _ = case val of {}
+  update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
+  update (Ref (Array _ addr)) i expr = do 
+    ref <- allocVar
+    writeHeap addr [(i, ref)]
+    -- associate 'ref' with the expression
+    modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
+
+  cond = IfBool 
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp n (Expr 'Num n)
@@ -345,6 +381,26 @@ instance Accessible 'Bool where
 -- access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
+
+-- update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
+-- update (Val val) _ _ = case val of {}
+-- update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
+-- update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
+-- update (Ref (Array _ addr)) i expr = do 
+--   ref <- allocVar
+--   writeHeap addr [(i, ref)]
+--   -- associate 'ref' with the expression
+--   assign (Var ref) expr
+
+
+
+-- update (If ex ex' ex3) i expr = _wc
+-- update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
+-- update (Array _ addr) i expr = do
+--   ref <- allocVar
+--   writeHeap addr [(i, ref)]
+--   -- associate 'ref' with the expression
+--   assign (Variable ref) expr
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 -- update :: Referable ty => Ref ('Arr kind) -> Int -> Expr kind n -> Comp n ()

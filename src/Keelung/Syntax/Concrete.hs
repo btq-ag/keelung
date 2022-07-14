@@ -150,7 +150,8 @@ instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
   flatten (S.Or x y) = Or (flatten x) (flatten y)
   flatten (S.Xor x y) = Xor (flatten x) (flatten y)
   flatten (S.BEq x y) = BEq (flatten x) (flatten y)
-  flatten (S.If c t e) = If (flatten c) (flatten t) (flatten e)
+  flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
+  flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.ToBool x) = ToBool (flatten x)
   flatten (S.ToNum x) = ToNum (flatten x)
 

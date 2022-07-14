@@ -9,7 +9,7 @@ module Main where
 
 -- import Control.Monad (forM_)
 import Keelung
-import Control.Monad
+-- import Control.Monad
 
 -- | Outputs whether number is given.
 echo :: Comp GF181 (Expr 'Num GF181)
@@ -30,7 +30,7 @@ tempConvert = do
   toFahrenheit <- input
   degree <- input
   return $
-    If
+    cond
       toFahrenheit
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
