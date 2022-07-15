@@ -10,8 +10,7 @@ module Keelung.Monad
     Computation (..),
     Elaborated (..),
     Assignment (..),
-
-    -- 
+    --
 
     -- * Experimental
 
@@ -20,7 +19,7 @@ module Keelung.Monad
 
     -- * Array
 
-    -- allocArray,
+    allocArray,
     -- allocArray2,
     -- allocArray3,
     -- access,
@@ -30,23 +29,23 @@ module Keelung.Monad
     -- update2,
     -- update3,
     -- lengthOf,
-    Accessible(..),
+    Referable (..),
 
     -- * Input Variable & Array
     input,
     inputNum,
     inputBool,
     inputs,
-    -- inputVarNum,
-    -- inputVarBool,
-    -- inputArray,
-    -- inputArray2,
-    -- inputArray3,
+    inputs2,
+    inputs3,
+
+
+
+
     cond,
 
     -- * Statements
-    assert
-
+    assert,
     -- ifThenElse,
     -- reduce,
     -- reducei,
@@ -177,59 +176,44 @@ allocVar = do
   modify (\st -> st {compNextVar = succ index})
   return index
 
--- | Requests a fresh input variable
--- inputVar :: Comp n (Ref ty)
--- inputVar = do
---   var <- allocVar
---   markVarAsInput var
---   return $ Variable2 var
-
 --------------------------------------------------------------------------------
 
--- | Typeclass for requesting inputs
+-- | Typeclass for operations on base types
 class Proper t where
   -- | Request a fresh input
   input :: Comp n (Expr t n)
-  -- | Update an entry of an array 
+
+  -- | Update an entry of an array
   update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
-  -- | Conditional clause 
+
+  -- | Conditional clause
   cond :: Expr 'Bool n -> Expr t n -> Expr t n -> Expr t n
-
--- update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
--- update (Val val) _ _ = case val of {}
--- update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
--- update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
--- update (Ref (Array _ addr)) i expr = do 
---   ref <- allocVar
---   writeHeap addr [(i, ref)]
---   -- associate 'ref' with the expression
---   assign (Var ref) expr
-
 
 instance Proper 'Num where
   input = inputNum
+
   update (Val val) _ _ = case val of {}
   update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
-  update (Ref (Array _ addr)) i expr = do 
+  update (Ref (Array _ addr)) i expr = do
     ref <- allocVar
     writeHeap addr [(i, ref)]
     -- associate 'ref' with the expression
-    modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
+    assign ref expr
 
-  cond = IfNum 
+  cond = IfNum
 
 instance Proper 'Bool where
   input = inputBool
 
   update (Val val) _ _ = case val of {}
   update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
-  update (Ref (Array _ addr)) i expr = do 
+  update (Ref (Array _ addr)) i expr = do
     ref <- allocVar
     writeHeap addr [(i, ref)]
     -- associate 'ref' with the expression
-    modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
+    assign ref expr
 
-  cond = IfBool 
+  cond = IfBool
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp n (Expr 'Num n)
@@ -249,55 +233,36 @@ inputBool = do
 -- Array & Input Array
 --------------------------------------------------------------------------------
 
--- -- | Allocates a 1D-array of fresh variables
--- allocArray' :: Referable kind => [Expr kind n] -> Comp n (Ref ('Arr kind))
--- allocArray' xs = do
---   let size = length xs
---   when (size == 0) $ throwError EmptyArrayError
---   -- declare new variables
---   vars <- newVars size
---   -- allocate a new array and associate it's content with the new variables
---   array <- allocateArrayWithVars vars
+-- | Allocates a 1D-array of fresh variables
+allocArray :: Referable t => [Expr t n] -> Comp n (Expr ('Arr t) n)
+allocArray xs = do
+  let size = length xs
+  when (size == 0) $ throwError EmptyArrayError
+  -- declare new variables
+  vars <- newVars size
+  -- alloc ate a new array and associate it's content with the new variables
+  arrayAddr <- allocateArrayWithVars vars
 
---   forM_ (zip [0 ..] xs) $ \(i, x) -> do
---     update array i x
+  forM_ (zip (IntSet.toList vars) xs) $ \(var, expr) -> do
+    -- associate each variable with the corresponding element of the array
+    assign var expr
 
---   return array
+  return (Ref arrayAddr)
 
 -- | Convert an array into a list of expressions
--- expose :: Ref ('Arr kind) -> Comp n [Expr kind n]
--- expose (Array2 len addr) = do
---   forM [0 .. len - 1] $ \i -> do
---     Var . Variable <$> readHeap (addr, i)
+-- toList :: Expr ('Arr t) n -> Comp n [Expr t n]
+-- toList (Val val) = case val of {}
+-- toList (Ref (Array len addr)) = do
 
--- allocArray' 0 = throwError EmptyArrayError
--- allocArray' size = do
---   -- declare new variables
---   vars <- newVars size
---   -- allocate a new array and associate it's content with the new variables
---   allocateArrayWithVars vars
+--   elems <- forM [0 .. pred len] $ \i -> do
+--     readHeap (addr, i)
 
--- | Allocates a 1D-array of fresh variables
--- allocArray :: Int -> Comp n (Ref ('Arr kind))
--- allocArray 0 = throwError EmptyArrayError
--- allocArray size = do
---   -- declare new variables
---   vars <- newVars size
---   -- allocate a new array and associate it's content with the new variables
---   allocateArrayWithVars vars
+  -- return $ map (Ref . NumVar) elems
 
--- -- | Allocates a 2D-array of fresh variables
--- allocArray2 :: Int -> Int -> Comp n (Ref ('Arr ('Arr kind)))
--- allocArray2 0 _ = throwError EmptyArrayError
--- allocArray2 _ 0 = throwError EmptyArrayError
--- allocArray2 sizeM sizeN = do
---   -- allocate `sizeM` arrays each of size `sizeN`
---   innerArrays <- replicateM sizeM (allocArray sizeN)
---   -- collect references of these arrays
---   vars <- forM innerArrays $ \array -> do
---     case array of Array2 _ addr -> return addr
---   -- and allocate a new array with these references
---   allocateArrayWithVars $ IntSet.fromList vars
+  -- -- read the array from the heap
+  -- elems <- readHeap addr
+  -- -- convert each element into an expression
+  -- return $ map (\(i, n) -> Ref $ Array len n) elems
 
 -- -- | Allocates a 3D-array of fresh variables
 -- allocArray3 :: Int -> Int -> Int -> Comp n (Ref ('Arr ('Arr ('Arr kind))))
@@ -316,61 +281,54 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: Int -> Comp n (Expr ('Arr t) n)
+inputs :: (Proper t, Referable t) => Int -> Comp n (Expr ('Arr t) n)
 inputs 0 = throwError EmptyArrayError
 inputs size = do
-  -- draw new variables and mark them as inputs
-  vars <- newVars size
-  markVarsAsInput vars
-  -- allocate a new array and associate it's content with the new variables
-  Ref <$> allocateArrayWithVars vars
+  vars <- replicateM size input
+  allocArray vars
 
--- -- | Requests a 2D-array of fresh input variables
--- inputArray2 :: Int -> Int -> Comp n (Ref ('Arr ('Arr kind)))
--- inputArray2 0 _ = throwError EmptyArrayError
--- inputArray2 _ 0 = throwError EmptyArrayError
--- inputArray2 sizeM sizeN = do
---   -- allocate `sizeM` input arrays each of size `sizeN`
---   innerArrays <- replicateM sizeM (inputArray sizeN)
---   -- collect references of these arrays
---   vars <- forM innerArrays $ \array -> do
---     case array of Array2 _ addr -> return addr
---   -- and allocate a new array with these references
---   allocateArrayWithVars $ IntSet.fromList vars
+-- | Requests a 2D-array of fresh input variables
+inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
+inputs2 0 _ = throwError EmptyArrayError
+inputs2 _ 0 = throwError EmptyArrayError
+inputs2 sizeM sizeN = do
+  vars <- replicateM sizeM (inputs sizeN)
+  allocArray vars
 
--- -- | Requests a 3D-array of fresh input variables
--- inputArray3 :: Int -> Int -> Int -> Comp n (Ref ('Arr ('Arr ('Arr kind))))
--- inputArray3 0 _ _ = throwError EmptyArrayError
--- inputArray3 _ 0 _ = throwError EmptyArrayError
--- inputArray3 _ _ 0 = throwError EmptyArrayError
--- inputArray3 sizeM sizeN sizeO = do
---   -- allocate `sizeM` input arrays each of size `sizeN * sizeO`
---   innerArrays <- replicateM sizeM (inputArray2 sizeN sizeO)
---   -- collect references of these arrays
---   vars <- forM innerArrays $ \array -> do
---     case array of Array2 _ addr -> return addr
---   -- and allocate a new array with these references
---   allocateArrayWithVars $ IntSet.fromList vars
+-- | Requests a 3D-array of fresh input variables
+inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
+inputs3 0 _ _ = throwError EmptyArrayError
+inputs3 _ 0 _ = throwError EmptyArrayError
+inputs3 _ _ 0 = throwError EmptyArrayError
+inputs3 sizeM sizeN sizeO = do
+  vars <- replicateM sizeM (inputs2 sizeN sizeO)
+  allocArray vars
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for retrieving the element of an array
-class Accessible t where
+class Referable t where
   access :: Ref ('Arr t) -> Int -> Comp n (Expr t n)
 
--- access :: Ref ('Arr t) -> Int -> Comp n (Expr t n)
--- access (Array len addr) i = do
---   when (i < 0 || i >= len) $ throwError $ IndexOutOfBoundsError i len
---   Var . Variable <$> readHeap (addr, i)
+  -- | Associates a variable with an expression
+  assign :: Addr -> Expr t n -> Comp n ()
 
-instance Accessible ('Arr ref) where
+instance Referable ('Arr ref) where
   access (Array len addr) i = Ref . Array len <$> readHeap (addr, i)
 
-instance Accessible 'Num where
-  access (Array _len addr) i = Ref . NumVar <$> readHeap (addr, i)
+  assign _ (Val val) = case val of {}
+  assign ref (Ref (Array len addr)) = do
+    forM_ [0 .. len - 1] $ \i -> do
+      var <- readHeap (addr, i)
+      writeHeap ref [(i, var)]
 
-instance Accessible 'Bool where
+instance Referable 'Num where
+  access (Array _len addr) i = Ref . NumVar <$> readHeap (addr, i)
+  assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
+
+instance Referable 'Bool where
   access (Array _len addr) i = Ref . BoolVar <$> readHeap (addr, i)
+  assign ref expr = modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
 
 -- -- | Access a variable from a 2-D array
 -- access2 :: Ref ('Arr ('Arr kind)) -> (Int, Int) -> Comp n (Ref kind)
@@ -381,35 +339,6 @@ instance Accessible 'Bool where
 -- access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
-
--- update :: Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
--- update (Val val) _ _ = case val of {}
--- update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
--- update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
--- update (Ref (Array _ addr)) i expr = do 
---   ref <- allocVar
---   writeHeap addr [(i, ref)]
---   -- associate 'ref' with the expression
---   assign (Var ref) expr
-
-
-
--- update (If ex ex' ex3) i expr = _wc
--- update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
--- update (Array _ addr) i expr = do
---   ref <- allocVar
---   writeHeap addr [(i, ref)]
---   -- associate 'ref' with the expression
---   assign (Variable ref) expr
-
--- | Update array 'addr' at position 'i' to expression 'expr'
--- update :: Referable ty => Ref ('Arr kind) -> Int -> Expr kind n -> Comp n ()
--- update (Array _ addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
--- update (Array _ addr) i expr = do
---   ref <- allocVar
---   writeHeap addr [(i, ref)]
---   -- associate 'ref' with the expression
---   assign (Variable ref) expr
 
 -- -- | Update array 'addr' at position '(j, i)' to expression 'expr'
 -- update2 :: Referable ty => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr ty n -> Comp n ()
