@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -11,6 +12,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Data.Serialize
+import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
@@ -21,7 +23,11 @@ type Var = Int
 type Addr = Int
 
 -- | A Heap is an mapping of mappings of variables
-type Heap = IntMap (IntMap Int)
+type Heap =
+  IntMap
+    ( Kind, -- kind of element
+      IntMap Int -- mapping of index to address of element variables 
+    )
 
 --------------------------------------------------------------------------------
 
@@ -31,7 +37,38 @@ data Kind
   | Bool -- Booleans
   | Unit -- Unit
   | Arr Kind -- Arrays
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance Serialize Kind
+
+instance Semigroup Kind where
+  a <> b = case (a, b) of
+    (Num, Num) -> Num
+    (Bool, Bool) -> Bool
+    (Unit, Unit) -> Unit
+    (Arr a', Arr b') -> Arr (a' <> b')
+    _ -> error "Kinds must be the same"
+
+kindOf :: Expr t n -> Kind
+kindOf (Val (Number _)) = Num
+kindOf (Val (Boolean _)) = Bool
+kindOf (Val UnitVal) = Unit
+kindOf (Ref (BoolVar _)) = Bool
+kindOf (Ref (NumVar _)) = Num
+kindOf (Ref (Array kind _ _)) = Arr kind
+kindOf (Add _ _) = Num
+kindOf (Sub _ _) = Num
+kindOf (Mul _ _) = Num
+kindOf (Div _ _) = Num
+kindOf (Eq _ _) = Bool
+kindOf (And _ _) = Bool
+kindOf (Or _ _) = Bool
+kindOf (Xor _ _) = Bool
+kindOf (BEq _ _) = Bool
+kindOf (IfNum {}) = Num
+kindOf (IfBool {}) = Bool
+kindOf (ToBool _) = Bool
+kindOf (ToNum _) = Num
 
 --------------------------------------------------------------------------------
 
@@ -76,7 +113,7 @@ instance Serialize n => Serialize (Val 'Unit n) where
 
 instance Functor (Val t) where
   fmap f (Number n) = Number (f n)
-  fmap _ (Boolean b) = Boolean b 
+  fmap _ (Boolean b) = Boolean b
   fmap _ UnitVal = UnitVal
 
 --------------------------------------------------------------------------------
@@ -85,13 +122,13 @@ instance Functor (Val t) where
 data Ref :: Kind -> Type where
   BoolVar :: Var -> Ref 'Bool
   NumVar :: Var -> Ref 'Num
-  Array :: Int -> Addr -> Ref ('Arr val) -- RefKinds to arrays
+  Array :: Kind -> Int -> Addr -> Ref ('Arr val)
 
 -- | 2 references are equal if they refer to the same variable or array
 instance Eq (Ref kind) where
   BoolVar i == BoolVar j = i == j
   NumVar i == NumVar j = i == j
-  Array _ addr == Array _ addr' = addr == addr'
+  Array _ _ addr == Array _ _ addr' = addr == addr'
 
 instance Serialize (Ref 'Num) where
   put (NumVar v) = putWord8 0 >> put v
@@ -110,23 +147,23 @@ instance Serialize (Ref 'Bool) where
       _ -> fail "Invalid tag"
 
 instance Serialize (Ref ('Arr val)) where
-  put (Array n a) = putWord8 2 >> put n >> put a
+  put (Array k n a) = putWord8 2 >> put k >> put n >> put a
   get = do
     tag <- getWord8
     case tag of
-      2 -> Array <$> get <*> get
+      2 -> Array <$> get <*> get <*> get
       _ -> fail "Invalid tag"
 
 instance Show (Ref ref) where
   show (BoolVar v) = "$B" ++ show v
   show (NumVar v) = "$N" ++ show v
-  show (Array n a) = "$A" ++ show n ++ ":" ++ show a
+  show (Array _ n a) = "$A" ++ show n ++ ":" ++ show a
 
 --------------------------------------------------------------------------------
 
 -- | Expressions are indexed by 'Kind' and parameterised by some field
 data Expr :: Kind -> Type -> Type where
-  -- Value & Reference 
+  -- Value & Reference
   Val :: Val t n -> Expr t n
   Ref :: Ref t -> Expr t n
   -- Operators on numbers
@@ -199,8 +236,9 @@ instance Serialize n => Serialize (Expr 'Unit n) where
   put expr = case expr of
     Val val -> putWord8 0 >> put val
     Ref ref -> case ref of {}
-    -- IfNum x y z -> putWord8 40 >> put x >> put y >> put z
-    -- IfBool x y z -> putWord8 41 >> put x >> put y >> put z
+
+  -- IfNum x y z -> putWord8 40 >> put x >> put y >> put z
+  -- IfBool x y z -> putWord8 41 >> put x >> put y >> put z
   get = do
     tag <- getWord8
     case tag of
@@ -324,5 +362,3 @@ nbeq x y = IfBool (x `BEq` y) false true
 -- | Helper function for negating a boolean expression
 neg :: Expr 'Bool n -> Expr 'Bool n
 neg x = true `Xor` x
-
-

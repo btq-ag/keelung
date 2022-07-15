@@ -80,7 +80,7 @@ instance Integral n => Flatten (S.Val t n) Val where
 instance Flatten (S.Ref kind) Ref where
   flatten (S.BoolVar i) = BoolVar i
   flatten (S.NumVar i) = NumVar i
-  flatten (S.Array n i) = Array n i
+  flatten (S.Array _ n i) = Array n i
 
 data Expr
   = Val Val

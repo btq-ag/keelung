@@ -193,10 +193,10 @@ instance Proper 'Num where
   input = inputNum
 
   update (Val val) _ _ = case val of {}
-  update (Ref (Array _ addr)) i (Ref (NumVar n)) = writeHeap addr [(i, n)]
-  update (Ref (Array _ addr)) i expr = do
+  update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr Num [(i, n)]
+  update (Ref (Array _ _ addr)) i expr = do
     ref <- allocVar
-    writeHeap addr [(i, ref)]
+    writeHeap addr Num [(i, ref)]
     -- associate 'ref' with the expression
     assign ref expr
 
@@ -206,10 +206,10 @@ instance Proper 'Bool where
   input = inputBool
 
   update (Val val) _ _ = case val of {}
-  update (Ref (Array _ addr)) i (Ref (BoolVar n)) = writeHeap addr [(i, n)]
-  update (Ref (Array _ addr)) i expr = do
+  update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr Bool [(i, n)]
+  update (Ref (Array _ _ addr)) i expr = do
     ref <- allocVar
-    writeHeap addr [(i, ref)]
+    writeHeap addr Bool [(i, ref)]
     -- associate 'ref' with the expression
     assign ref expr
 
@@ -238,10 +238,11 @@ allocArray :: Referable t => [Expr t n] -> Comp n (Expr ('Arr t) n)
 allocArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
+  let kind = kindOf (head xs)
   -- declare new variables
   vars <- newVars size
   -- alloc ate a new array and associate it's content with the new variables
-  arrayAddr <- allocateArrayWithVars vars
+  arrayAddr <- allocateArrayWithVars kind vars
 
   forM_ (zip (IntSet.toList vars) xs) $ \(var, expr) -> do
     -- associate each variable with the corresponding element of the array
@@ -314,20 +315,20 @@ class Referable t where
   assign :: Addr -> Expr t n -> Comp n ()
 
 instance Referable ('Arr ref) where
-  access (Array len addr) i = Ref . Array len <$> readHeap (addr, i)
+  access (Array kind len addr) i = Ref . Array kind len <$> readHeap (addr, i)
 
   assign _ (Val val) = case val of {}
-  assign ref (Ref (Array len addr)) = do
+  assign ref (Ref (Array kind len addr)) = do
     forM_ [0 .. len - 1] $ \i -> do
       var <- readHeap (addr, i)
-      writeHeap ref [(i, var)]
+      writeHeap ref kind [(i, var)]
 
 instance Referable 'Num where
-  access (Array _len addr) i = Ref . NumVar <$> readHeap (addr, i)
+  access (Array _ _ addr) i = Ref . NumVar <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
 
 instance Referable 'Bool where
-  access (Array _len addr) i = Ref . BoolVar <$> readHeap (addr, i)
+  access (Array _ _ addr) i = Ref . BoolVar <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
 
 -- -- | Access a variable from a 2-D array
@@ -363,12 +364,12 @@ newVars n = do
 
 -- | Internal helper function for allocating an array
 -- and associate the address with a set of variables
-allocateArrayWithVars :: IntSet -> Comp n (Ref ('Arr ty))
-allocateArrayWithVars vars = do
+allocateArrayWithVars :: Kind -> IntSet -> Comp n (Ref ('Arr ty))
+allocateArrayWithVars kind vars = do
   let size = IntSet.size vars
   addr <- freshAddr
-  writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
-  return $ Array size addr
+  writeHeap addr kind $ zip [0 .. pred size] $ IntSet.toList vars
+  return $ Array kind size addr
   where
     freshAddr :: Comp n Addr
     freshAddr = do
@@ -386,11 +387,11 @@ markVarsAsInput vars =
   modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- | Internal helper function for allocating an array on the heap
-writeHeap :: Addr -> [(Int, Var)] -> Comp n ()
-writeHeap addr array = do
+writeHeap :: Addr -> Kind -> [(Int, Var)] -> Comp n ()
+writeHeap addr kind array = do
   let bindings = IntMap.fromList array
   heap <- gets compHeap
-  let heap' = IntMap.insertWith (<>) addr bindings heap
+  let heap' = IntMap.insertWith (<>) addr (kind, bindings) heap
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for access an array on the heap
@@ -400,7 +401,7 @@ readHeap (addr, i) = do
   case IntMap.lookup addr heap of
     Nothing ->
       throwError $ UnboundArrayError addr i heap
-    Just array -> case IntMap.lookup i array of
+    Just (_, array) -> case IntMap.lookup i array of
       Nothing -> throwError $ UnboundArrayError addr i heap
       Just n -> return n
 
