@@ -25,9 +25,25 @@ type Addr = Int
 -- | A Heap is an mapping of mappings of variables
 type Heap =
   IntMap
-    ( Kind, -- kind of element
+    ( ElemType, -- kind of element
       IntMap Int -- mapping of index to address of element variables 
     )
+
+-- | Type of elements of a array 
+data ElemType
+  = NumElem -- Field numbers
+  | BoolElem -- Booleans
+  | ArrElem ElemType Int -- Arrays
+  deriving (Show, Eq, Generic)
+
+instance Serialize ElemType
+
+instance Semigroup ElemType where
+  a <> b = case (a, b) of
+    (NumElem, NumElem) -> NumElem
+    (BoolElem, BoolElem) -> BoolElem
+    (ArrElem a' l, ArrElem b' _) -> ArrElem (a' <> b') l
+    _ -> error "ElemType must be the same"
 
 --------------------------------------------------------------------------------
 
@@ -37,38 +53,7 @@ data Kind
   | Bool -- Booleans
   | Unit -- Unit
   | Arr Kind -- Arrays
-  deriving (Show, Eq, Generic)
-
-instance Serialize Kind
-
-instance Semigroup Kind where
-  a <> b = case (a, b) of
-    (Num, Num) -> Num
-    (Bool, Bool) -> Bool
-    (Unit, Unit) -> Unit
-    (Arr a', Arr b') -> Arr (a' <> b')
-    _ -> error "Kinds must be the same"
-
-kindOf :: Expr t n -> Kind
-kindOf (Val (Number _)) = Num
-kindOf (Val (Boolean _)) = Bool
-kindOf (Val UnitVal) = Unit
-kindOf (Ref (BoolVar _)) = Bool
-kindOf (Ref (NumVar _)) = Num
-kindOf (Ref (Array kind _ _)) = Arr kind
-kindOf (Add _ _) = Num
-kindOf (Sub _ _) = Num
-kindOf (Mul _ _) = Num
-kindOf (Div _ _) = Num
-kindOf (Eq _ _) = Bool
-kindOf (And _ _) = Bool
-kindOf (Or _ _) = Bool
-kindOf (Xor _ _) = Bool
-kindOf (BEq _ _) = Bool
-kindOf (IfNum {}) = Num
-kindOf (IfBool {}) = Bool
-kindOf (ToBool _) = Bool
-kindOf (ToNum _) = Num
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
@@ -122,7 +107,7 @@ instance Functor (Val t) where
 data Ref :: Kind -> Type where
   BoolVar :: Var -> Ref 'Bool
   NumVar :: Var -> Ref 'Num
-  Array :: Kind -> Int -> Addr -> Ref ('Arr val)
+  Array :: ElemType -> Int -> Addr -> Ref ('Arr val)
 
 -- | 2 references are equal if they refer to the same variable or array
 instance Eq (Ref kind) where
