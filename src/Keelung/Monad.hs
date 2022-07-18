@@ -29,6 +29,8 @@ module Keelung.Monad
     -- update3,
     -- lengthOf,
     Referable (access, fromArray),
+    access2,
+    access3,
 
     -- * Input Variable & Array
     input,
@@ -42,8 +44,7 @@ module Keelung.Monad
     -- * Statements
     assert,
     -- ifThenElse,
-    -- reduce,
-    -- reducei,
+    reduce
     -- -- loop,s
     -- loopi,
     -- sum',
@@ -75,13 +76,13 @@ import Prelude hiding (product, sum)
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
-data Assignment ty n = Assignment (Ref ty) (Expr ty n)
+data Assignment t n = Assignment (Ref t) (Expr t n)
   deriving (Eq, Generic)
 
-instance Show n => Show (Assignment ty n) where
+instance Show n => Show (Assignment t n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Functor (Assignment ty) where
+instance Functor (Assignment t) where
   fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 instance Serialize n => Serialize (Assignment 'Num n)
@@ -129,15 +130,15 @@ instance Serialize n => Serialize (Computation n)
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
-data Elaborated ty n = Elaborated
+data Elaborated t n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Expr ty n),
+    elabExpr :: !(Expr t n),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
   deriving (Generic, Eq)
 
-instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
+instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated t n) where
   show (Elaborated expr comp) =
     "{\n expression: "
       ++ show (fmap N expr)
@@ -285,7 +286,7 @@ inputs3 sizeM sizeN sizeO = do
 
 -- | Typeclass for retrieving the element of an array
 class Referable t where
-  access :: Ref ('Arr t) -> Int -> Comp n (Expr t n)
+  access :: Expr ('Arr t) n -> Int -> Comp n (Expr t n)
 
   -- | Associates a variable with an expression
   assign :: Addr -> Expr t n -> Comp n ()
@@ -306,7 +307,8 @@ class Referable t where
 --     Arr k -> return $ map (Ref . Arr k) elems
 
 instance Referable ('Arr ref) where
-  access (Array elemType len addr) i = Ref . Array elemType len . snd <$> readHeap (addr, i)
+  access (Val val) _ = case val of {}
+  access (Ref (Array elemType len addr)) i = Ref . Array elemType len . snd <$> readHeap (addr, i)
 
   assign _ (Val val) = case val of {}
   assign ref (Ref (Array elemType len addr)) = do
@@ -332,7 +334,8 @@ instance Referable ('Arr ref) where
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len 
 
 instance Referable 'Num where
-  access (Array _ _ addr) i = Ref . NumVar . snd <$> readHeap (addr, i)
+  access (Val val) _ = case val of {}
+  access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
 
 
@@ -354,7 +357,8 @@ instance Referable 'Num where
 
 
 instance Referable 'Bool where
-  access (Array _ _ addr) i = Ref . BoolVar . snd <$> readHeap (addr, i)
+  access (Val val) _ = case val of {}
+  access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
 
   fromArray (Val val) = case val of {}
@@ -373,24 +377,24 @@ instance Referable 'Bool where
 
   typeOf _ = BoolElem  
 
--- -- | Access a variable from a 2-D array
--- access2 :: Ref ('Arr ('Arr kind)) -> (Int, Int) -> Comp n (Ref kind)
--- access2 addr (i, j) = access addr i >>= flip access j
+-- | Access a variable from a 2-D array
+access2 :: Referable t => Expr ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Expr t n)
+access2 addr (i, j) = access addr i >>= flip access j
 
--- -- | Access a variable from a 3-D array
--- access3 :: Ref ('Arr ('Arr ('Arr kind))) -> (Int, Int, Int) -> Comp n (Ref kind)
--- access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
+-- | Access a variable from a 3-D array
+access3 :: Referable t => Expr ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Expr t n)
+access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
 
 -- -- | Update array 'addr' at position '(j, i)' to expression 'expr'
--- update2 :: Referable ty => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr ty n -> Comp n ()
+-- update2 :: Referable t => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr t n -> Comp n ()
 -- update2 ref (j, i) expr = do
 --   ref' <- access ref i
 --   update ref' j expr
 
 -- -- | Update array 'addr' at position '(k, j, i)' to expression 'expr'
--- update3 :: Referable ty => Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Expr ty n -> Comp n ()
+-- update3 :: Referable t => Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Expr t n -> Comp n ()
 -- update3 ref (k, j, i) expr = do
 --   ref' <- access ref i >>= flip access j
 --   update ref' k expr
@@ -450,8 +454,8 @@ readHeap (addr, i) = do
 -- --------------------------------------------------------------------------------
 
 -- -- | Typeclass for certain operations on references
--- class Referable ty where
---   assign :: Ref ('V ty) -> Expr ty n -> Comp n ()
+-- class Referable t where
+--   assign :: Ref ('V ty) -> Expr t n -> Comp n ()
 
 -- instance Referable 'Num where
 --   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
@@ -460,8 +464,8 @@ readHeap (addr, i) = do
 --   assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
 
 -- -- | Typeclass for comparing expressions
--- class Comparable ty where
---   equal :: Expr ty n -> Expr ty n -> Expr 'Bool n
+-- class Comparable t where
+--   equal :: Expr t n -> Expr t n -> Expr 'Bool n
 
 -- instance Comparable 'Num where
 --   equal x y = x `Eq` y
@@ -472,12 +476,12 @@ readHeap (addr, i) = do
 -- --------------------------------------------------------------------------------
 
 -- -- | Helper function for constructing the if...then...else expression
--- ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n (Expr ty n)
+-- ifThenElse :: Expr 'Bool n -> Comp n (Expr t n) -> Comp n (Expr t n) -> Comp n (Expr t n)
 -- ifThenElse p x y = If p <$> x <*> y
 
--- -- | An alternative to 'foldM'
--- reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
--- reduce a xs f = foldM f a xs
+-- | An alternative to 'foldM'
+reduce :: Foldable m => Expr t n -> m a -> (Expr t n -> a -> Comp n (Expr t n)) -> Comp n (Expr t n)
+reduce a xs f = foldM f a xs
 
 -- -- reduce ::
 -- --   Ref ('A ('V kind)) ->
@@ -542,7 +546,7 @@ assert :: Expr 'Bool n -> Comp n ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 
 -- -- | Assert that two expressions are equal
--- assertArrayEqual :: Comparable ty => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
+-- assertArrayEqual :: Comparable t => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
 -- assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
 --   a <- access xs i
 --   b <- access ys i
