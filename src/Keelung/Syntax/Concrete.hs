@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -42,15 +43,19 @@ instance Serialize Val
 data Ref
   = NumVar Var
   | BoolVar Var
-  | Array Int Addr
-  deriving (Generic, Eq)
+  deriving
+    ( -- | Array Int Addr
+      Generic,
+      Eq
+    )
 
 instance Serialize Ref
 
 instance Show Ref where
   show (NumVar n) = "$N" ++ show n
   show (BoolVar n) = "$B" ++ show n
-  show (Array _ n) = "$A" ++ show n
+
+-- show (Array _ n) = "$A" ++ show n
 
 --------------------------------------------------------------------------------
 data ArrRef = Arr Addr ArrKind
@@ -77,10 +82,14 @@ instance Integral n => Flatten (S.Val t n) Val where
   flatten (S.Boolean b) = Boolean b
   flatten S.UnitVal = Unit
 
-instance Flatten (S.Ref kind) Ref where
+instance Flatten (S.Ref 'S.Bool) Ref where
   flatten (S.BoolVar i) = BoolVar i
+
+instance Flatten (S.Ref 'S.Num) Ref where
   flatten (S.NumVar i) = NumVar i
-  flatten (S.Array _ n i) = Array n i
+
+-- flatten (S.NumVar i) = NumVar i
+-- flatten (S.Array _ n i) = Array n i
 
 data Expr
   = Val Val
@@ -138,22 +147,47 @@ instance Show Expr where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance (Typeable kind, Integral n) => Flatten (S.Expr kind n) Expr where
+instance Integral n => Flatten (S.Expr 'S.Num n) Expr where
   flatten (S.Val val) = Val (flatten val)
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
   flatten (S.Div x y) = Div (flatten x) (flatten y)
+  flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
+  flatten (S.ToNum x) = ToNum (flatten x)
+
+instance Integral n => Flatten (S.Expr 'S.Bool n) Expr where
+  flatten (S.Val val) = Val (flatten val)
+  flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Eq x y) = Eq (flatten x) (flatten y)
   flatten (S.And x y) = And (flatten x) (flatten y)
   flatten (S.Or x y) = Or (flatten x) (flatten y)
   flatten (S.Xor x y) = Xor (flatten x) (flatten y)
   flatten (S.BEq x y) = BEq (flatten x) (flatten y)
-  flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.ToBool x) = ToBool (flatten x)
-  flatten (S.ToNum x) = ToNum (flatten x)
+
+instance Integral n => Flatten (S.Expr 'S.Unit n) Expr where
+  flatten (S.Val S.UnitVal) = Val Unit
+  flatten (S.Ref ref) = case ref of {}
+
+-- instance (Integral n) => Flatten (S.Expr kind n) Expr where
+--   flatten (S.Val val) = Val (flatten val)
+--   flatten (S.Ref ref) = Var (flatten ref)
+--   flatten (S.Add x y) = Add (flatten x) (flatten y)
+--   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
+--   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
+--   flatten (S.Div x y) = Div (flatten x) (flatten y)
+--   flatten (S.Eq x y) = Eq (flatten x) (flatten y)
+--   flatten (S.And x y) = And (flatten x) (flatten y)
+--   flatten (S.Or x y) = Or (flatten x) (flatten y)
+--   flatten (S.Xor x y) = Xor (flatten x) (flatten y)
+--   flatten (S.BEq x y) = BEq (flatten x) (flatten y)
+--   flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
+--   flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
+--   flatten (S.ToBool x) = ToBool (flatten x)
+--   flatten (S.ToNum x) = ToNum (flatten x)
 
 instance Serialize Expr
 
@@ -175,23 +209,14 @@ instance Show Elaborated where
       ++ show comp
       ++ "\n}"
 
--- instance (Typeable kind, Integral n) => Flatten (S.Computation n) Elaborated where
---   flatten (S.Computation e c) = Elaborated (flatten e) (flatten c)
-
-instance
-  (Typeable kind, Integral n, Flatten (S.Computation n) Computation) =>
-  Flatten (S.Elaborated kind n) Elaborated
-  where
+instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Num n) Elaborated where
   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
 
--- instance (Typeable kind) => Flatten (S.Elaborated kind B64) Elaborated where
---   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
+instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Bool n) Elaborated where
+  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
 
--- instance (Typeable kind) => Flatten (S.Elaborated kind GF181) Elaborated where
---   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
-
--- instance (Typeable kind) => Flatten (S.Elaborated kind BN128) Elaborated where
---   flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
+instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Unit n) Elaborated where
+  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
 
 instance Serialize Elaborated
 
@@ -202,7 +227,10 @@ data Assignment = Assignment Ref Expr
 instance Show Assignment where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance (Typeable kind, Integral n) => Flatten (S.Assignment kind n) Assignment where
+instance Integral n => Flatten (S.Assignment 'S.Num n) Assignment where
+  flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
+
+instance Integral n => Flatten (S.Assignment 'S.Bool n) Assignment where
   flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
 
 instance Serialize Assignment
@@ -294,7 +322,7 @@ freeVars expr = case expr of
   -- Var (UnitVar n) -> IntSet.singleton n
   Var (NumVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
-  Var (Array _ n) -> IntSet.singleton n
+  -- Var (Array _ n) -> IntSet.singleton n
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y
