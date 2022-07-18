@@ -174,6 +174,9 @@ allocVar = do
 
 --------------------------------------------------------------------------------
 
+-- | Updates an entry of an array.
+-- When the assigned expression is a variable, 
+-- we update the entry directly with the variable instead
 update :: Referable t => Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
 update (Val val) _ _ = case val of {}
 update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
@@ -224,14 +227,23 @@ toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
-  -- declare new variables
-  vars <- newVars size
-  -- alloc ate a new array and associate it's content with the new variables
-  arrayAddr <- allocateArrayWithVars kind vars
 
-  forM_ (zip (IntSet.toList vars) xs) $ \(var, expr) -> do
-    -- associate each variable with the corresponding element of the array
-    assign var expr
+
+  -- don't allocate a fresh variable the expression is already a variable
+  vars <- forM xs $ \expr -> do 
+    case expr of 
+      Ref (NumVar var) -> return var
+      Ref (BoolVar var) -> return var
+      others -> do 
+        var <- allocVar 
+        assign var others
+        return var 
+  -- allocate a new array and associate it's content with the new variables
+  arrayAddr <- allocateArrayWithVars kind (IntSet.fromList vars)
+
+  -- forM_ (zip (IntSet.toList vars) xs) $ \(var, expr) -> do
+  --   -- associate each variable with the corresponding element of the array
+  --   assign var expr
 
   return (Ref arrayAddr)
 
@@ -402,8 +414,8 @@ access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 -- --------------------------------------------------------------------------------
 
 -- | Internal helper function for generating multiple fresh variables.
-newVars :: Int -> Comp n IntSet
-newVars n = do
+allocVars :: Int -> Comp n IntSet
+allocVars n = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = n + index})
   return $ IntSet.fromDistinctAscList [index .. index + n - 1]

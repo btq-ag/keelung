@@ -43,19 +43,13 @@ instance Serialize Val
 data Ref
   = NumVar Var
   | BoolVar Var
-  deriving
-    ( -- | Array Int Addr
-      Generic,
-      Eq
-    )
+  deriving ( Generic, Eq)
 
 instance Serialize Ref
 
 instance Show Ref where
   show (NumVar n) = "$N" ++ show n
   show (BoolVar n) = "$B" ++ show n
-
--- show (Array _ n) = "$A" ++ show n
 
 --------------------------------------------------------------------------------
 data ArrRef = Arr Addr ArrKind
@@ -311,18 +305,14 @@ assignNum :: Ref -> Expr -> Comp ()
 assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
 
 assignBool :: Ref -> Expr -> Comp ()
-assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compNumAsgns st}
+assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
 
 -- collect free variables of an expression
 freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
-  -- Var (NumVar n) -> IntSet.singleton n
-  -- Var (BoolVar n) -> IntSet.singleton n
-  -- Var (UnitVar n) -> IntSet.singleton n
   Var (NumVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
-  -- Var (Array _ n) -> IntSet.singleton n
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y
