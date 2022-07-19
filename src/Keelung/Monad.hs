@@ -222,7 +222,7 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Allocates a 1D-array of fresh variables
-toArray :: Referable t => [Expr t n] -> Comp n (Expr ('Arr t) n)
+toArray :: (Referable t, Show n) => [Expr t n] -> Comp n (Expr ('Arr t) n)
 toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
@@ -234,6 +234,7 @@ toArray xs = do
     case expr of 
       Ref (NumVar var) -> return var
       Ref (BoolVar var) -> return var
+      Ref (Array _ _ addr) -> return addr
       others -> do 
         var <- allocVar 
         assign var others
@@ -271,14 +272,14 @@ toArray xs = do
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Referable t) => Int -> Comp n (Expr ('Arr t) n)
+inputs :: (Proper t, Referable t, Show n) => Int -> Comp n (Expr ('Arr t) n)
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
+inputs2 :: (Proper t, Referable t, Show n) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
@@ -286,7 +287,7 @@ inputs2 sizeM sizeN = do
   toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
+inputs3 :: (Proper t, Referable t, Show n) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
@@ -307,16 +308,6 @@ class Referable t where
   fromArray :: Expr ('Arr t) n -> Comp n [Expr t n]
 
   typeOf :: Expr t n -> ElemType
-
---
---   elems <- forM [0 .. pred len] $ \i -> do
---     readHeap (addr, i)
-
---   case kind of
---     Num -> return $ map (Ref . NumVar) elems
---     Bool -> return $ map (Ref . BoolVar) elems
---     Unit -> return $ map (Ref . UnitVar) elems
---     Arr k -> return $ map (Ref . Arr k) elems
 
 instance Referable ('Arr ref) where
   access (Val val) _ = case val of {}
@@ -397,28 +388,14 @@ access2 addr (i, j) = access addr i >>= flip access j
 access3 :: Referable t => Expr ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Expr t n)
 access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
---------------------------------------------------------------------------------
-
--- -- | Update array 'addr' at position '(j, i)' to expression 'expr'
--- update2 :: Referable t => Ref ('A ('A ('V ty))) -> (Int, Int) -> Expr t n -> Comp n ()
--- update2 ref (j, i) expr = do
---   ref' <- access ref i
---   update ref' j expr
-
--- -- | Update array 'addr' at position '(k, j, i)' to expression 'expr'
--- update3 :: Referable t => Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Expr t n -> Comp n ()
--- update3 ref (k, j, i) expr = do
---   ref' <- access ref i >>= flip access j
---   update ref' k expr
-
 -- --------------------------------------------------------------------------------
 
--- | Internal helper function for generating multiple fresh variables.
-allocVars :: Int -> Comp n IntSet
-allocVars n = do
-  index <- gets compNextVar
-  modify (\st -> st {compNextVar = n + index})
-  return $ IntSet.fromDistinctAscList [index .. index + n - 1]
+-- -- | Internal helper function for generating multiple fresh variables.
+-- allocVars :: Int -> Comp n IntSet
+-- allocVars n = do
+--   index <- gets compNextVar
+--   modify (\st -> st {compNextVar = n + index})
+--   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
 -- | Internal helper function for allocating an array
 -- and associate the address with a set of variables

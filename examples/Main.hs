@@ -9,6 +9,7 @@ module Main where
 
 -- import Control.Monad (forM_)
 import Keelung
+import Control.Monad (forM_)
 -- import Control.Monad
 
 -- | Outputs whether number is given.
@@ -78,6 +79,21 @@ assertSquare = do
   y <- input
   assert ((x * x) `Eq` y)
   return unit
+
+loop3 :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+loop3 n m = do
+  xs <- inputs2 n m
+  -- expecting square of signatures as input
+  squares <- inputs2 n m
+  -- for each signature
+  forM_ [0 .. n - 1] $ \i -> do
+    -- for each term of signature
+    forM_ [0 .. m - 1] $ \j -> do
+      x <- access2 xs (i, j)
+      x' <- access2 squares (i, j)
+      assert (x' `Eq` (x * x))
+
+  return unit 
 
 --   --------------------------------------------------------------------------------
 
