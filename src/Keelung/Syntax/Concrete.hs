@@ -82,9 +82,6 @@ instance Flatten (S.Ref 'S.Bool) Ref where
 instance Flatten (S.Ref 'S.Num) Ref where
   flatten (S.NumVar i) = NumVar i
 
--- flatten (S.NumVar i) = NumVar i
--- flatten (S.Array _ n i) = Array n i
-
 data Expr
   = Val Val
   | Var Ref
@@ -105,7 +102,6 @@ data Expr
 sizeOfExpr :: Expr -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
-  -- Var _ -> 1
   Var _ -> 1
   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y

@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE EmptyCase #-}
+-- {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Syntax where
 
@@ -72,30 +72,6 @@ instance Show n => Show (Val t n) where
   show (Boolean b) = show b
   show UnitVal = "unit"
 
-instance Serialize n => Serialize (Val 'Num n) where
-  put (Number n) = putWord8 0 >> put n
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> Number <$> get
-      _ -> fail "Invalid tag"
-
-instance Serialize n => Serialize (Val 'Bool n) where
-  put (Boolean b) = putWord8 1 >> put b
-  get = do
-    tag <- getWord8
-    case tag of
-      1 -> Boolean <$> get
-      _ -> fail "Invalid tag"
-
-instance Serialize n => Serialize (Val 'Unit n) where
-  put UnitVal = putWord8 2
-  get = do
-    tag <- getWord8
-    case tag of
-      2 -> return UnitVal
-      _ -> fail "Invalid tag"
-
 instance Functor (Val t) where
   fmap f (Number n) = Number (f n)
   fmap _ (Boolean b) = Boolean b
@@ -114,30 +90,6 @@ instance Eq (Ref kind) where
   BoolVar i == BoolVar j = i == j
   NumVar i == NumVar j = i == j
   Array _ _ addr == Array _ _ addr' = addr == addr'
-
-instance Serialize (Ref 'Num) where
-  put (NumVar v) = putWord8 0 >> put v
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> NumVar <$> get
-      _ -> fail "Invalid tag"
-
-instance Serialize (Ref 'Bool) where
-  put (BoolVar v) = putWord8 1 >> put v
-  get = do
-    tag <- getWord8
-    case tag of
-      1 -> BoolVar <$> get
-      _ -> fail "Invalid tag"
-
-instance Serialize (Ref ('Arr val)) where
-  put (Array k n a) = putWord8 2 >> put k >> put n >> put a
-  get = do
-    tag <- getWord8
-    case tag of
-      2 -> Array <$> get <*> get <*> get
-      _ -> fail "Invalid tag"
 
 instance Show (Ref ref) where
   show (BoolVar v) = "$B" ++ show v
@@ -169,73 +121,9 @@ data Expr :: Kind -> Type -> Type where
   ToBool :: Expr 'Num n -> Expr 'Bool n
   ToNum :: Expr 'Bool n -> Expr 'Num n
 
-instance Serialize n => Serialize (Expr 'Num n) where
-  put expr = case expr of
-    Val n -> putWord8 0 >> put n
-    Ref ref -> putWord8 10 >> put ref
-    Add x y -> putWord8 20 >> put x >> put y
-    Sub x y -> putWord8 21 >> put x >> put y
-    Mul x y -> putWord8 22 >> put x >> put y
-    Div x y -> putWord8 23 >> put x >> put y
-    IfNum x y z -> putWord8 40 >> put x >> put y >> put z
-    ToNum x -> putWord8 51 >> put x
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> Val <$> get
-      10 -> Ref <$> get
-      20 -> Add <$> get <*> get
-      21 -> Sub <$> get <*> get
-      22 -> Mul <$> get <*> get
-      23 -> Div <$> get <*> get
-      40 -> IfNum <$> get <*> get <*> get
-      51 -> ToNum <$> get
-      _ -> error $ "Invalid expr tag 1 " ++ show tag
-
-instance Serialize n => Serialize (Expr 'Bool n) where
-  put expr = case expr of
-    Val val -> putWord8 0 >> put val
-    Ref ref -> putWord8 10 >> put ref
-    Eq x y -> putWord8 30 >> put x >> put y
-    And x y -> putWord8 31 >> put x >> put y
-    Or x y -> putWord8 32 >> put x >> put y
-    Xor x y -> putWord8 33 >> put x >> put y
-    BEq x y -> putWord8 34 >> put x >> put y
-    IfBool x y z -> putWord8 41 >> put x >> put y >> put z
-    ToBool x -> putWord8 50 >> put x
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> Val <$> get
-      10 -> Ref <$> get
-      30 -> Eq <$> get <*> get
-      31 -> And <$> get <*> get
-      32 -> Or <$> get <*> get
-      33 -> Xor <$> get <*> get
-      34 -> BEq <$> get <*> get
-      41 -> IfBool <$> get <*> get <*> get
-      50 -> ToBool <$> get
-      _ -> error $ "Invalid expr tag 2 " ++ show tag
-
-instance Serialize n => Serialize (Expr 'Unit n) where
-  put expr = case expr of
-    Val val -> putWord8 0 >> put val
-    Ref ref -> case ref of {}
-
-  -- IfNum x y z -> putWord8 40 >> put x >> put y >> put z
-  -- IfBool x y z -> putWord8 41 >> put x >> put y >> put z
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> Val <$> get
-      _ -> error $ "Invalid expr tag 3 " ++ show tag
-
 instance Functor (Expr ty) where
   fmap f expr = case expr of
     Val val -> Val (fmap f val)
-    -- Number n -> Number (f n)
-    -- Boolean b -> Boolean b
-    -- UnitVal -> UnitVal
     Ref ref -> Ref ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)

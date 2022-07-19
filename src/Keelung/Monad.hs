@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -44,7 +43,7 @@ module Keelung.Monad
     -- * Statements
     assert,
     -- ifThenElse,
-    reduce
+    reduce,
     -- -- loop,s
     -- loopi,
     -- sum',
@@ -66,8 +65,6 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Serialize
-import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
@@ -77,17 +74,13 @@ import Prelude hiding (product, sum)
 
 -- | An Assignment associates an expression with a reference
 data Assignment t n = Assignment (Ref t) (Expr t n)
-  deriving (Eq, Generic)
+  deriving (Eq)
 
 instance Show n => Show (Assignment t n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
 instance Functor (Assignment t) where
   fmap f (Assignment var expr) = Assignment var (fmap f expr)
-
-instance Serialize n => Serialize (Assignment 'Num n)
-
-instance Serialize n => Serialize (Assignment 'Bool n)
 
 --------------------------------------------------------------------------------
 
@@ -107,7 +100,7 @@ data Computation n = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr 'Bool n]
   }
-  deriving (Generic, Eq)
+  deriving (Eq)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
@@ -125,7 +118,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
       ++ "\n\
          \}"
 
-instance Serialize n => Serialize (Computation n)
+-- instance Serialize n => Serialize (Computation n)
 
 --------------------------------------------------------------------------------
 
@@ -136,7 +129,7 @@ data Elaborated t n = Elaborated
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
-  deriving (Generic, Eq)
+  deriving (Eq)
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated t n) where
   show (Elaborated expr comp) =
@@ -145,12 +138,6 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated t n)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"
-
-instance Serialize n => Serialize (Elaborated 'Num n)
-
-instance Serialize n => Serialize (Elaborated 'Bool n)
-
-instance Serialize n => Serialize (Elaborated 'Unit n)
 
 --------------------------------------------------------------------------------
 
@@ -175,7 +162,7 @@ allocVar = do
 --------------------------------------------------------------------------------
 
 -- | Updates an entry of an array.
--- When the assigned expression is a variable, 
+-- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
 update :: Referable t => Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
 update (Val val) _ _ = case val of {}
@@ -228,46 +215,20 @@ toArray xs = do
   when (size == 0) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
 
-
   -- don't allocate a fresh variable the expression is already a variable
-  vars <- forM xs $ \expr -> do 
-    case expr of 
+  vars <- forM xs $ \expr -> do
+    case expr of
       Ref (NumVar var) -> return var
       Ref (BoolVar var) -> return var
       Ref (Array _ _ addr) -> return addr
-      others -> do 
-        var <- allocVar 
+      others -> do
+        var <- allocVar
         assign var others
-        return var 
+        return var
   -- allocate a new array and associate it's content with the new variables
   arrayAddr <- allocateArrayWithVars kind (IntSet.fromList vars)
 
-  -- forM_ (zip (IntSet.toList vars) xs) $ \(var, expr) -> do
-  --   -- associate each variable with the corresponding element of the array
-  --   assign var expr
-
   return (Ref arrayAddr)
-
--- return $ map (Ref . NumVar) elems
-
--- -- read the array from the heap
--- elems <- readHeap addr
--- -- convert each element into an expression
--- return $ map (\(i, n) -> Ref $ Array len n) elems
-
--- -- | Allocates a 3D-array of fresh variables
--- allocArray3 :: Int -> Int -> Int -> Comp n (Ref ('Arr ('Arr ('Arr kind))))
--- allocArray3 0 _ _ = throwError EmptyArrayError
--- allocArray3 _ 0 _ = throwError EmptyArrayError
--- allocArray3 _ _ 0 = throwError EmptyArrayError
--- allocArray3 sizeM sizeN sizeO = do
---   -- allocate `sizeM` arrays each of size `sizeN * sizeO`
---   innerArrays <- replicateM sizeM (allocArray2 sizeN sizeO)
---   -- collect references of these arrays
---   vars <- forM innerArrays $ \array -> do
---     case array of Array2 _ addr -> return addr
---   -- and allocate a new array with these references
---   allocateArrayWithVars $ IntSet.fromList vars
 
 --------------------------------------------------------------------------------
 
@@ -334,13 +295,12 @@ instance Referable ('Arr ref) where
         elems
 
   typeOf (Val val) = case val of {}
-  typeOf (Ref (Array elemType len _)) = ArrElem elemType len 
+  typeOf (Ref (Array elemType len _)) = ArrElem elemType len
 
 instance Referable 'Num where
   access (Val val) _ = case val of {}
   access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
-
 
   fromArray (Val val) = case val of {}
   fromArray (Ref (Array _ len addr)) = do
@@ -356,8 +316,7 @@ instance Referable 'Num where
         )
         elems
 
-  typeOf _ = NumElem  
-
+  typeOf _ = NumElem
 
 instance Referable 'Bool where
   access (Val val) _ = case val of {}
@@ -378,7 +337,7 @@ instance Referable 'Bool where
         )
         elems
 
-  typeOf _ = BoolElem  
+  typeOf _ = BoolElem
 
 -- | Access a variable from a 2-D array
 access2 :: Referable t => Expr ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Expr t n)
