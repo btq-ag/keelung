@@ -222,7 +222,7 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Allocates a 1D-array of fresh variables
-toArray :: (Referable t, Show n) => [Expr t n] -> Comp n (Expr ('Arr t) n)
+toArray :: Referable t => [Expr t n] -> Comp n (Expr ('Arr t) n)
 toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
@@ -272,14 +272,14 @@ toArray xs = do
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Referable t, Show n) => Int -> Comp n (Expr ('Arr t) n)
+inputs :: (Proper t, Referable t) => Int -> Comp n (Expr ('Arr t) n)
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Referable t, Show n) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
+inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
@@ -287,7 +287,7 @@ inputs2 sizeM sizeN = do
   toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Referable t, Show n) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
+inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
