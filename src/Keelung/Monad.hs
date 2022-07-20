@@ -69,6 +69,7 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
 import Prelude hiding (product, sum)
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 

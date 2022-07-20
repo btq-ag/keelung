@@ -19,7 +19,8 @@ import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
 import qualified Keelung.Monad as S
-import Keelung.Syntax (Addr, Heap, Var)
+import Keelung.Types ( Addr, Var, Heap )
+import qualified Keelung.Types as S
 import qualified Keelung.Syntax as S
 
 class Flatten a b where

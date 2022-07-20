@@ -5,7 +5,7 @@ module Keelung
     module Keelung.Field,
     module Keelung.Error,
     module Keelung.Monad,
-    Compilable(..),
+    Compilable (..),
   )
 where
 
@@ -20,6 +20,7 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Concrete (flatten)
 import qualified Keelung.Syntax.Concrete as C
+import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process

@@ -1,13 +1,13 @@
 module Keelung.Error where
 
-import Keelung.Syntax (Addr, Heap)
+import Keelung.Types (Addr, Heap)
 
 data Error
   = EmptyArrayError
-  | IndexOutOfBoundsError Addr Int 
+  | IndexOutOfBoundsError Addr Int
   | UnboundArrayError Addr Int Heap
-  -- | UnboundArrayError Addr Int Heap
-  deriving Eq 
+  deriving (-- | UnboundArrayError Addr Int Heap
+            Eq)
 
 instance Show Error where
   show EmptyArrayError = "Array size must not be 0"

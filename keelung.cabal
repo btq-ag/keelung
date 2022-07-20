@@ -31,6 +31,7 @@ library
       Keelung.Monad
       Keelung.Syntax
       Keelung.Syntax.Concrete
+      Keelung.Types
   other-modules:
       Paths_keelung
   hs-source-dirs:
