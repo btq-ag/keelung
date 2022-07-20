@@ -4,7 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 
 module Keelung.Syntax
-  ( Expr (..),
+  ( Val (..),
     fromBool,
     toBool,
     true,
@@ -23,33 +23,33 @@ import Keelung.Types
 
 --------------------------------------------------------------------------------
 
--- | Expressions are indexed by 'Kind' and parameterised by some field
-data Expr :: Kind -> Type -> Type where
-  -- Value & Reference
-  Number :: n -> Expr 'Num n -- Field numbers
-  Boolean :: Bool -> Expr 'Bool n -- Booleans
-  UnitVal :: Expr 'Unit n -- Unit
+-- | Values are indexed by 'Kind' and parameterised by some field
+data Val :: Kind -> Type -> Type where
+  -- Base Values 
+  Number :: n -> Val 'Num n -- Field numbers
+  Boolean :: Bool -> Val 'Bool n -- Booleans
+  UnitVal :: Val 'Unit n -- Unit
   -- Reference
-  Ref :: Ref t -> Expr t n
+  Ref :: Ref t -> Val t n
   -- Operators on numbers
-  Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
-  Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
-  Mul :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
-  Div :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
-  Eq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
+  Add :: Val 'Num n -> Val 'Num n -> Val 'Num n
+  Sub :: Val 'Num n -> Val 'Num n -> Val 'Num n
+  Mul :: Val 'Num n -> Val 'Num n -> Val 'Num n
+  Div :: Val 'Num n -> Val 'Num n -> Val 'Num n
+  Eq :: Val 'Num n -> Val 'Num n -> Val 'Bool n
   -- Operators on booleans
-  And :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
-  Or :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
-  Xor :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
-  BEq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+  And :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+  Or :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+  Xor :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+  BEq :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
   -- if...then...else clause
-  IfNum :: Expr 'Bool n -> Expr 'Num n -> Expr 'Num n -> Expr 'Num n
-  IfBool :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+  IfNum :: Val 'Bool n -> Val 'Num n -> Val 'Num n -> Val 'Num n
+  IfBool :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n -> Val 'Bool n
   -- Conversion between Booleans and Field numbers
-  ToBool :: Expr 'Num n -> Expr 'Bool n
-  ToNum :: Expr 'Bool n -> Expr 'Num n
+  ToBool :: Val 'Num n -> Val 'Bool n
+  ToNum :: Val 'Bool n -> Val 'Num n
 
-instance Functor (Expr ty) where
+instance Functor (Val ty) where
   fmap f expr = case expr of
     Number n -> Number (f n)
     Boolean b -> Boolean b
@@ -69,7 +69,7 @@ instance Functor (Expr ty) where
     ToBool x -> ToBool (fmap f x)
     ToNum x -> ToNum (fmap f x)
 
-instance Show n => Show (Expr ty n) where
+instance Show n => Show (Val ty n) where
   showsPrec prec expr = case expr of
     Number n -> showsPrec prec n
     Boolean b -> showsPrec prec b
@@ -89,7 +89,7 @@ instance Show n => Show (Expr ty n) where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance Eq n => Eq (Expr ty n) where
+instance Eq n => Eq (Val ty n) where
   a == b = case (a, b) of
     (Number x, Number y) -> x == y
     (Boolean x, Boolean y) -> x == y
@@ -110,7 +110,7 @@ instance Eq n => Eq (Expr ty n) where
     (ToNum x, ToNum y) -> x == y
     _ -> False
 
-instance GaloisField n => Num (Expr 'Num n) where
+instance GaloisField n => Num (Val 'Num n) where
   (+) = Add
   (-) = Sub
   (*) = Mul
@@ -120,49 +120,49 @@ instance GaloisField n => Num (Expr 'Num n) where
   signum = const (Number 1)
   fromInteger = Number . fromNatural . fromInteger
 
-instance GaloisField n => Semiring (Expr 'Num n) where
+instance GaloisField n => Semiring (Val 'Num n) where
   plus = Add
   times = Mul
   zero = Number 0
   one = Number 1
 
-instance GaloisField n => Ring (Expr 'Num n) where
+instance GaloisField n => Ring (Val 'Num n) where
   negate = id
 
-instance GaloisField n => Fractional (Expr 'Num n) where
+instance GaloisField n => Fractional (Val 'Num n) where
   fromRational = Number . fromRational
   (/) = Div
 
 --------------------------------------------------------------------------------
 
 -- | An synonym of 'ToNum' for converting booleans to numbers
-fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
+fromBool :: GaloisField n => Val 'Bool n -> Val 'Num n
 fromBool = ToNum
 
 -- | An synonym of 'ToBool' for converting numbers to booleans
-toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
+toBool :: GaloisField n => Val 'Num n -> Val 'Bool n
 toBool = ToBool
 
 -- | Smart constructor for 'True'
-true :: Expr 'Bool n
+true :: Val 'Bool n
 true = Boolean True
 
 -- | Smart constructor for 'False'
-false :: Expr 'Bool n
+false :: Val 'Bool n
 false = Boolean False
 
 -- | Smart constructor for 'Unit'
-unit :: Expr 'Unit n
+unit :: Val 'Unit n
 unit = UnitVal
 
 -- | Helper function for not-`Eq`
-neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
+neq :: Val 'Num n -> Val 'Num n -> Val 'Bool n
 neq x y = IfBool (x `Eq` y) false true
 
 -- | Helper function for not-`BEq`
-nbeq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+nbeq :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
 nbeq x y = IfBool (x `BEq` y) false true
 
 -- | Helper function for negating a boolean expression
-neg :: Expr 'Bool n -> Expr 'Bool n
+neg :: Val 'Bool n -> Val 'Bool n
 neg x = true `Xor` x

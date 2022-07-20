@@ -81,23 +81,23 @@ wrapper2 args' payload = do
         Right x -> return x
 
 class Compilable t where
-  elaborate :: Comp n (Expr t n) -> Either String (Elaborated t n)
+  elaborate :: Comp n (Val t n) -> Either String (Elaborated t n)
   elaborate prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated expr comp'
 
-  elaborateAndFlatten :: (Integral n, AcceptedField n) => Comp n (Expr t n) -> Either String C.Elaborated
+  elaborateAndFlatten :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either String C.Elaborated
 
-  generateAs :: (Serialize n, Integral n, AcceptedField n) => String -> Comp n (Expr t n) -> IO ()
+  generateAs :: (Serialize n, Integral n, AcceptedField n) => String -> Comp n (Val t n) -> IO ()
   generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
 
-  compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Expr t n) -> IO ()
+  compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO ()
   compile prog = wrapper ["protocol", "toCS"] (elaborateAndFlatten prog)
 
-  compileAsR1CS :: (Serialize n, Integral n, AcceptedField n) => Comp n (Expr t n) -> IO ()
+  compileAsR1CS :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO ()
   compileAsR1CS prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
 
-  interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Expr t n) -> [n] -> IO (Maybe n)
+  interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO (Maybe n)
   interpret prog xs = wrapper2 ["protocol", "interpret"] $ case elaborateAndFlatten prog of
     Left err -> Left err
     Right elab -> Right (elab, xs)

@@ -138,7 +138,7 @@ instance Show Expr where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance Integral n => Flatten (S.Expr 'S.Num n) Expr where
+instance Integral n => Flatten (S.Val 'S.Num n) Expr where
   flatten (S.Number n) = Val (Number (toInteger n))
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
@@ -148,7 +148,7 @@ instance Integral n => Flatten (S.Expr 'S.Num n) Expr where
   flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.ToNum x) = ToNum (flatten x)
 
-instance Integral n => Flatten (S.Expr 'S.Bool n) Expr where
+instance Integral n => Flatten (S.Val 'S.Bool n) Expr where
   flatten (S.Boolean b) = Val (Boolean b)
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Eq x y) = Eq (flatten x) (flatten y)
@@ -159,7 +159,7 @@ instance Integral n => Flatten (S.Expr 'S.Bool n) Expr where
   flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
   flatten (S.ToBool x) = ToBool (flatten x)
 
-instance Integral n => Flatten (S.Expr 'S.Unit n) Expr where
+instance Integral n => Flatten (S.Val 'S.Unit n) Expr where
   flatten S.UnitVal = Val Unit
   flatten (S.Ref ref) = case ref of {}
 
@@ -275,7 +275,7 @@ instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation 
       (map flatten asgns')
       (encodeFieldType $ toProxy asgns')
     where
-      toProxy :: [S.Expr kind n] -> Proxy n
+      toProxy :: [S.Val kind n] -> Proxy n
       toProxy = const Proxy
 
 instance Serialize Computation

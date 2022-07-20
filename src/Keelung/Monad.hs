@@ -73,7 +73,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
-data Assignment t n = Assignment (Ref t) (Expr t n)
+data Assignment t n = Assignment (Ref t) (Val t n)
   deriving (Eq)
 
 instance Show n => Show (Assignment t n) where
@@ -98,7 +98,7 @@ data Computation n = Computation
     compNumAsgns :: [Assignment 'Num n],
     compBoolAsgns :: [Assignment 'Bool n],
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Expr 'Bool n]
+    compAssertions :: [Val 'Bool n]
   }
   deriving (Eq)
 
@@ -125,7 +125,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
 -- | The result of elaborating a computation
 data Elaborated t n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Expr t n),
+    elabVal :: !(Val t n),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
@@ -164,7 +164,7 @@ allocVar = do
 -- | Updates an entry of an array.
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
-update :: Referable t => Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
+update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
 update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
 update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem [(i, n)]
 update (Ref (Array elemType _ addr)) i expr = do
@@ -176,10 +176,10 @@ update (Ref (Array elemType _ addr)) i expr = do
 -- | Typeclass for operations on base types
 class Proper t where
   -- | Request a fresh input
-  input :: Comp n (Expr t n)
+  input :: Comp n (Val t n)
 
   -- | Conditional clause
-  cond :: Expr 'Bool n -> Expr t n -> Expr t n -> Expr t n
+  cond :: Val 'Bool n -> Val t n -> Val t n -> Val t n
 
 instance Proper 'Num where
   input = inputNum
@@ -190,14 +190,14 @@ instance Proper 'Bool where
   cond = IfBool
 
 -- | Requests a fresh Num input variable
-inputNum :: Comp n (Expr 'Num n)
+inputNum :: Comp n (Val 'Num n)
 inputNum = do
   var <- allocVar
   markVarAsInput var
   return $ Ref $ NumVar var
 
 -- | Requests a fresh Bool input variable
-inputBool :: Comp n (Expr 'Bool n)
+inputBool :: Comp n (Val 'Bool n)
 inputBool = do
   var <- allocVar
   markVarAsInput var
@@ -208,7 +208,7 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Allocates a 1D-array of fresh variables
-toArray :: Referable t => [Expr t n] -> Comp n (Expr ('Arr t) n)
+toArray :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
 toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
@@ -232,14 +232,14 @@ toArray xs = do
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Referable t) => Int -> Comp n (Expr ('Arr t) n)
+inputs :: (Proper t, Referable t) => Int -> Comp n (Val ('Arr t) n)
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Expr ('Arr ('Arr t)) n)
+inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
@@ -247,7 +247,7 @@ inputs2 sizeM sizeN = do
   toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Expr ('Arr ('Arr ('Arr t))) n)
+inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
@@ -259,15 +259,15 @@ inputs3 sizeM sizeN sizeO = do
 
 -- | Typeclass for retrieving the element of an array
 class Referable t where
-  access :: Expr ('Arr t) n -> Int -> Comp n (Expr t n)
+  access :: Val ('Arr t) n -> Int -> Comp n (Val t n)
 
   -- | Associates a variable with an expression
-  assign :: Addr -> Expr t n -> Comp n ()
+  assign :: Addr -> Val t n -> Comp n ()
 
   -- | Convert an array into a list of expressions
-  fromArray :: Expr ('Arr t) n -> Comp n [Expr t n]
+  fromArray :: Val ('Arr t) n -> Comp n [Val t n]
 
-  typeOf :: Expr t n -> ElemType
+  typeOf :: Val t n -> ElemType
 
 instance Referable ('Arr ref) where
   access (Ref (Array elemType len addr)) i = Ref . Array elemType len . snd <$> readHeap (addr, i)
@@ -331,11 +331,11 @@ instance Referable 'Bool where
   typeOf _ = BoolElem
 
 -- | Access a variable from a 2-D array
-access2 :: Referable t => Expr ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Expr t n)
+access2 :: Referable t => Val ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Val t n)
 access2 addr (i, j) = access addr i >>= flip access j
 
 -- | Access a variable from a 3-D array
-access3 :: Referable t => Expr ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Expr t n)
+access3 :: Referable t => Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Val t n)
 access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 -- --------------------------------------------------------------------------------
@@ -394,7 +394,7 @@ readHeap (addr, i) = do
 
 -- -- | Typeclass for certain operations on references
 -- class Referable t where
---   assign :: Ref ('V ty) -> Expr t n -> Comp n ()
+--   assign :: Ref ('V ty) -> Val t n -> Comp n ()
 
 -- instance Referable 'Num where
 --   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
@@ -404,7 +404,7 @@ readHeap (addr, i) = do
 
 -- -- | Typeclass for comparing expressions
 -- class Comparable t where
---   equal :: Expr t n -> Expr t n -> Expr 'Bool n
+--   equal :: Val t n -> Val t n -> Val 'Bool n
 
 -- instance Comparable 'Num where
 --   equal x y = x `Eq` y
@@ -415,11 +415,11 @@ readHeap (addr, i) = do
 -- --------------------------------------------------------------------------------
 
 -- -- | Helper function for constructing the if...then...else expression
--- ifThenElse :: Expr 'Bool n -> Comp n (Expr t n) -> Comp n (Expr t n) -> Comp n (Expr t n)
+-- ifThenElse :: Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
 -- ifThenElse p x y = If p <$> x <*> y
 
 -- | An alternative to 'foldM'
-reduce :: Foldable m => Expr t n -> m a -> (Expr t n -> a -> Comp n (Expr t n)) -> Comp n (Expr t n)
+reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
 reduce a xs f = foldM f a xs
 
 -- -- reduce ::
@@ -466,22 +466,22 @@ reduce a xs f = foldM f a xs
 
 -- -- | For iterating through an array of array
 -- -- TODO: merge this with 'loop'
--- -- loopArr :: GaloisField n => Ref ('A ('A ref)) -> Int -> (Ref ('A ref) -> Comp n (Expr kind n)) -> Comp n ()
+-- -- loopArr :: GaloisField n => Ref ('A ('A ref)) -> Int -> (Ref ('A ref) -> Comp n (Val kind n)) -> Comp n ()
 -- -- loopArr xs len f = forM_ [0 .. pred len] $ \i -> do
 -- --   x <- slice i xs
 -- --   f x
--- sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Expr 'Num n)
+-- sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Val 'Num n)
 -- sum' xs = reducei xs 0 $ \_ acc x -> do
 --   return $ acc + Var x
 
--- product' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Expr 'Num n)
+-- product' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Val 'Num n)
 -- product' xs = reducei xs 1 $ \_ acc x -> do
 --   return $ acc * Var x
 
 --------------------------------------------------------------------------------
 
 -- | Assert that the given expression is true
-assert :: Expr 'Bool n -> Comp n ()
+assert :: Val 'Bool n -> Comp n ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 
 -- -- | Assert that two expressions are equal
