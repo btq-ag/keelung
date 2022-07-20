@@ -19,9 +19,9 @@ import GHC.Generics (Generic)
 import Keelung.Error
 import Keelung.Field
 import qualified Keelung.Monad as S
-import Keelung.Types ( Addr, Var, Heap )
-import qualified Keelung.Types as S
 import qualified Keelung.Syntax as S
+import Keelung.Types (Addr, Heap, Var)
+import qualified Keelung.Types as S
 
 class Flatten a b where
   flatten :: a -> b
@@ -44,7 +44,7 @@ instance Serialize Val
 data Ref
   = NumVar Var
   | BoolVar Var
-  deriving ( Generic, Eq)
+  deriving (Generic, Eq)
 
 instance Serialize Ref
 
@@ -72,10 +72,10 @@ instance Serialize ArrKind
 --     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
 --     | otherwise = UnitVar ref
 
-instance Integral n => Flatten (S.Val t n) Val where
-  flatten (S.Number n) = Number (toInteger n)
-  flatten (S.Boolean b) = Boolean b
-  flatten S.UnitVal = Unit
+-- instance Integral n => Flatten (S.Val t n) Val where
+--   flatten (S.Number n) = Number (toInteger n)
+--   flatten (S.Boolean b) = Boolean b
+--   flatten S.UnitVal = Unit
 
 instance Flatten (S.Ref 'S.Bool) Ref where
   flatten (S.BoolVar i) = BoolVar i
@@ -139,7 +139,7 @@ instance Show Expr where
     ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance Integral n => Flatten (S.Expr 'S.Num n) Expr where
-  flatten (S.Val val) = Val (flatten val)
+  flatten (S.Number n) = Val (Number (toInteger n))
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Add x y) = Add (flatten x) (flatten y)
   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
@@ -149,7 +149,7 @@ instance Integral n => Flatten (S.Expr 'S.Num n) Expr where
   flatten (S.ToNum x) = ToNum (flatten x)
 
 instance Integral n => Flatten (S.Expr 'S.Bool n) Expr where
-  flatten (S.Val val) = Val (flatten val)
+  flatten (S.Boolean b) = Val (Boolean b)
   flatten (S.Ref ref) = Var (flatten ref)
   flatten (S.Eq x y) = Eq (flatten x) (flatten y)
   flatten (S.And x y) = And (flatten x) (flatten y)
@@ -160,7 +160,7 @@ instance Integral n => Flatten (S.Expr 'S.Bool n) Expr where
   flatten (S.ToBool x) = ToBool (flatten x)
 
 instance Integral n => Flatten (S.Expr 'S.Unit n) Expr where
-  flatten (S.Val S.UnitVal) = Val Unit
+  flatten S.UnitVal = Val Unit
   flatten (S.Ref ref) = case ref of {}
 
 -- instance (Integral n) => Flatten (S.Expr kind n) Expr where

@@ -5,6 +5,7 @@ module Keelung
     module Keelung.Field,
     module Keelung.Error,
     module Keelung.Monad,
+    Kind(..),
     Compilable (..),
   )
 where

@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
@@ -166,7 +165,6 @@ allocVar = do
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
 update :: Referable t => Expr ('Arr t) n -> Int -> Expr t n -> Comp n ()
-update (Val val) _ _ = case val of {}
 update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
 update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem [(i, n)]
 update (Ref (Array elemType _ addr)) i expr = do
@@ -272,16 +270,13 @@ class Referable t where
   typeOf :: Expr t n -> ElemType
 
 instance Referable ('Arr ref) where
-  access (Val val) _ = case val of {}
   access (Ref (Array elemType len addr)) i = Ref . Array elemType len . snd <$> readHeap (addr, i)
 
-  assign _ (Val val) = case val of {}
   assign ref (Ref (Array elemType len addr)) = do
     forM_ [0 .. len - 1] $ \i -> do
       (_, var) <- readHeap (addr, i)
       writeHeap ref elemType [(i, var)]
 
-  fromArray (Val val) = case val of {}
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)
@@ -295,15 +290,12 @@ instance Referable ('Arr ref) where
         )
         elems
 
-  typeOf (Val val) = case val of {}
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len
 
 instance Referable 'Num where
-  access (Val val) _ = case val of {}
   access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
 
-  fromArray (Val val) = case val of {}
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)
@@ -320,11 +312,9 @@ instance Referable 'Num where
   typeOf _ = NumElem
 
 instance Referable 'Bool where
-  access (Val val) _ = case val of {}
   access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
   assign ref expr = modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
 
-  fromArray (Val val) = case val of {}
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)

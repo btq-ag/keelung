@@ -5,7 +5,6 @@
 
 module Keelung.Syntax
   ( Expr (..),
-    Val (..),
     fromBool,
     toBool,
     true,
@@ -24,32 +23,13 @@ import Keelung.Types
 
 --------------------------------------------------------------------------------
 
-data Val :: Kind -> Type -> Type where
-  Number :: n -> Val 'Num n -- Field numbers
-  Boolean :: Bool -> Val 'Bool n -- Booleans
-  UnitVal :: Val 'Unit n -- Unit
-
-instance Eq n => Eq (Val t n) where
-  Number x == Number y = x == y
-  Boolean x == Boolean y = x == y
-  UnitVal == UnitVal = True
-
-instance Show n => Show (Val t n) where
-  show (Number n) = show n
-  show (Boolean b) = show b
-  show UnitVal = "unit"
-
-instance Functor (Val t) where
-  fmap f (Number n) = Number (f n)
-  fmap _ (Boolean b) = Boolean b
-  fmap _ UnitVal = UnitVal
-
---------------------------------------------------------------------------------
-
 -- | Expressions are indexed by 'Kind' and parameterised by some field
 data Expr :: Kind -> Type -> Type where
   -- Value & Reference
-  Val :: Val t n -> Expr t n
+  Number :: n -> Expr 'Num n -- Field numbers
+  Boolean :: Bool -> Expr 'Bool n -- Booleans
+  UnitVal :: Expr 'Unit n -- Unit
+  -- Reference
   Ref :: Ref t -> Expr t n
   -- Operators on numbers
   Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
@@ -71,7 +51,9 @@ data Expr :: Kind -> Type -> Type where
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of
-    Val val -> Val (fmap f val)
+    Number n -> Number (f n)
+    Boolean b -> Boolean b
+    UnitVal -> UnitVal
     Ref ref -> Ref ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
@@ -89,10 +71,9 @@ instance Functor (Expr ty) where
 
 instance Show n => Show (Expr ty n) where
   showsPrec prec expr = case expr of
-    -- Number n -> showsPrec prec n
-    -- Boolean b -> showsPrec prec b
-    -- UnitVal -> showString "unit"
-    Val val -> shows val
+    Number n -> showsPrec prec n
+    Boolean b -> showsPrec prec b
+    UnitVal -> showString "unit"
     Ref ref -> shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
@@ -110,7 +91,9 @@ instance Show n => Show (Expr ty n) where
 
 instance Eq n => Eq (Expr ty n) where
   a == b = case (a, b) of
-    (Val x, Val y) -> x == y
+    (Number x, Number y) -> x == y
+    (Boolean x, Boolean y) -> x == y
+    (UnitVal, UnitVal) -> True
     (Ref x, Ref y) -> x == y
     (Add x y, Add z w) -> x == z && y == w
     (Sub x y, Sub z w) -> x == z && y == w
@@ -134,20 +117,20 @@ instance GaloisField n => Num (Expr 'Num n) where
   abs = id
 
   -- law of `signum`: abs x * signum x == x
-  signum = const (Val (Number 1))
-  fromInteger = Val . Number . fromNatural . fromInteger
+  signum = const (Number 1)
+  fromInteger = Number . fromNatural . fromInteger
 
 instance GaloisField n => Semiring (Expr 'Num n) where
   plus = Add
   times = Mul
-  zero = Val (Number 0)
-  one = Val (Number 1)
+  zero = Number 0
+  one = Number 1
 
 instance GaloisField n => Ring (Expr 'Num n) where
   negate = id
 
 instance GaloisField n => Fractional (Expr 'Num n) where
-  fromRational = Val . Number . fromRational
+  fromRational = Number . fromRational
   (/) = Div
 
 --------------------------------------------------------------------------------
@@ -162,15 +145,15 @@ toBool = ToBool
 
 -- | Smart constructor for 'True'
 true :: Expr 'Bool n
-true = Val (Boolean True)
+true = Boolean True
 
 -- | Smart constructor for 'False'
 false :: Expr 'Bool n
-false = Val (Boolean False)
+false = Boolean False
 
 -- | Smart constructor for 'Unit'
 unit :: Expr 'Unit n
-unit = Val UnitVal
+unit = UnitVal
 
 -- | Helper function for not-`Eq`
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
