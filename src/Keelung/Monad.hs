@@ -38,6 +38,7 @@ module Keelung.Monad
     inputs2,
     inputs3,
     cond,
+    condM,
 
     -- * Statements
     assert,
@@ -67,8 +68,8 @@ import qualified Data.IntSet as IntSet
 import Keelung.Error
 import Keelung.Field
 import Keelung.Syntax
-import Prelude hiding (product, sum)
 import Keelung.Types
+import Prelude hiding (product, sum)
 
 --------------------------------------------------------------------------------
 
@@ -414,9 +415,9 @@ readHeap (addr, i) = do
 
 -- --------------------------------------------------------------------------------
 
--- -- | Helper function for constructing the if...then...else expression
--- ifThenElse :: Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
--- ifThenElse p x y = If p <$> x <*> y
+-- | Helper function for constructing the if...then...else expression
+condM :: Proper t => Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
+condM p x y = cond p <$> x <*> y
 
 -- | An alternative to 'foldM'
 reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
