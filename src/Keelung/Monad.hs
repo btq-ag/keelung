@@ -25,7 +25,7 @@ module Keelung.Monad
     update,
     -- update2,
     -- update3,
-    -- lengthOf,
+    lengthOf,
     Referable (access, fromArray),
     access2,
     access3,
@@ -450,8 +450,8 @@ reduce a xs f = foldM f a xs
 --     e
 --     [0 .. pred (lengthOf xs)]
 
--- lengthOf :: Ref ('A kind) -> Int
--- lengthOf (Array n _) = n
+lengthOf :: Val ('Arr t) n -> Int
+lengthOf (Ref (Array _ len _)) = len
 
 -- -- | For iterating through an array
 -- -- loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
