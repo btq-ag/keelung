@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.Constraint.Polynomial
+      Keelung.Constraint.R1C
       Keelung.Error
       Keelung.Field
       Keelung.Monad

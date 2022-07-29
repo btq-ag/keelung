@@ -8,25 +8,11 @@ module Keelung.Monad
     Computation (..),
     Elaborated (..),
     Assignment (..),
-    --
-
-    -- * Experimental
-
-    -- allocArray',
-    -- expose,
-
     -- * Array
-    toArray,
-    -- allocArray2,
-    -- allocArray3,
-    -- access,
-    -- access2,
-    -- access3,
-    update,
-    -- update2,
-    -- update3,
-    lengthOf,
     Referable (access, fromArray),
+    toArray,
+    lengthOf,
+    update,
     access2,
     access3,
 
@@ -37,25 +23,11 @@ module Keelung.Monad
     inputs,
     inputs2,
     inputs3,
-    cond,
-    condM,
 
     -- * Statements
+    cond,
     assert,
-    -- ifThenElse,
     reduce,
-    -- -- loop,s
-    -- loopi,
-    -- sum',
-    -- product',
-
-    -- -- * Assertion
-    -- assert,
-    -- assertArrayEqual,
-
-    -- -- * Other typeclasses
-    -- Referable (..),
-    -- Comparable (..),
   )
 where
 
@@ -339,14 +311,7 @@ access2 addr (i, j) = access addr i >>= flip access j
 access3 :: Referable t => Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Val t n)
 access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
--- --------------------------------------------------------------------------------
-
--- -- | Internal helper function for generating multiple fresh variables.
--- allocVars :: Int -> Comp n IntSet
--- allocVars n = do
---   index <- gets compNextVar
---   modify (\st -> st {compNextVar = n + index})
---   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
+--------------------------------------------------------------------------------
 
 -- | Internal helper function for allocating an array
 -- and associate the address with a set of variables
@@ -393,103 +358,19 @@ readHeap (addr, i) = do
 
 -- --------------------------------------------------------------------------------
 
--- -- | Typeclass for certain operations on references
--- class Referable t where
---   assign :: Ref ('V ty) -> Val t n -> Comp n ()
-
--- instance Referable 'Num where
---   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
-
--- instance Referable 'Bool where
---   assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
-
--- -- | Typeclass for comparing expressions
--- class Comparable t where
---   equal :: Val t n -> Val t n -> Val 'Bool n
-
--- instance Comparable 'Num where
---   equal x y = x `Eq` y
-
--- instance Comparable 'Bool where
---   equal x y = x `BEq` y
-
--- --------------------------------------------------------------------------------
-
--- | Helper function for constructing the if...then...else expression
-condM :: Proper t => Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
-condM p x y = cond p <$> x <*> y
+-- -- | Helper function for constructing the if...then...else expression
+-- condM :: Proper t => Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
+-- condM p x y = cond p <$> x <*> y
 
 -- | An alternative to 'foldM'
 reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
 reduce a xs f = foldM f a xs
 
--- -- reduce ::
--- --   Ref ('A ('V kind)) ->
--- --   Int ->
--- --   a ->
--- --   (a -> Ref ('V kind) -> Comp n a) ->
--- --   Comp n a
--- -- reduce xs len e f = reducei xs len e (const f)
-
--- -- | For aggregating some result of an array
--- --   the supplied function will be given
--- --      1. the current index
--- --      1. the current accumulator
--- --      3. the current element
--- reducei ::
---   Ref ('A ('V kind)) ->
---   a ->
---   (Int -> a -> Ref ('V kind) -> Comp n a) ->
---   Comp n a
--- reducei xs e f =
---   foldM
---     ( \acc i -> do
---         x <- access xs i
---         f i acc x
---     )
---     e
---     [0 .. pred (lengthOf xs)]
-
 lengthOf :: Val ('Arr t) n -> Int
 lengthOf (Ref (Array _ len _)) = len
-
--- -- | For iterating through an array
--- -- loop :: GaloisField n => Ref ('A ('V kind)) -> Int -> (Ref ('V kind) -> Comp n ()) -> Comp n ()
--- -- loop xs len f = reduce xs len () $ \_acc x -> do
--- --   _ <- f x
--- --   return ()
-
--- -- | For iterating through an array
--- loopi :: GaloisField n => Ref ('A ('V kind)) -> (Int -> Ref ('V kind) -> Comp n ()) -> Comp n ()
--- loopi xs f = reducei xs () $ \i _acc x -> do
---   _ <- f i x
---   return ()
-
--- -- | For iterating through an array of array
--- -- TODO: merge this with 'loop'
--- -- loopArr :: GaloisField n => Ref ('A ('A ref)) -> Int -> (Ref ('A ref) -> Comp n (Val kind n)) -> Comp n ()
--- -- loopArr xs len f = forM_ [0 .. pred len] $ \i -> do
--- --   x <- slice i xs
--- --   f x
--- sum' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Val 'Num n)
--- sum' xs = reducei xs 0 $ \_ acc x -> do
---   return $ acc + Var x
-
--- product' :: GaloisField n => Ref ('A ('V 'Num)) -> Comp n (Val 'Num n)
--- product' xs = reducei xs 1 $ \_ acc x -> do
---   return $ acc * Var x
 
 --------------------------------------------------------------------------------
 
 -- | Assert that the given expression is true
 assert :: Val 'Bool n -> Comp n ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
-
--- -- | Assert that two expressions are equal
--- assertArrayEqual :: Comparable t => Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
--- assertArrayEqual len xs ys = forM_ [0 .. len - 1] $ \i -> do
---   a <- access xs i
---   b <- access ys i
---   assert (Var a `equal` Var b)
-
--- --------------------------------------------------------------------------------
