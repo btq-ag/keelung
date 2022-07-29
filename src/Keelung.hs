@@ -5,8 +5,9 @@ module Keelung
     module Keelung.Field,
     module Keelung.Error,
     module Keelung.Monad,
-    Kind(..),
+    Kind (..),
     Compilable (..),
+    GaloisField,
   )
 where
 
@@ -14,6 +15,7 @@ import Control.Arrow (left, right, second)
 import Control.Monad (join)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
+import Data.Field.Galois (GaloisField)
 import Data.Serialize
 import Keelung.Error
 import Keelung.Field
