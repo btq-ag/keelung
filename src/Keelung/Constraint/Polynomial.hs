@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Constraint.Polynomial
   ( Poly,
@@ -28,13 +29,17 @@ import Keelung.Field (N (..))
 import Keelung.Types (Var)
 import Prelude hiding (negate)
 import qualified Prelude
+import GHC.Generics (Generic)
+import Data.Serialize (Serialize)
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)
-  deriving (Functor)
+  deriving (Functor, Generic)
+
+instance Serialize n => Serialize (Poly n)
 
 -- 2 Poly's are the same, if they have the same coefficients and variables
 -- or one is the negation of the other

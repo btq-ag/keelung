@@ -38,14 +38,14 @@ tempConvert = do
 
 -- |
 main :: IO ()
-main = do
-  -- here goes the program you want to compile
-  let program = assertToBe42
+main = return ()
+  -- -- here goes the program you want to compile
+  -- let program = assertToBe42
 
-  let toR1CS = False
-  if toR1CS
-    then compileAsR1CS program -- compile as a R1CS
-    else compile program -- compile as a ConstraintSystem
+  -- let toR1CS = False
+  -- if toR1CS
+  --   then compileAsR1CS program -- compile as a R1CS
+  --   else compile program -- compile as a ConstraintSystem
 
 -- assertArrayToBe42 :: Comp GF181 (Val 'Unit GF181)
 -- assertArrayToBe42 = do

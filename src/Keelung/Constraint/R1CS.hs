@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Constraint.R1CS where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
-import Data.IntSet (IntSet)
 import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
@@ -24,6 +28,9 @@ data R1CS n = R1CS
     r1csOutputVar :: Maybe Var,
     r1csCNQZPairs :: [(Var, Var)]
   }
+  deriving (Generic)
+
+instance Serialize n => Serialize (R1CS n)
 
 instance (Show n, GaloisField n, Integral n, Bounded n) => Show (R1CS n) where
   show r1cs@(R1CS cs n is _ os _) =

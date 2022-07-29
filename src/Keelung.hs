@@ -27,6 +27,7 @@ import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
+import Keelung.Constraint.R1CS (R1CS)
 
 -- | Internal function for invoking the Keelung compiler on PATH
 wrapper :: Serialize a => [String] -> Either String a -> IO ()
@@ -36,6 +37,38 @@ wrapper args' payload = do
     Nothing -> putStrLn "Cannot install the Keelung Compiler from Docker"
     Just (cmd, args) -> do
       Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload) >>= putStrLn
+
+-- | Internal function for invoking the Keelung compiler on PATH
+wrapper2 :: (Serialize a, Serialize n, Integral n) => [String] -> Either String (a, [n]) -> IO (Maybe n)
+wrapper2 args' payload = do
+  path <- findKeelungc
+  case path of
+    Nothing -> do
+      putStrLn "Cannot install the Keelung Compiler from Docker"
+      return Nothing
+    Just (cmd, args) -> do
+      let payload' = right (second (map toInteger)) payload
+      blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload')
+      let result = decode (BSC.pack blob)
+      case join result of
+        Left err -> do
+          putStrLn $ "Error: " ++ err
+          return Nothing
+        Right x -> return x
+
+-- | Internal function for invoking the Keelung compiler on PATH
+wrapper3 :: (Serialize a, Serialize n, Integral n) => [String] -> Either String a -> IO (Either String (R1CS n))
+wrapper3 args' payload = do
+  path <- findKeelungc
+  case path of
+    Nothing -> do
+      return $ Left "Cannot install the Keelung Compiler from Docker"
+    Just (cmd, args) -> do
+      blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
+      case decode (BSC.pack blob) of
+        Left err -> do
+          return $ Left $ "Error: " ++ err
+        Right x -> return $ Right x
 
 findKeelungc :: IO (Maybe (String, [String]))
 findKeelungc = do
@@ -64,24 +97,6 @@ findKeelungc = do
         (Process.readProcess whichCmd [cmd] mempty >> return True)
         (\_ -> return False)
 
--- | Internal function for invoking the Keelung compiler on PATH
-wrapper2 :: (Serialize a, Serialize n, Integral n) => [String] -> Either String (a, [n]) -> IO (Maybe n)
-wrapper2 args' payload = do
-  path <- findKeelungc
-  case path of
-    Nothing -> do
-      putStrLn "Cannot install the Keelung Compiler from Docker"
-      return Nothing
-    Just (cmd, args) -> do
-      let payload' = right (second (map toInteger)) payload
-      blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload')
-      let result = decode (BSC.pack blob)
-      case join result of
-        Left err -> do
-          putStrLn $ "Error: " ++ err
-          return Nothing
-        Right x -> return x
-
 class Compilable t where
   elaborate :: Comp n (Val t n) -> Either String (Elaborated t n)
   elaborate prog = do
@@ -96,8 +111,8 @@ class Compilable t where
   compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO ()
   compile prog = wrapper ["protocol", "toCS"] (elaborateAndFlatten prog)
 
-  compileAsR1CS :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO ()
-  compileAsR1CS prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
+  compileAsR1CS :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO (Either String (R1CS n))
+  compileAsR1CS prog = wrapper3 ["protocol", "toR1CS"] (elaborateAndFlatten prog)
 
   interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO (Maybe n)
   interpret prog xs = wrapper2 ["protocol", "interpret"] $ case elaborateAndFlatten prog of
