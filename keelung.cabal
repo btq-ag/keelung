@@ -28,6 +28,7 @@ library
       Keelung
       Keelung.Constraint.Polynomial
       Keelung.Constraint.R1C
+      Keelung.Constraint.R1CS
       Keelung.Error
       Keelung.Field
       Keelung.Monad
