@@ -65,7 +65,8 @@ wrapper3 args' payload = do
       return $ Left "Cannot install the Keelung Compiler from Docker"
     Just (cmd, args) -> do
       blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
-      case decode (BSC.pack blob) of
+      let result = decode (BSC.pack blob)
+      case join result of
         Left err -> do
           return $ Left $ "Error: " ++ err
         Right x -> return $ Right x
