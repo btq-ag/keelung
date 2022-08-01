@@ -280,10 +280,10 @@ instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation 
 
 instance Serialize Computation
 
-type Comp = StateT Computation (Except Error)
+type Comp = StateT Computation (Except ElabError)
 
 -- | How to run the 'Comp' monad
-runComp :: Computation -> Comp a -> Either Error (a, Computation)
+runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
 runComp comp f = runExcept (runStateT f comp)
 
 elaborate :: FieldType -> Comp Expr -> Either String Elaborated

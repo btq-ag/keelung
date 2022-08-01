@@ -3,7 +3,7 @@
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
-    module Keelung.Error,
+    -- module Keelung.Error,
     module Keelung.Monad,
     Kind (..),
     Compilable (..),
@@ -11,13 +11,11 @@ module Keelung
   )
 where
 
-import Control.Arrow (left, right, second)
-import Control.Monad (join)
-import qualified Data.ByteString as BS
+import Control.Arrow (left)
 import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
 import Data.Serialize
-import Keelung.Error
+import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
@@ -27,50 +25,25 @@ import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
-import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Error (ElabError)
 
--- | Internal function for invoking the Keelung compiler on PATH
-wrapper :: Serialize a => [String] -> Either String a -> IO ()
+-- | Internal function for handling data serialization
+wrapper :: (Serialize a, Serialize b) => [String] -> Either String a -> IO (Either Error b)
 wrapper args' payload = do
-  result <- findKeelungc
-  case result of
-    Nothing -> putStrLn "Cannot install the Keelung Compiler from Docker"
-    Just (cmd, args) -> do
-      Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload) >>= putStrLn
-
--- | Internal function for invoking the Keelung compiler on PATH
-wrapper2 :: (Serialize a, Serialize n, Integral n) => [String] -> Either String (a, [n]) -> IO (Maybe n)
-wrapper2 args' payload = do
   path <- findKeelungc
   case path of
-    Nothing -> do
-      putStrLn "Cannot install the Keelung Compiler from Docker"
-      return Nothing
-    Just (cmd, args) -> do
-      let payload' = right (second (map toInteger)) payload
-      blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload')
-      let result = decode (BSC.pack blob)
-      case join result of
-        Left err -> do
-          putStrLn $ "Error: " ++ err
-          return Nothing
-        Right x -> return x
-
--- | Internal function for invoking the Keelung compiler on PATH
-wrapper3 :: (Serialize a, Serialize n, Integral n) => [String] -> Either String a -> IO (Either String (R1CS n))
-wrapper3 args' payload = do
-  path <- findKeelungc
-  case path of
-    Nothing -> do
-      return $ Left "Cannot install the Keelung Compiler from Docker"
+    Nothing -> return $ Left InstallError
     Just (cmd, args) -> do
       blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
       let result = decode (BSC.pack blob)
-      case join result of
-        Left err -> do
-          return $ Left $ "Error: " ++ err
-        Right x -> return $ Right x
+      case result of
+        Left err -> return $ Left $ DecodeError err
+        Right (Left err) -> return $ Left $ CompileError err
+        Right (Right x) -> return $ Right x
 
+-- | Locate the Keelung compiler
+--      1. see if "keelungc" is in PATH
+--      2. if not, try to run "docker run banacorn/keelung"
 findKeelungc :: IO (Maybe (String, [String]))
 findKeelungc = do
   keelungcExists <- checkCmd "keelungc"
@@ -99,26 +72,20 @@ findKeelungc = do
         (\_ -> return False)
 
 class Compilable t where
-  elaborate :: Comp n (Val t n) -> Either String (Elaborated t n)
+  elaborate :: Comp n (Val t n) -> Either Error (Elaborated t n)
   elaborate prog = do
-    (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    (expr, comp') <- left ElabError $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ Elaborated expr comp'
 
   elaborateAndFlatten :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either String C.Elaborated
 
-  generateAs :: (Serialize n, Integral n, AcceptedField n) => String -> Comp n (Val t n) -> IO ()
-  generateAs filepath prog = BS.writeFile filepath $ encode (elaborateAndFlatten prog)
+  compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO (Either Error (R1CS n))
+  compile prog = wrapper ["protocol", "toR1CS"] (elaborateAndFlatten prog)
 
-  compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO ()
-  compile prog = wrapper ["protocol", "toCS"] (elaborateAndFlatten prog)
-
-  compileAsR1CS :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO (Either String (R1CS n))
-  compileAsR1CS prog = wrapper3 ["protocol", "toR1CS"] (elaborateAndFlatten prog)
-
-  interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO (Maybe n)
-  interpret prog xs = wrapper2 ["protocol", "interpret"] $ case elaborateAndFlatten prog of
+  interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO (Either Error (Maybe n))
+  interpret prog xs = wrapper ["protocol", "interpret"] $ case elaborateAndFlatten prog of
     Left err -> Left err
-    Right elab -> Right (elab, xs)
+    Right elab -> Right (elab, map toInteger xs)
 
 instance Compilable 'Bool where
   elaborateAndFlatten prog = do
@@ -134,3 +101,17 @@ instance Compilable 'Unit where
   elaborateAndFlatten prog = do
     (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ flatten $ Elaborated expr comp'
+
+--------------------------------------------------------------------------------
+
+data Error
+  = DecodeError String -- Cannot decode the output from the Keelung compiler
+  | InstallError -- Cannot locate the Keelung compiler
+  | ElabError ElabError
+  | CompileError String
+
+instance Show Error where
+  show (DecodeError err) = "Decode Error: " ++ err
+  show InstallError = "Cannot locate the Keelung compiler"
+  show (ElabError err) = "Elaboration Error: " ++ show err
+  show (CompileError err) = "Compile Error: " ++ err

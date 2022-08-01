@@ -2,14 +2,14 @@ module Keelung.Error where
 
 import Keelung.Types (Addr, Heap)
 
-data Error
+data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int
   | UnboundArrayError Addr Int Heap
   deriving (-- | UnboundArrayError Addr Int Heap
             Eq)
 
-instance Show Error where
+instance Show ElabError where
   show EmptyArrayError = "Array size must not be 0"
   show (IndexOutOfBoundsError addr n) =
     "Index " ++ show n ++ " out of bounds for array " ++ show addr

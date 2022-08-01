@@ -115,10 +115,10 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated t n)
 --------------------------------------------------------------------------------
 
 -- | The type of a Keelung program
-type Comp n = StateT (Computation n) (Except Error)
+type Comp n = StateT (Computation n) (Except ElabError)
 
 -- | How to run the 'Comp' monad
-runComp :: Computation n -> Comp n a -> Either Error (a, Computation n)
+runComp :: Computation n -> Comp n a -> Either ElabError (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
 
 --------------------------------------------------------------------------------
