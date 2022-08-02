@@ -28,7 +28,7 @@ data R1CS n = R1CS
     r1csOutputVar :: Maybe Var,
     r1csCNQZPairs :: [(Var, Var)]
   }
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance Serialize n => Serialize (R1CS n)
 

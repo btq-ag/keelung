@@ -9,6 +9,7 @@ data Error
   | InstallError -- Cannot locate the Keelung compiler
   | ElabError ElabError
   | CompileError String
+  deriving (Eq)
 
 instance Show Error where
   show (DecodeError err) = "Decode Error: " ++ err
@@ -22,8 +23,7 @@ data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int
   | UnboundArrayError Addr Int Heap
-  deriving (-- | UnboundArrayError Addr Int Heap
-            Eq)
+  deriving (Eq)
 
 instance Show ElabError where
   show EmptyArrayError = "Array size must not be 0"
