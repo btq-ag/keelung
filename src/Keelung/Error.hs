@@ -2,6 +2,22 @@ module Keelung.Error where
 
 import Keelung.Types (Addr, Heap)
 
+--------------------------------------------------------------------------------
+
+data Error
+  = DecodeError String -- Cannot decode the output from the Keelung compiler
+  | InstallError -- Cannot locate the Keelung compiler
+  | ElabError ElabError
+  | CompileError String
+
+instance Show Error where
+  show (DecodeError err) = "Decode Error: " ++ err
+  show InstallError = "Cannot locate the Keelung compiler"
+  show (ElabError err) = "Elaboration Error: " ++ show err
+  show (CompileError err) = "Compile Error: " ++ err
+
+--------------------------------------------------------------------------------
+
 data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int
