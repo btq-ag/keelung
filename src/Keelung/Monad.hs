@@ -351,9 +351,9 @@ readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
     Nothing ->
-      throwError $ UnboundArrayError addr i heap
+      throwError $ IndexOutOfBoundsError addr i heap
     Just (elemType, array) -> case IntMap.lookup i array of
-      Nothing -> throwError $ UnboundArrayError addr i heap
+      Nothing -> throwError $ IndexOutOfBoundsError addr i heap
       Just n -> return (elemType, n)
 
 -- --------------------------------------------------------------------------------

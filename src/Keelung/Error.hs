@@ -1,5 +1,6 @@
 module Keelung.Error where
 
+import qualified Data.IntMap as IntMap
 import Keelung.Types (Addr, Heap)
 
 --------------------------------------------------------------------------------
@@ -21,13 +22,13 @@ instance Show Error where
 
 data ElabError
   = EmptyArrayError
-  | IndexOutOfBoundsError Addr Int
-  | UnboundArrayError Addr Int Heap
+  | IndexOutOfBoundsError Addr Int Heap
   deriving (Eq)
 
 instance Show ElabError where
   show EmptyArrayError = "Array size must not be 0"
-  show (IndexOutOfBoundsError addr n) =
-    "Index " ++ show n ++ " out of bounds for array " ++ show addr
-  show (UnboundArrayError addr i heap) =
-    "Unbound index at " ++ show i ++ " of array " ++ show addr ++ " in " ++ show heap
+  show (IndexOutOfBoundsError addr i heap) =
+    "Index " ++ show i ++ " out of bounds for array "
+      ++ show addr
+      ++ " of length "
+      ++ show (IntMap.size heap)
