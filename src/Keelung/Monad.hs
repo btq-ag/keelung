@@ -16,7 +16,7 @@ module Keelung.Monad
     access2,
     access3,
 
-    -- * Input Variable & Array
+    -- * Inputs 
     input,
     inputNum,
     inputBool,
@@ -350,10 +350,9 @@ readHeap :: (Addr, Int) -> Comp n (ElemType, Int)
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
-    Nothing ->
-      throwError $ IndexOutOfBoundsError addr i heap
+    Nothing -> error "readHeap: address not found"
     Just (elemType, array) -> case IntMap.lookup i array of
-      Nothing -> throwError $ IndexOutOfBoundsError addr i heap
+      Nothing -> throwError $ IndexOutOfBoundsError addr i array
       Just n -> return (elemType, n)
 
 -- --------------------------------------------------------------------------------
