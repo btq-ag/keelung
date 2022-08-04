@@ -243,7 +243,13 @@ class Referable t where
   typeOf :: Val t n -> ElemType
 
 instance Referable ('Arr ref) where
-  access (Ref (Array elemType len addr)) i = Ref . Array elemType len . snd <$> readHeap (addr, i)
+  access (Ref (Array elemType _ addr)) i = do 
+    (elemType', addr') <- readHeap (addr, i)
+    -- the element should be an array, we extract the length from its ElemType
+    let len' = case elemType' of
+          ArrElem _ l -> l
+          _ -> error "access: array element is not an array"
+    return $ Ref (Array elemType len' addr')
 
   assign ref (Ref (Array elemType len addr)) = do
     forM_ [0 .. len - 1] $ \i -> do
