@@ -34,7 +34,7 @@ compile prog = case elaborate prog of
   Right elab -> wrapper ["protocol", "toR1CS"] elab
 
 -- | Interpret a program with inputs 
-interpret :: (Serialize n, Integral n, AcceptedField n, Compilable t) => Comp n (Val t n) -> [n] -> IO (Either Error (Maybe n))
+interpret :: (Serialize n, Integral n, AcceptedField n, Compilable t) => Comp n (Val t n) -> [n] -> IO (Either Error [n])
 interpret prog xs = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "interpret"] (elab, map toInteger xs)
