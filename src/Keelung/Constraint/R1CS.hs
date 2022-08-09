@@ -25,7 +25,7 @@ data R1CS n = R1CS
     r1csNumOfInputVars :: Int,
     -- Set of Boolean input vars
     r1csBooleanInputVars :: IntSet,
-    r1csOutputVar :: Maybe Var,
+    r1csOutputVars :: IntSet,
     r1csCNQZPairs :: [(Var, Var)]
   }
   deriving (Generic, Eq)
@@ -45,8 +45,8 @@ instance (Show n, GaloisField n, Integral n, Bounded n) => Show (R1CS n) where
       ++ "  number of input vars: "
       ++ show is
       ++ "\n"
-      ++ "  output var: "
-      ++ show os
+      ++ "  output vars: "
+      ++ show (IntSet.toList os)
       ++ "\n"
       ++ "}"
     where
