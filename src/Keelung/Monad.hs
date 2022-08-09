@@ -8,6 +8,7 @@ module Keelung.Monad
     Computation (..),
     Elaborated (..),
     Assignment (..),
+
     -- * Array
     Referable (access, fromArray),
     toArray,
@@ -16,7 +17,7 @@ module Keelung.Monad
     access2,
     access3,
 
-    -- * Inputs 
+    -- * Inputs
     input,
     inputNum,
     inputBool,
@@ -125,26 +126,30 @@ runComp comp f = runExcept (runStateT f comp)
 -- Variable & Input Variable
 --------------------------------------------------------------------------------
 
--- | Allocate a fresh variable.
-allocVar :: Comp n Int
-allocVar = do
+-- | Allocate a fresh address.
+freshVar :: Comp n Var
+freshVar = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = succ index})
   return index
 
+freshAddr :: Comp n Addr
+freshAddr = do
+  addr <- gets compNextAddr
+  modify (\st -> st {compNextAddr = succ addr})
+  return addr
+
 --------------------------------------------------------------------------------
 
--- | Updates an entry of an array.
+-- | Update an entry of an array.
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
 update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
 update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
 update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem [(i, n)]
 update (Ref (Array elemType _ addr)) i expr = do
-  ref <- allocVar
-  writeHeap addr elemType [(i, ref)]
-  -- associate 'ref' with the expression
-  assign ref expr
+  ref <- alloc expr
+  writeHeap addr elemType [(i, addrOfRef ref)]
 
 -- | Typeclass for operations on base types
 class Proper t where
@@ -165,14 +170,14 @@ instance Proper 'Bool where
 -- | Requests a fresh Num input variable
 inputNum :: Comp n (Val 'Num n)
 inputNum = do
-  var <- allocVar
+  var <- freshVar
   markVarAsInput var
   return $ Ref $ NumVar var
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp n (Val 'Bool n)
 inputBool = do
-  var <- allocVar
+  var <- freshVar
   markVarAsInput var
   return $ Ref $ BoolVar var
 
@@ -180,27 +185,15 @@ inputBool = do
 -- Array & Input Array
 --------------------------------------------------------------------------------
 
--- | Allocates a 1D-array of fresh variables
+-- | Converts a list of values to an 1D-array
 toArray :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
 toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
-
-  -- don't allocate a fresh variable the expression is already a variable
-  vars <- forM xs $ \expr -> do
-    case expr of
-      Ref (NumVar var) -> return var
-      Ref (BoolVar var) -> return var
-      Ref (Array _ _ addr) -> return addr
-      others -> do
-        var <- allocVar
-        assign var others
-        return var
-  -- allocate a new array and associate it's content with the new variables
-  arrayAddr <- allocateArrayWithVars kind (IntSet.fromList vars)
-
-  return (Ref arrayAddr)
+  -- allocates fresh variables for each elements
+  vars <- mapM alloc xs
+  Ref <$> allocateArrayWithVars2 kind vars
 
 --------------------------------------------------------------------------------
 
@@ -234,16 +227,16 @@ inputs3 sizeM sizeN sizeO = do
 class Referable t where
   access :: Val ('Arr t) n -> Int -> Comp n (Val t n)
 
-  -- | Associates a variable with an expression
-  assign :: Addr -> Val t n -> Comp n ()
+  -- | Allocates a fresh variable for a value
+  alloc :: Val t n -> Comp n (Ref t)
 
   -- | Convert an array into a list of expressions
   fromArray :: Val ('Arr t) n -> Comp n [Val t n]
 
   typeOf :: Val t n -> ElemType
 
-instance Referable ('Arr ref) where
-  access (Ref (Array elemType _ addr)) i = do 
+instance Referable ref => Referable ('Arr ref) where
+  access (Ref (Array elemType _ addr)) i = do
     (elemType', addr') <- readHeap (addr, i)
     -- the element should be an array, we extract the length from its ElemType
     let len' = case elemType' of
@@ -251,10 +244,11 @@ instance Referable ('Arr ref) where
           _ -> error "access: array element is not an array"
     return $ Ref (Array elemType len' addr')
 
-  assign ref (Ref (Array elemType len addr)) = do
-    forM_ [0 .. len - 1] $ \i -> do
-      (_, var) <- readHeap (addr, i)
-      writeHeap ref elemType [(i, var)]
+  alloc xs@(Ref (Array elemType len _)) = do
+    vars <- forM [0 .. len - 1] $ \i -> do
+      x <- access xs i
+      alloc x
+    allocateArrayWithVars2 elemType vars
 
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
@@ -273,7 +267,11 @@ instance Referable ('Arr ref) where
 
 instance Referable 'Num where
   access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
-  assign ref expr = modify' $ \st -> st {compNumAsgns = Assignment (NumVar ref) expr : compNumAsgns st}
+
+  alloc val = do
+    var <- freshVar
+    modify' $ \st -> st {compNumAsgns = Assignment (NumVar var) val : compNumAsgns st}
+    return $ NumVar var
 
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
@@ -292,7 +290,11 @@ instance Referable 'Num where
 
 instance Referable 'Bool where
   access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
-  assign ref expr = modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar ref) expr : compBoolAsgns st}
+
+  alloc val = do
+    var <- freshVar
+    modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar var) val : compBoolAsgns st}
+    return $ BoolVar var
 
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
@@ -319,20 +321,20 @@ access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
 --------------------------------------------------------------------------------
 
+-- | Internal helper function extracting the address of a reference
+addrOfRef :: Ref t -> Addr
+addrOfRef (BoolVar addr) = addr
+addrOfRef (NumVar addr) = addr
+addrOfRef (Array _ _ addr) = addr
+
 -- | Internal helper function for allocating an array
 -- and associate the address with a set of variables
-allocateArrayWithVars :: ElemType -> IntSet -> Comp n (Ref ('Arr ty))
-allocateArrayWithVars elemType vars = do
-  let size = IntSet.size vars
+allocateArrayWithVars2 :: ElemType -> [Ref t] -> Comp n (Ref ('Arr ty))
+allocateArrayWithVars2 elemType refs = do
+  let size = length refs
   addr <- freshAddr
-  writeHeap addr elemType $ zip [0 .. pred size] $ IntSet.toList vars
+  writeHeap addr elemType $ zip [0 .. pred size] (map addrOfRef refs)
   return $ Array elemType size addr
-  where
-    freshAddr :: Comp n Addr
-    freshAddr = do
-      addr <- gets compNextAddr
-      modify (\st -> st {compNextAddr = succ addr})
-      return addr
 
 -- | Internal helper function for marking a variable as input.
 markVarAsInput :: Var -> Comp n ()
@@ -361,11 +363,7 @@ readHeap (addr, i) = do
       Nothing -> throwError $ IndexOutOfBoundsError addr i array
       Just n -> return (elemType, n)
 
--- --------------------------------------------------------------------------------
-
--- -- | Helper function for constructing the if...then...else expression
--- condM :: Proper t => Val 'Bool n -> Comp n (Val t n) -> Comp n (Val t n) -> Comp n (Val t n)
--- condM p x y = cond p <$> x <*> y
+--------------------------------------------------------------------------------
 
 -- | An alternative to 'foldM'
 reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
