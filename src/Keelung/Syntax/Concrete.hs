@@ -1,83 +1,17 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Syntax.Concrete where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import Control.Monad.Reader
 import Control.Monad.State
-import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Serialize
-import Data.Typeable
+import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Error
-import Keelung.Field
-import qualified Keelung.Monad as S
-import qualified Keelung.Syntax as S
-import Keelung.Types (Addr, Heap, Var)
-import qualified Keelung.Types as S
-
-class Flatten a b where
-  flatten :: a -> b
-
---------------------------------------------------------------------------------
-
-type HeapM = Reader Heap
-
-runHeapM :: Heap -> HeapM a -> a
-runHeapM h m = runReader m h
-
-readHeap :: Addr -> Int -> HeapM Expr
-readHeap addr i = do
-  heap <- ask
-  case IntMap.lookup addr heap of
-    Nothing -> error "HeapM: address not found"
-    Just (elemType, array) -> case IntMap.lookup i array of
-      Nothing -> error "HeapM: index ouf of bounds"
-      Just n -> case elemType of
-        S.NumElem -> return $ Var $ NumVar n
-        S.BoolElem -> return $ Var $ NumVar n
-        S.ArrElem _ len -> do
-          Array <$> mapM (readHeap addr) [0 .. pred len]
-
---------------------------------------------------------------------------------
-
--- | Typeclass for removing kinds
-class Simplify a b where
-  simplify :: a -> HeapM b
-
-simplifyComputation :: (Integral n, AcceptedField n) => S.Computation n -> Computation
-simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
-  runHeapM heap $ do
-    Computation
-      nextVar
-      nextAddr
-      inputVars
-      heap
-      <$> mapM simplify asgns
-      <*> mapM simplify bsgns
-      <*> mapM simplify asgns'
-      <*> return (encodeFieldType $ toProxy asgns')
-  where
-    toProxy :: [S.Val kind n] -> Proxy n
-    toProxy = const Proxy
-
-simplifyElaborated :: (Integral n, AcceptedField n) => S.Elaborated t n -> Elaborated
-simplifyElaborated (S.Elaborated expr comp) =
-  Elaborated
-    (runHeapM heap (simplify expr))
-    comp'
-  where
-    comp' = simplifyComputation comp
-    heap = compHeap comp'
+import Keelung.Error (ElabError)
+import Keelung.Field (FieldType)
+import Keelung.Types (Heap, Var)
 
 --------------------------------------------------------------------------------
 
@@ -108,35 +42,6 @@ instance Show Ref where
   show (BoolVar n) = "$B" ++ show n
 
 --------------------------------------------------------------------------------
-data ArrRef = Arr Addr ArrKind
-  deriving (Generic, Eq)
-
-instance Serialize ArrRef
-
-instance Show ArrRef where
-  show (Arr addr _) = "@" ++ show addr
-
-data ArrKind = ArrOf | ArrOfNum | ArrOfBool | ArrOfUnit
-  deriving (Generic, Eq)
-
-instance Serialize ArrKind
-
--- instance Typeable kind => Flatten (S.Ref ('S.V kind)) Ref where
---   flatten var@(S.Variable ref)
---     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Bool))) = BoolVar ref
---     | typeOf var == typeRep (Proxy :: Proxy (S.Ref ('S.V 'S.Num))) = NumVar ref
---     | otherwise = UnitVar ref
-
--- instance Integral n => Flatten (S.Val t n) Val where
---   flatten (S.Number n) = Number (toInteger n)
---   flatten (S.Boolean b) = Boolean b
---   flatten S.UnitVal = Unit
-
-instance Flatten (S.Ref 'S.Bool) Ref where
-  flatten (S.BoolVar i) = BoolVar i
-
-instance Flatten (S.Ref 'S.Num) Ref where
-  flatten (S.NumVar i) = NumVar i
 
 data Expr
   = Val Val
@@ -196,74 +101,11 @@ instance Show Expr where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance Integral n => Simplify (S.Val t n) Expr where
-  simplify expr = case expr of
-    S.Number n -> return $ Val (Number (toInteger n))
-    S.Boolean b -> return $ Val (Boolean b)
-    S.UnitVal -> return $ Val Unit
-    S.Ref x -> case x of
-      S.BoolVar n -> return $ Var (BoolVar n)
-      S.NumVar n -> return $ Var (NumVar n)
-      S.Array _ len addr -> Array <$> mapM (readHeap addr) [0 .. pred len]
-    S.Add x y -> Add <$> simplify x <*> simplify y
-    S.Sub x y -> Sub <$> simplify x <*> simplify y
-    S.Mul x y -> Mul <$> simplify x <*> simplify y
-    S.Div x y -> Div <$> simplify x <*> simplify y
-    S.Eq x y -> Eq <$> simplify x <*> simplify y
-    S.And x y -> And <$> simplify x <*> simplify y
-    S.Or x y -> Or <$> simplify x <*> simplify y
-    S.Xor x y -> Xor <$> simplify x <*> simplify y
-    S.BEq x y -> BEq <$> simplify x <*> simplify y
-    S.IfNum p x y -> If <$> simplify p <*> simplify x <*> simplify y
-    S.IfBool p x y -> If <$> simplify p <*> simplify x <*> simplify y
-    S.ToBool x -> ToBool <$> simplify x
-    S.ToNum x -> ToNum <$> simplify x
-
-instance Integral n => Flatten (S.Val 'S.Num n) Expr where
-  flatten (S.Number n) = Val (Number (toInteger n))
-  flatten (S.Ref ref) = Var (flatten ref)
-  flatten (S.Add x y) = Add (flatten x) (flatten y)
-  flatten (S.Sub x y) = Sub (flatten x) (flatten y)
-  flatten (S.Mul x y) = Mul (flatten x) (flatten y)
-  flatten (S.Div x y) = Div (flatten x) (flatten y)
-  flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
-  flatten (S.ToNum x) = ToNum (flatten x)
-
-instance Integral n => Flatten (S.Val 'S.Bool n) Expr where
-  flatten (S.Boolean b) = Val (Boolean b)
-  flatten (S.Ref ref) = Var (flatten ref)
-  flatten (S.Eq x y) = Eq (flatten x) (flatten y)
-  flatten (S.And x y) = And (flatten x) (flatten y)
-  flatten (S.Or x y) = Or (flatten x) (flatten y)
-  flatten (S.Xor x y) = Xor (flatten x) (flatten y)
-  flatten (S.BEq x y) = BEq (flatten x) (flatten y)
-  flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
-  flatten (S.ToBool x) = ToBool (flatten x)
-
-instance Integral n => Flatten (S.Val 'S.Unit n) Expr where
-  flatten S.UnitVal = Val Unit
-  flatten (S.Ref ref) = case ref of {}
-
--- instance (Integral n) => Flatten (S.Expr kind n) Expr where
---   flatten (S.Val val) = Val (flatten val)
---   flatten (S.Ref ref) = Var (flatten ref)
---   flatten (S.Add x y) = Add (flatten x) (flatten y)
---   flatten (S.Sub x y) = Sub (flatten x) (flatten y)
---   flatten (S.Mul x y) = Mul (flatten x) (flatten y)
---   flatten (S.Div x y) = Div (flatten x) (flatten y)
---   flatten (S.Eq x y) = Eq (flatten x) (flatten y)
---   flatten (S.And x y) = And (flatten x) (flatten y)
---   flatten (S.Or x y) = Or (flatten x) (flatten y)
---   flatten (S.Xor x y) = Xor (flatten x) (flatten y)
---   flatten (S.BEq x y) = BEq (flatten x) (flatten y)
---   flatten (S.IfNum c t e) = If (flatten c) (flatten t) (flatten e)
---   flatten (S.IfBool c t e) = If (flatten c) (flatten t) (flatten e)
---   flatten (S.ToBool x) = ToBool (flatten x)
---   flatten (S.ToNum x) = ToNum (flatten x)
-
 instance Serialize Expr
 
 instance Serialize FieldType
+
+--------------------------------------------------------------------------------
 
 data Elaborated = Elaborated
   { -- | The resulting 'Expr'
@@ -281,16 +123,9 @@ instance Show Elaborated where
       ++ show comp
       ++ "\n}"
 
-instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Num n) Elaborated where
-  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
-
-instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Bool n) Elaborated where
-  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
-
-instance (Integral n, Flatten (S.Computation n) Computation) => Flatten (S.Elaborated 'S.Unit n) Elaborated where
-  flatten (S.Elaborated e c) = Elaborated (flatten e) (flatten c)
-
 instance Serialize Elaborated
+
+--------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
 data Assignment = Assignment Ref Expr
@@ -299,19 +134,9 @@ data Assignment = Assignment Ref Expr
 instance Show Assignment where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Integral n => Flatten (S.Assignment 'S.Num n) Assignment where
-  flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
-
-instance Integral n => Flatten (S.Assignment 'S.Bool n) Assignment where
-  flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
-
-instance Integral n => Simplify (S.Assignment 'S.Num n) Assignment where
-  simplify (S.Assignment (S.NumVar n) e) = Assignment (NumVar n) <$> simplify e
-
-instance Integral n => Simplify (S.Assignment 'S.Bool n) Assignment where
-  simplify (S.Assignment (S.BoolVar n) e) = Assignment (BoolVar n) <$> simplify e
-
 instance Serialize Assignment
+
+--------------------------------------------------------------------------------
 
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
@@ -350,22 +175,9 @@ instance Show Computation where
       ++ "\n\
          \}"
 
-instance (Integral n, AcceptedField n) => Flatten (S.Computation n) Computation where
-  flatten (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
-    Computation
-      nextVar
-      nextAddr
-      inputVars
-      heap
-      (map flatten asgns)
-      (map flatten bsgns)
-      (map flatten asgns')
-      (encodeFieldType $ toProxy asgns')
-    where
-      toProxy :: [S.Val kind n] -> Proxy n
-      toProxy = const Proxy
-
 instance Serialize Computation
+
+--------------------------------------------------------------------------------
 
 type Comp = StateT Computation (Except ElabError)
 

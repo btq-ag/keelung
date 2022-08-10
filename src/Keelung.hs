@@ -20,7 +20,7 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Syntax.Concrete (simplifyElaborated)
+import Keelung.Syntax.Simplify (simplify)
 import qualified Keelung.Syntax.Concrete as C
 import Keelung.Types
 import System.IO.Error
@@ -45,7 +45,7 @@ interpret prog xs = case elaborate prog of
 elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
 elaborate prog = do
   (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ simplifyElaborated $ Elaborated expr comp'
+  return $ simplify $ Elaborated expr comp'
 
 --------------------------------------------------------------------------------
 

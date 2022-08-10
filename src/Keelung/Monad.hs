@@ -92,8 +92,6 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
       ++ "\n\
          \}"
 
--- instance Serialize n => Serialize (Computation n)
-
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
