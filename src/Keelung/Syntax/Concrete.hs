@@ -11,6 +11,7 @@ module Keelung.Syntax.Concrete where
 import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State
+import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Serialize
@@ -25,6 +26,12 @@ import qualified Keelung.Types as S
 
 class Flatten a b where
   flatten :: a -> b
+
+-- | Typeclass for removing kinds
+class Simplify a b where
+  simplify :: a -> Comp b
+
+--------------------------------------------------------------------------------
 
 data Val
   = Number Integer
@@ -140,6 +147,42 @@ instance Show Expr where
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
+
+instance Integral n => Simplify (S.Val t n) Expr where
+  simplify expr = case expr of
+    S.Number n -> return $ Val (Number (toInteger n))
+    S.Boolean b -> return $ Val (Boolean b)
+    S.UnitVal -> return $ Val Unit
+    S.Ref x -> case x of
+      S.BoolVar n -> return $ Var (BoolVar n)
+      S.NumVar n -> return $ Var (NumVar n)
+      S.Array _ len addr -> Array <$> mapM (readHeap addr) [0 .. pred len]
+    S.Add x y -> Add <$> simplify x <*> simplify y
+    S.Sub x y -> Sub <$> simplify x <*> simplify y
+    S.Mul x y -> Mul <$> simplify x <*> simplify y
+    S.Div x y -> Div <$> simplify x <*> simplify y
+    S.Eq x y -> Eq <$> simplify x <*> simplify y
+    S.And x y -> And <$> simplify x <*> simplify y
+    S.Or x y -> Or <$> simplify x <*> simplify y
+    S.Xor x y -> Xor <$> simplify x <*> simplify y
+    S.BEq x y -> BEq <$> simplify x <*> simplify y
+    S.IfNum p x y -> If <$> simplify p <*> simplify x <*> simplify y
+    S.IfBool p x y -> If <$> simplify p <*> simplify x <*> simplify y
+    S.ToBool x -> ToBool <$> simplify x
+    S.ToNum x -> ToNum <$> simplify x
+
+-- simplify (S.Number n) = return $ Val (Number (toInteger n))
+-- simplify (S.Ref (S.NumVar n)) = return $ Var (NumVar n)
+-- simplify (S.Ref (S.BoolVar n)) = return $ Var (BoolVar n)
+-- simplify (S.Ref (S.Array elemType len addr)) = _
+-- simplify (S.Add x y) = Add <$> simplify x <*> simplify y
+-- simplify (S.Sub x y) = Sub <$> simplify x <*> simplify y
+-- simplify (S.Mul x y) = Mul <$> simplify x <*> simplify y
+-- simplify (S.Div x y) = Div <$> simplify x <*> simplify y
+-- simplify (S.IfNum p x y) = _
+--     -- If <$> simplify p <*> simplify x <*> simplify y
+-- simplify (S.ToNum x) = _
+-- ToNum <$> simplify x
 
 instance Integral n => Flatten (S.Val 'S.Num n) Expr where
   flatten (S.Number n) = Val (Number (toInteger n))
@@ -326,3 +369,16 @@ freeVars expr = case expr of
   If x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x
+
+readHeap :: Addr -> Int -> Comp Expr
+readHeap addr i = do
+  heap <- gets compHeap
+  case IntMap.lookup addr heap of
+    Nothing -> error "readHeap: address not found"
+    Just (elemType, array) -> case IntMap.lookup i array of
+      Nothing -> throwError $ IndexOutOfBoundsError addr i array
+      Just n -> case elemType of
+        S.NumElem -> return $ Var $ NumVar n
+        S.BoolElem -> return $ Var $ NumVar n
+        S.ArrElem _ len -> do
+          Array <$> mapM (readHeap addr) [0 .. pred len]
