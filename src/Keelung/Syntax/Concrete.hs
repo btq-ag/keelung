@@ -10,6 +10,7 @@ module Keelung.Syntax.Concrete where
 
 import Control.Arrow (left)
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -27,9 +28,56 @@ import qualified Keelung.Types as S
 class Flatten a b where
   flatten :: a -> b
 
+--------------------------------------------------------------------------------
+
+type HeapM = Reader Heap
+
+runHeapM :: Heap -> HeapM a -> a
+runHeapM h m = runReader m h
+
+readHeap :: Addr -> Int -> HeapM Expr
+readHeap addr i = do
+  heap <- ask
+  case IntMap.lookup addr heap of
+    Nothing -> error "HeapM: address not found"
+    Just (elemType, array) -> case IntMap.lookup i array of
+      Nothing -> error "HeapM: index ouf of bounds"
+      Just n -> case elemType of
+        S.NumElem -> return $ Var $ NumVar n
+        S.BoolElem -> return $ Var $ NumVar n
+        S.ArrElem _ len -> do
+          Array <$> mapM (readHeap addr) [0 .. pred len]
+
+--------------------------------------------------------------------------------
+
 -- | Typeclass for removing kinds
 class Simplify a b where
-  simplify :: a -> Comp b
+  simplify :: a -> HeapM b
+
+simplifyComputation :: (Integral n, AcceptedField n) => S.Computation n -> Computation
+simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+  runHeapM heap $ do
+    Computation
+      nextVar
+      nextAddr
+      inputVars
+      heap
+      <$> mapM simplify asgns
+      <*> mapM simplify bsgns
+      <*> mapM simplify asgns'
+      <*> return (encodeFieldType $ toProxy asgns')
+  where
+    toProxy :: [S.Val kind n] -> Proxy n
+    toProxy = const Proxy
+
+simplifyElaborated :: (Integral n, AcceptedField n) => S.Elaborated t n -> Elaborated
+simplifyElaborated (S.Elaborated expr comp) =
+  Elaborated
+    (runHeapM heap (simplify expr))
+    comp'
+  where
+    comp' = simplifyComputation comp
+    heap = compHeap comp'
 
 --------------------------------------------------------------------------------
 
@@ -171,19 +219,6 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.ToBool x -> ToBool <$> simplify x
     S.ToNum x -> ToNum <$> simplify x
 
--- simplify (S.Number n) = return $ Val (Number (toInteger n))
--- simplify (S.Ref (S.NumVar n)) = return $ Var (NumVar n)
--- simplify (S.Ref (S.BoolVar n)) = return $ Var (BoolVar n)
--- simplify (S.Ref (S.Array elemType len addr)) = _
--- simplify (S.Add x y) = Add <$> simplify x <*> simplify y
--- simplify (S.Sub x y) = Sub <$> simplify x <*> simplify y
--- simplify (S.Mul x y) = Mul <$> simplify x <*> simplify y
--- simplify (S.Div x y) = Div <$> simplify x <*> simplify y
--- simplify (S.IfNum p x y) = _
---     -- If <$> simplify p <*> simplify x <*> simplify y
--- simplify (S.ToNum x) = _
--- ToNum <$> simplify x
-
 instance Integral n => Flatten (S.Val 'S.Num n) Expr where
   flatten (S.Number n) = Val (Number (toInteger n))
   flatten (S.Ref ref) = Var (flatten ref)
@@ -270,6 +305,12 @@ instance Integral n => Flatten (S.Assignment 'S.Num n) Assignment where
 instance Integral n => Flatten (S.Assignment 'S.Bool n) Assignment where
   flatten (S.Assignment r e) = Assignment (flatten r) (flatten e)
 
+instance Integral n => Simplify (S.Assignment 'S.Num n) Assignment where
+  simplify (S.Assignment (S.NumVar n) e) = Assignment (NumVar n) <$> simplify e
+
+instance Integral n => Simplify (S.Assignment 'S.Bool n) Assignment where
+  simplify (S.Assignment (S.BoolVar n) e) = Assignment (BoolVar n) <$> simplify e
+
 instance Serialize Assignment
 
 -- | Data structure for elaboration bookkeeping
@@ -332,6 +373,9 @@ type Comp = StateT Computation (Except ElabError)
 runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
 runComp comp f = runExcept (runStateT f comp)
 
+evalComp :: Computation -> Comp a -> Either ElabError a
+evalComp comp f = runExcept (evalStateT f comp)
+
 elaborate :: FieldType -> Comp Expr -> Either String Elaborated
 elaborate fieldType prog = do
   (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty fieldType) prog
@@ -369,16 +413,3 @@ freeVars expr = case expr of
   If x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x
-
-readHeap :: Addr -> Int -> Comp Expr
-readHeap addr i = do
-  heap <- gets compHeap
-  case IntMap.lookup addr heap of
-    Nothing -> error "readHeap: address not found"
-    Just (elemType, array) -> case IntMap.lookup i array of
-      Nothing -> throwError $ IndexOutOfBoundsError addr i array
-      Just n -> case elemType of
-        S.NumElem -> return $ Var $ NumVar n
-        S.BoolElem -> return $ Var $ NumVar n
-        S.ArrElem _ len -> do
-          Array <$> mapM (readHeap addr) [0 .. pred len]

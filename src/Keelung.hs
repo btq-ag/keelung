@@ -6,9 +6,9 @@ module Keelung
     module Keelung.Monad,
     compile,
     interpret,
+    elaborate,
     Kind (..),
-    Compilable (..),
-    GaloisField
+    GaloisField,
   )
 where
 
@@ -20,7 +20,7 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Syntax.Concrete (flatten)
+import Keelung.Syntax.Concrete (simplifyElaborated)
 import qualified Keelung.Syntax.Concrete as C
 import Keelung.Types
 import System.IO.Error
@@ -28,37 +28,24 @@ import qualified System.Info
 import qualified System.Process as Process
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: (Serialize n, Integral n, AcceptedField n, Compilable t) => Comp n (Val t n) -> IO (Either Error (R1CS n))
+compile :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> IO (Either Error (R1CS n))
 compile prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "toR1CS"] elab
 
--- | Interpret a program with inputs 
-interpret :: (Serialize n, Integral n, AcceptedField n, Compilable t) => Comp n (Val t n) -> [n] -> IO (Either Error [n])
+-- | Interpret a program with inputs
+interpret :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO (Either Error [n])
 interpret prog xs = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "interpret"] (elab, map toInteger xs)
 
 --------------------------------------------------------------------------------
--- | Typeclass for elaborating a program.
 
-class Compilable t where
-  elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
-
-instance Compilable 'Bool where
-  elaborate prog = do
-    (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-    return $ flatten $ Elaborated expr comp'
-
-instance Compilable 'Num where
-  elaborate prog = do
-    (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-    return $ flatten $ Elaborated expr comp'
-
-instance Compilable 'Unit where
-  elaborate prog = do
-    (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-    return $ flatten $ Elaborated expr comp'
+-- | Elaborate a program 
+elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
+elaborate prog = do
+  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ simplifyElaborated $ Elaborated expr comp'
 
 --------------------------------------------------------------------------------
 
