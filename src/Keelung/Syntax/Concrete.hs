@@ -86,6 +86,7 @@ instance Flatten (S.Ref 'S.Num) Ref where
 data Expr
   = Val Val
   | Var Ref
+  | Array [Expr]
   | Add Expr Expr
   | Sub Expr Expr
   | Mul Expr Expr
@@ -104,6 +105,7 @@ sizeOfExpr :: Expr -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
+  Array xs -> sum (map sizeOfExpr xs)
   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
@@ -125,6 +127,7 @@ instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
     Var var -> shows var
+    Array xs -> showList xs
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -310,6 +313,7 @@ freeVars expr = case expr of
   Val _ -> mempty
   Var (NumVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
+  Array xs -> IntSet.unions (map freeVars xs)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y
