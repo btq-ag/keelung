@@ -37,21 +37,25 @@ instance (Show n, GaloisField n, Integral n, Bounded n) => Show (R1CS n) where
     "R1CS {\n\
     \  R1C constraints ("
       <> show numberOfConstraints
-      <> "):\n"
+      <> "):\n\n"
       <> showConstraints
       ++ "\n  number of variables: "
       ++ show n
-      ++ "\n"
-      ++ "  number of input vars: "
-      ++ show is
-      ++ "\n"
-      ++ "  output vars: "
+      ++ "\n  input  variables: "
+      ++ inputVars
+      ++ "\n  output variables: "
       ++ show (IntSet.toList os)
-      ++ "\n"
-      ++ "}"
+      ++ "\n}"
     where
+      inputVars = case is of
+        0 -> "none"
+        1 -> "$0"
+        _ -> "$0 .. $" <> show (is - 1)
       numberOfConstraints = length cs + is
-      showConstraints = unlines (map (\s -> "    " ++ show s) (toR1Cs r1cs))
+      constraints = toR1Cs r1cs
+      showConstraints = if null constraints 
+        then "none"
+        else unlines (map (\s -> "    " ++ show s) constraints)
 
 -- | Return R1Cs from a R1CS
 --   (includes boolean constraints for input variables)
