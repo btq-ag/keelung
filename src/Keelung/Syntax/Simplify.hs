@@ -1,3 +1,5 @@
+-- | Module for converting Kinded syntax to Typed syntax 
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -11,7 +13,7 @@ import Data.Proxy (Proxy (Proxy))
 import Keelung.Field (AcceptedField, encodeFieldType)
 import qualified Keelung.Monad as S
 import qualified Keelung.Syntax as S
-import Keelung.Syntax.Concrete
+import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
 import qualified Keelung.Types as S
 

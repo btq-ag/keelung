@@ -21,7 +21,7 @@ import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Simplify (simplify)
-import qualified Keelung.Syntax.Concrete as C
+import qualified Keelung.Syntax.Typed as C
 import Keelung.Types
 import System.IO.Error
 import qualified System.Info

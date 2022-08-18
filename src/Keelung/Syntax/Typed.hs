@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Syntax.Concrete where
+module Keelung.Syntax.Typed where
 
 import Control.Arrow (left)
 import Control.Monad.Except
