@@ -6,6 +6,7 @@ module Keelung.Monad
   ( Comp,
     runComp,
     Computation (..),
+    emptyComputation,
     Elaborated (..),
     Assignment (..),
 
@@ -75,6 +76,9 @@ data Computation n = Computation
     compAssertions :: [Val 'Bool n]
   }
   deriving (Eq)
+
+emptyComputation :: Computation n
+emptyComputation = Computation 0 0 mempty mempty mempty mempty mempty
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
