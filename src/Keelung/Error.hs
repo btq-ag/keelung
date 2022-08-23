@@ -24,6 +24,7 @@ instance Show Error where
 data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int (IntMap Int)
+  | IndexOutOfBoundsError2 Int Int 
   deriving (Eq)
 
 instance Show ElabError where
@@ -33,3 +34,5 @@ instance Show ElabError where
       ++ show addr
       ++ " of length "
       ++ show (IntMap.size array)
+  show (IndexOutOfBoundsError2 len index) =
+    "Index " ++ show index ++ " out of bounds for array of length " ++ show len

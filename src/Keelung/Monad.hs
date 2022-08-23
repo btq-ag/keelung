@@ -147,6 +147,7 @@ freshAddr = do
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
 update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
+update (ArrayVal _) _ _ = return () -- No-op since ArrayVal is immutable
 update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
 update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem [(i, n)]
 update (Ref (Array elemType _ addr)) i expr = do
@@ -227,6 +228,7 @@ inputs3 sizeM sizeN sizeO = do
 
 -- | Typeclass for retrieving the element of an array
 class Referable t where
+  -- | Read the element of an array
   access :: Val ('Arr t) n -> Int -> Comp n (Val t n)
 
   -- | Allocates a fresh variable for a value
@@ -238,6 +240,11 @@ class Referable t where
   typeOf :: Val t n -> ElemType
 
 instance Referable ref => Referable ('Arr ref) where
+
+  access (ArrayVal xs) i = if i < length xs
+    then return $ xs !! i
+    else throwError $ IndexOutOfBoundsError2 (length xs) i 
+
   access (Ref (Array elemType _ addr)) i = do
     (elemType', addr') <- readHeap (addr, i)
     -- the element should be an array, we extract the length from its ElemType
@@ -246,16 +253,21 @@ instance Referable ref => Referable ('Arr ref) where
           _ -> error "access: array element is not an array"
     return $ Ref (Array elemType len' addr')
 
+  alloc (ArrayVal []) = throwError EmptyArrayError
+  alloc (ArrayVal (x:xs)) = do 
+    -- allocate a fresh variable for each element
+    vars <- mapM alloc (x:xs)
+    allocateArrayWithVars2 (typeOf x) vars
   alloc xs@(Ref (Array elemType len _)) = do
     vars <- forM [0 .. len - 1] $ \i -> do
       x <- access xs i
       alloc x
     allocateArrayWithVars2 elemType vars
 
+  fromArray (ArrayVal xs) = return xs
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)
-
     return $
       map
         ( \(elemType, elemAddr) ->
@@ -265,9 +277,14 @@ instance Referable ref => Referable ('Arr ref) where
         )
         elems
 
+  typeOf (ArrayVal xs) = typeOf (head xs)
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len
 
 instance Referable 'Num where
+
+  access (ArrayVal xs) i = if i < length xs
+    then return $ xs !! i
+    else throwError $ IndexOutOfBoundsError2 (length xs) i 
   access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
 
   alloc val = do
@@ -275,6 +292,7 @@ instance Referable 'Num where
     modify' $ \st -> st {compNumAsgns = Assignment (NumVar var) val : compNumAsgns st}
     return $ NumVar var
 
+  fromArray (ArrayVal xs) = return xs
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)
@@ -291,6 +309,10 @@ instance Referable 'Num where
   typeOf _ = NumElem
 
 instance Referable 'Bool where
+
+  access (ArrayVal xs) i = if i < length xs
+    then return $ xs !! i
+    else throwError $ IndexOutOfBoundsError2 (length xs) i 
   access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
 
   alloc val = do
@@ -298,6 +320,7 @@ instance Referable 'Bool where
     modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar var) val : compBoolAsgns st}
     return $ BoolVar var
 
+  fromArray (ArrayVal xs) = return xs
   fromArray (Ref (Array _ len addr)) = do
     elems <- forM [0 .. pred len] $ \i -> do
       readHeap (addr, i)
@@ -372,6 +395,7 @@ reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> 
 reduce a xs f = foldM f a xs
 
 lengthOf :: Val ('Arr t) n -> Int
+lengthOf (ArrayVal xs) = length xs
 lengthOf (Ref (Array _ len _)) = len
 
 --------------------------------------------------------------------------------

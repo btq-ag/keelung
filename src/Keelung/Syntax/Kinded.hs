@@ -29,6 +29,7 @@ data Val :: Kind -> Type -> Type where
   Number :: n -> Val 'Num n -- Field numbers
   Boolean :: Bool -> Val 'Bool n -- Booleans
   UnitVal :: Val 'Unit n -- Unit
+  ArrayVal :: [Val t n] -> Val ('Arr t) n -- Arrays
   -- Reference
   Ref :: Ref t -> Val t n
   -- Operators on numbers
@@ -54,6 +55,7 @@ instance Functor (Val ty) where
     Number n -> Number (f n)
     Boolean b -> Boolean b
     UnitVal -> UnitVal
+    ArrayVal xs -> ArrayVal (fmap (fmap f) xs)
     Ref ref -> Ref ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
@@ -74,6 +76,7 @@ instance Show n => Show (Val ty n) where
     Number n -> showsPrec prec n
     Boolean b -> showsPrec prec b
     UnitVal -> showString "unit"
+    ArrayVal xs -> shows xs 
     Ref ref -> shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y

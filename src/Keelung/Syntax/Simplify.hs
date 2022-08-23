@@ -76,6 +76,7 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.Number n -> return $ Val (Number (toInteger n))
     S.Boolean b -> return $ Val (Boolean b)
     S.UnitVal -> return $ Val Unit
+    S.ArrayVal xs -> Array <$> mapM simplifyM xs
     S.Ref x -> case x of
       S.BoolVar n -> return $ Var (BoolVar n)
       S.NumVar n -> return $ Var (NumVar n)
