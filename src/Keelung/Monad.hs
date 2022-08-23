@@ -14,6 +14,8 @@ module Keelung.Monad
     Referable (),
     fromList,
     fromArray,
+    toList,
+    fromIArray,
     toArray,
     lengthOf,
     update,
@@ -50,6 +52,7 @@ import Keelung.Field
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
+import Data.Array.IArray (Array)
 
 --------------------------------------------------------------------------------
 
@@ -204,6 +207,10 @@ toArray xs = do
 -- | Immutable version of `toArray`
 fromList :: Referable t => [Val t n] -> Val ('Arr t) n
 fromList xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
+
+-- | Immutable version of `toArray`
+fromIArray :: Referable t => Array Int (Val t n) -> Val ('Arr t) n
+fromIArray = ArrayVal
 
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
