@@ -150,11 +150,11 @@ freshAddr = do
 -- we update the entry directly with the variable instead
 update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
 update (ArrayVal _) _ _ = return () -- No-op since ArrayVal is immutable
-update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem [(i, n)]
-update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem [(i, n)]
+update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
+update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
 update (Ref (Array elemType _ addr)) i expr = do
   ref <- alloc expr
-  writeHeap addr elemType [(i, addrOfRef ref)]
+  writeHeap addr elemType (i, addrOfRef ref)
 
 -- | Typeclass for operations on base types
 class Proper t where
@@ -198,7 +198,7 @@ toArray xs = do
   let kind = typeOf (head xs)
   -- allocates fresh variables for each elements
   vars <- mapM alloc xs
-  Ref <$> allocateArrayWithVars2 kind vars
+  Ref <$> allocateArrayWithVars kind vars
 
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
@@ -250,12 +250,12 @@ instance Referable ref => Referable ('Arr ref) where
   alloc (ArrayVal (x : xs)) = do
     -- allocate a fresh variable for each element
     vars <- mapM alloc (x : xs)
-    allocateArrayWithVars2 (typeOf x) vars
+    allocateArrayWithVars (typeOf x) vars
   alloc xs@(Ref (Array elemType len _)) = do
     vars <- forM [0 .. len - 1] $ \i -> do
       x <- access xs i
       alloc x
-    allocateArrayWithVars2 elemType vars
+    allocateArrayWithVars elemType vars
 
   typeOf (ArrayVal xs) = typeOf (head xs)
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len
@@ -311,12 +311,10 @@ addrOfRef (Array _ _ addr) = addr
 
 -- | Internal helper function for allocating an array
 -- and associate the address with a set of variables
-allocateArrayWithVars2 :: ElemType -> [Ref t] -> Comp n (Ref ('Arr ty))
-allocateArrayWithVars2 elemType refs = do
-  let size = length refs
-  addr <- freshAddr
-  writeHeap addr elemType $ zip [0 .. pred size] (map addrOfRef refs)
-  return $ Array elemType size addr
+allocateArrayWithVars :: ElemType -> [Ref t] -> Comp n (Ref ('Arr ty))
+allocateArrayWithVars elemType refs = do
+  addr <- allocOnHeap elemType refs
+  return $ Array elemType (length refs) addr
 
 -- | Internal helper function for marking a variable as input.
 markVarAsInput :: Var -> Comp n ()
@@ -328,11 +326,22 @@ markVarsAsInput vars =
   modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- | Internal helper function for allocating an array on the heap
-writeHeap :: Addr -> ElemType -> [(Int, Var)] -> Comp n ()
-writeHeap addr kind array = do
-  let bindings = IntMap.fromList array
+allocOnHeap :: ElemType -> [Ref t] -> Comp n Addr
+allocOnHeap elemType refs = do
+  addr <- freshAddr
+  let addresses = map addrOfRef refs
+  let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
   heap <- gets compHeap
-  let heap' = IntMap.insertWith (<>) addr (kind, bindings) heap
+  let heap' = IntMap.insert addr (elemType, bindings) heap
+  modify (\st -> st {compHeap = heap'})
+  return addr
+
+-- | Internal helper function for updating an array entry on the heap
+writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp n ()
+writeHeap addr elemType (index, var) = do
+  let bindings = IntMap.singleton index var
+  heap <- gets compHeap
+  let heap' = IntMap.insertWith (<>) addr (elemType, bindings) heap
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for access an array on the heap
