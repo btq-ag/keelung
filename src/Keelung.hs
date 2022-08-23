@@ -4,6 +4,7 @@ module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
     module Keelung.Monad,
+    module Keelung.Error,
     compile,
     interpret,
     gf181,
@@ -11,7 +12,7 @@ module Keelung
     b64,
     elaborate,
     Kind (..),
-    GaloisField,
+    GaloisField
   )
 where
 
@@ -44,17 +45,26 @@ interpret prog xs = case elaborate prog of
 
 --------------------------------------------------------------------------------
 
+printErrorInstead :: (Serialize n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> IO [n]
+printErrorInstead prog xs = do
+  result <- interpret prog xs
+  case result of
+    Left err -> do
+      print err
+      return []
+    Right values -> return values
+
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Comp GF181 (Val t GF181) -> [GF181] -> IO (Either Error [N GF181])
-gf181 prog xs = fmap (map N) <$> interpret prog xs
+gf181 :: Comp GF181 (Val t GF181) -> [GF181] -> IO [N GF181]
+gf181 prog xs = map N <$> printErrorInstead prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Comp B64 (Val t B64) -> [B64] -> IO (Either Error [N B64])
-b64 prog xs = fmap (map N) <$> interpret prog xs
+b64 :: Comp B64 (Val t B64) -> [B64] -> IO [N B64]
+b64 prog xs = map N <$> printErrorInstead prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Comp BN128 (Val t BN128) -> [BN128] -> IO (Either Error [N BN128])
-bn128 prog xs = fmap (map N) <$> interpret prog xs
+bn128 :: Comp BN128 (Val t BN128) -> [BN128] -> IO [N BN128]
+bn128 prog xs = map N <$> printErrorInstead prog xs
 
 --------------------------------------------------------------------------------
 
