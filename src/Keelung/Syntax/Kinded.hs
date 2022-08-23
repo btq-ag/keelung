@@ -20,6 +20,7 @@ import Data.Field.Galois (GaloisField (..))
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
+import Data.Array.IArray (Array)
 
 --------------------------------------------------------------------------------
 
@@ -29,7 +30,7 @@ data Val :: Kind -> Type -> Type where
   Number :: n -> Val 'Num n -- Field numbers
   Boolean :: Bool -> Val 'Bool n -- Booleans
   UnitVal :: Val 'Unit n -- Unit
-  ArrayVal :: [Val t n] -> Val ('Arr t) n -- Arrays
+  ArrayVal :: Array Int (Val t n) -> Val ('Arr t) n -- Arrays
   -- Reference
   Ref :: Ref t -> Val t n
   -- Operators on numbers

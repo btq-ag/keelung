@@ -38,7 +38,10 @@ where
 
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
+import Data.Array ((!))
+import qualified Data.Array.IArray as IArray
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -194,21 +197,17 @@ inputBool = do
 -- | Converts a list of values to an 1D-array
 toArray :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
 toArray xs = do
-  let size = length xs
-  when (size == 0) $ throwError EmptyArrayError
+  when (null xs) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
   Ref <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
-fromList :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
-fromList xs = do
-  let size = length xs
-  when (size == 0) $ throwError EmptyArrayError
-  return $ ArrayVal xs 
+fromList :: Referable t => [Val t n] -> Val ('Arr t) n
+fromList xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
 
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
-fromArray (ArrayVal xs) = return xs
+fromArray (ArrayVal xs) = return $ toList xs
 fromArray (Ref (ArrayRef _ len addr)) = do
   -- collect addresses or variables of each element
   forM [0 .. pred len] $ \i -> do
@@ -252,14 +251,14 @@ class Referable t where
   constructElementRef :: ElemType -> Addr -> Ref t
 
 instance Referable ref => Referable ('Arr ref) where
-  alloc (ArrayVal []) = throwError EmptyArrayError
-  alloc (ArrayVal (x : xs)) = do
-    allocArray (typeOf x) (x : xs)
+  alloc (ArrayVal xs) = do
+    when (null xs) $ throwError EmptyArrayError
+    allocArray (typeOf (xs ! 0)) (toList xs)
   alloc xs@(Ref (ArrayRef elemType len _)) = do
     elements <- mapM (access xs) [0 .. len - 1]
     allocArray elemType elements
 
-  typeOf (ArrayVal xs) = typeOf (head xs)
+  typeOf (ArrayVal xs) = typeOf (xs ! 0)
   typeOf (Ref (ArrayRef elemType len _)) = ArrElem elemType len
 
   constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
@@ -291,7 +290,7 @@ instance Referable 'Bool where
 access :: Referable t => Val ('Arr t) n -> Int -> Comp n (Val t n)
 access (ArrayVal xs) i =
   if i < length xs
-    then return $ xs !! i
+    then return $ xs ! i
     else throwError $ IndexOutOfBoundsError2 (length xs) i
 access (Ref (ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
 

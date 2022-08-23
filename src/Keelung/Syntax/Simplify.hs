@@ -1,13 +1,13 @@
--- | Module for converting Kinded syntax to Typed syntax 
-
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
+-- | Module for converting Kinded syntax to Typed syntax
 module Keelung.Syntax.Simplify (simplify) where
 
 import Control.Monad.Reader
+import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
 import Data.Proxy (Proxy (Proxy))
 import Keelung.Field (AcceptedField, encodeFieldType)
@@ -76,7 +76,7 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.Number n -> return $ Val (Number (toInteger n))
     S.Boolean b -> return $ Val (Boolean b)
     S.UnitVal -> return $ Val Unit
-    S.ArrayVal xs -> Array <$> mapM simplifyM xs
+    S.ArrayVal xs -> Array . toList <$> mapM simplifyM xs
     S.Ref x -> case x of
       S.BoolVar n -> return $ Var (BoolVar n)
       S.NumVar n -> return $ Var (NumVar n)
