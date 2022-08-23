@@ -1,8 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Keelung.Error where
 
 import qualified Data.IntMap as IntMap
 import Keelung.Types (Addr)
 import Data.IntMap (IntMap)
+import GHC.Generics (Generic)
+import Data.Serialize (Serialize)
 
 --------------------------------------------------------------------------------
 
@@ -11,7 +14,7 @@ data Error
   | InstallError -- Cannot locate the Keelung compiler
   | ElabError ElabError
   | CompileError String
-  deriving (Eq)
+  deriving (Eq, Generic)
 
 instance Show Error where
   show (DecodeError err) = "Decode Error: " ++ err
@@ -19,13 +22,17 @@ instance Show Error where
   show (ElabError err) = "Elaboration Error: " ++ show err
   show (CompileError err) = "Compile Error: " ++ err
 
+instance Serialize Error
+
 --------------------------------------------------------------------------------
 
 data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int (IntMap Int)
   | IndexOutOfBoundsError2 Int Int 
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance Serialize ElabError
 
 instance Show ElabError where
   show EmptyArrayError = "Array size must not be 0"
@@ -36,3 +43,4 @@ instance Show ElabError where
       ++ show (IntMap.size array)
   show (IndexOutOfBoundsError2 len index) =
     "Index " ++ show index ++ " out of bounds for array of length " ++ show len
+
