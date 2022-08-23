@@ -57,15 +57,15 @@ data Kind
 data Ref :: Kind -> Type where
   BoolVar :: Var -> Ref 'Bool
   NumVar :: Var -> Ref 'Num
-  Array :: ElemType -> Int -> Addr -> Ref ('Arr val)
+  ArrayRef :: ElemType -> Int -> Addr -> Ref ('Arr val)
 
 -- | 2 references are equal if they refer to the same variable or array
 instance Eq (Ref kind) where
   BoolVar i == BoolVar j = i == j
   NumVar i == NumVar j = i == j
-  Array _ _ addr == Array _ _ addr' = addr == addr'
+  ArrayRef _ _ addr == ArrayRef _ _ addr' = addr == addr'
 
 instance Show (Ref ref) where
   show (BoolVar v) = "$B" ++ show v
   show (NumVar v) = "$N" ++ show v
-  show (Array _ n a) = "$A" ++ show n ++ ":" ++ show a
+  show (ArrayRef _ n a) = "$A" ++ show n ++ ":" ++ show a

@@ -80,7 +80,7 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.Ref x -> case x of
       S.BoolVar n -> return $ Var (BoolVar n)
       S.NumVar n -> return $ Var (NumVar n)
-      S.Array _ len addr -> Array <$> mapM (readHeap addr) [0 .. pred len]
+      S.ArrayRef _ len addr -> Array <$> mapM (readHeap addr) [0 .. pred len]
     S.Add x y -> Add <$> simplifyM x <*> simplifyM y
     S.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
     S.Mul x y -> Mul <$> simplifyM x <*> simplifyM y

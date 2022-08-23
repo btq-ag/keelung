@@ -12,6 +12,7 @@ module Keelung.Monad
 
     -- * Array
     Referable (),
+    fromList,
     fromArray,
     toArray,
     lengthOf,
@@ -150,9 +151,9 @@ freshAddr = do
 -- we update the entry directly with the variable instead
 update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
 update (ArrayVal _) _ _ = return () -- No-op since ArrayVal is immutable
-update (Ref (Array _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
-update (Ref (Array _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
-update (Ref (Array elemType _ addr)) i expr = do
+update (Ref (ArrayRef _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
+update (Ref (ArrayRef _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
+update (Ref (ArrayRef elemType _ addr)) i expr = do
   ref <- alloc expr
   writeHeap addr elemType (i, addrOfRef ref)
 
@@ -198,10 +199,17 @@ toArray xs = do
   let kind = typeOf (head xs)
   Ref <$> allocArray kind xs
 
+-- | Immutable version of `toArray`
+fromList :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
+fromList xs = do
+  let size = length xs
+  when (size == 0) $ throwError EmptyArrayError
+  return $ ArrayVal xs 
+
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
 fromArray (ArrayVal xs) = return xs
-fromArray (Ref (Array _ len addr)) = do
+fromArray (Ref (ArrayRef _ len addr)) = do
   -- collect addresses or variables of each element
   forM [0 .. pred len] $ \i -> do
     Ref <$> readHeap (addr, i)
@@ -247,14 +255,14 @@ instance Referable ref => Referable ('Arr ref) where
   alloc (ArrayVal []) = throwError EmptyArrayError
   alloc (ArrayVal (x : xs)) = do
     allocArray (typeOf x) (x : xs)
-  alloc xs@(Ref (Array elemType len _)) = do
+  alloc xs@(Ref (ArrayRef elemType len _)) = do
     elements <- mapM (access xs) [0 .. len - 1]
     allocArray elemType elements
 
   typeOf (ArrayVal xs) = typeOf (head xs)
-  typeOf (Ref (Array elemType len _)) = ArrElem elemType len
+  typeOf (Ref (ArrayRef elemType len _)) = ArrElem elemType len
 
-  constructElementRef (ArrElem l k) elemAddr = Array l k elemAddr
+  constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
   constructElementRef _ _ = error "expecting element to be array"
 
 instance Referable 'Num where
@@ -285,7 +293,7 @@ access (ArrayVal xs) i =
   if i < length xs
     then return $ xs !! i
     else throwError $ IndexOutOfBoundsError2 (length xs) i
-access (Ref (Array _ _ addr)) i = Ref <$> readHeap (addr, i)
+access (Ref (ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
 
 -- | Access an element from a 2-D array
 access2 :: Referable t => Val ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Val t n)
@@ -301,7 +309,7 @@ access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 addrOfRef :: Ref t -> Addr
 addrOfRef (BoolVar addr) = addr
 addrOfRef (NumVar addr) = addr
-addrOfRef (Array _ _ addr) = addr
+addrOfRef (ArrayRef _ _ addr) = addr
 
 -- | Internal helper function for allocating an array with values
 allocArray :: Referable t => ElemType -> [Val t n] -> Comp n (Ref ('Arr ty))
@@ -310,7 +318,7 @@ allocArray elemType vals = do
   refs <- mapM alloc vals
   -- allocate new array for holding the variables of these elements
   addr <- allocOnHeap elemType refs
-  return $ Array elemType (length refs) addr
+  return $ ArrayRef elemType (length refs) addr
 
 -- | Internal helper function for marking a variable as input.
 markVarAsInput :: Var -> Comp n ()
@@ -358,7 +366,7 @@ reduce a xs f = foldM f a xs
 
 lengthOf :: Val ('Arr t) n -> Int
 lengthOf (ArrayVal xs) = length xs
-lengthOf (Ref (Array _ len _)) = len
+lengthOf (Ref (ArrayRef _ len _)) = len
 
 --------------------------------------------------------------------------------
 
