@@ -41,6 +41,7 @@ where
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Array ((!))
+import Data.Array.IArray (Array)
 import qualified Data.Array.IArray as IArray
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -52,7 +53,6 @@ import Keelung.Field
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
-import Data.Array.IArray (Array)
 
 --------------------------------------------------------------------------------
 

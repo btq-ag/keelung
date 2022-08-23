@@ -6,6 +6,9 @@ module Keelung
     module Keelung.Monad,
     compile,
     interpret,
+    gf181,
+    bn128,
+    b64,
     elaborate,
     Kind (..),
     GaloisField,
@@ -41,7 +44,21 @@ interpret prog xs = case elaborate prog of
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program 
+-- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
+gf181 :: Comp GF181 (Val t GF181) -> [GF181] -> IO (Either Error [N GF181])
+gf181 prog xs = fmap (map N) <$> interpret prog xs
+
+-- | A specialized version of 'interpret' that outputs numbers as 'N B64'
+b64 :: Comp B64 (Val t B64) -> [B64] -> IO (Either Error [N B64])
+b64 prog xs = fmap (map N) <$> interpret prog xs
+
+-- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
+bn128 :: Comp BN128 (Val t BN128) -> [BN128] -> IO (Either Error [N BN128])
+bn128 prog xs = fmap (map N) <$> interpret prog xs
+
+--------------------------------------------------------------------------------
+
+-- | Elaborate a program
 elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
 elaborate prog = do
   (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
