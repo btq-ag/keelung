@@ -11,7 +11,8 @@ module Keelung.Monad
     Assignment (..),
 
     -- * Array
-    Referable (access, fromArray),
+    Referable (access),
+    fromArray,
     toArray,
     lengthOf,
     update,
@@ -226,6 +227,18 @@ inputs3 sizeM sizeN sizeO = do
 
 --------------------------------------------------------------------------------
 
+-- | Convert an array into a list of expressions
+fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
+fromArray (ArrayVal xs) = return xs
+fromArray (Ref (Array _ len addr)) = do
+  -- collect addresses or variables of each element
+  elems <- forM [0 .. pred len] $ \i -> do
+    readHeap (addr, i)
+  return $
+    map
+      (\(elemType, elemAddr) -> Ref $ constructElementRef elemType elemAddr)
+      elems
+
 -- | Typeclass for retrieving the element of an array
 class Referable t where
   -- | Read the element of an array
@@ -234,17 +247,15 @@ class Referable t where
   -- | Allocates a fresh variable for a value
   alloc :: Val t n -> Comp n (Ref t)
 
-  -- | Convert an array into a list of expressions
-  fromArray :: Val ('Arr t) n -> Comp n [Val t n]
-
   typeOf :: Val t n -> ElemType
 
+  constructElementRef :: ElemType -> Addr -> Ref t
+
 instance Referable ref => Referable ('Arr ref) where
-
-  access (ArrayVal xs) i = if i < length xs
-    then return $ xs !! i
-    else throwError $ IndexOutOfBoundsError2 (length xs) i 
-
+  access (ArrayVal xs) i =
+    if i < length xs
+      then return $ xs !! i
+      else throwError $ IndexOutOfBoundsError2 (length xs) i
   access (Ref (Array elemType _ addr)) i = do
     (elemType', addr') <- readHeap (addr, i)
     -- the element should be an array, we extract the length from its ElemType
@@ -254,9 +265,9 @@ instance Referable ref => Referable ('Arr ref) where
     return $ Ref (Array elemType len' addr')
 
   alloc (ArrayVal []) = throwError EmptyArrayError
-  alloc (ArrayVal (x:xs)) = do 
+  alloc (ArrayVal (x : xs)) = do
     -- allocate a fresh variable for each element
-    vars <- mapM alloc (x:xs)
+    vars <- mapM alloc (x : xs)
     allocateArrayWithVars2 (typeOf x) vars
   alloc xs@(Ref (Array elemType len _)) = do
     vars <- forM [0 .. len - 1] $ \i -> do
@@ -264,27 +275,17 @@ instance Referable ref => Referable ('Arr ref) where
       alloc x
     allocateArrayWithVars2 elemType vars
 
-  fromArray (ArrayVal xs) = return xs
-  fromArray (Ref (Array _ len addr)) = do
-    elems <- forM [0 .. pred len] $ \i -> do
-      readHeap (addr, i)
-    return $
-      map
-        ( \(elemType, elemAddr) ->
-            case elemType of
-              ArrElem l k -> Ref $ Array l k elemAddr
-              _ -> error "expecting element to be array"
-        )
-        elems
-
   typeOf (ArrayVal xs) = typeOf (head xs)
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len
 
-instance Referable 'Num where
+  constructElementRef (ArrElem l k) elemAddr = Array l k elemAddr
+  constructElementRef _ _ = error "expecting element to be array"
 
-  access (ArrayVal xs) i = if i < length xs
-    then return $ xs !! i
-    else throwError $ IndexOutOfBoundsError2 (length xs) i 
+instance Referable 'Num where
+  access (ArrayVal xs) i =
+    if i < length xs
+      then return $ xs !! i
+      else throwError $ IndexOutOfBoundsError2 (length xs) i
   access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
 
   alloc val = do
@@ -292,27 +293,17 @@ instance Referable 'Num where
     modify' $ \st -> st {compNumAsgns = Assignment (NumVar var) val : compNumAsgns st}
     return $ NumVar var
 
-  fromArray (ArrayVal xs) = return xs
-  fromArray (Ref (Array _ len addr)) = do
-    elems <- forM [0 .. pred len] $ \i -> do
-      readHeap (addr, i)
-
-    return $
-      map
-        ( \(elemType, elemAddr) ->
-            case elemType of
-              NumElem -> Ref $ NumVar elemAddr
-              _ -> error "expecting element to be of Num"
-        )
-        elems
-
   typeOf _ = NumElem
+
+  constructElementRef NumElem elemAddr = NumVar elemAddr
+  constructElementRef _ _ = error "expecting element to be of Num"
 
 instance Referable 'Bool where
 
-  access (ArrayVal xs) i = if i < length xs
-    then return $ xs !! i
-    else throwError $ IndexOutOfBoundsError2 (length xs) i 
+  access (ArrayVal xs) i =
+    if i < length xs
+      then return $ xs !! i
+      else throwError $ IndexOutOfBoundsError2 (length xs) i
   access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
 
   alloc val = do
@@ -320,21 +311,10 @@ instance Referable 'Bool where
     modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar var) val : compBoolAsgns st}
     return $ BoolVar var
 
-  fromArray (ArrayVal xs) = return xs
-  fromArray (Ref (Array _ len addr)) = do
-    elems <- forM [0 .. pred len] $ \i -> do
-      readHeap (addr, i)
-
-    return $
-      map
-        ( \(elemType, elemAddr) ->
-            case elemType of
-              BoolElem -> Ref $ BoolVar elemAddr
-              _ -> error "expecting element to be of Bool"
-        )
-        elems
-
   typeOf _ = BoolElem
+
+  constructElementRef BoolElem elemAddr = BoolVar elemAddr
+  constructElementRef _ _ = error "expecting element to be of Bool"
 
 -- | Access a variable from a 2-D array
 access2 :: Referable t => Val ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Val t n)
