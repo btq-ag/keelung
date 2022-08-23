@@ -11,11 +11,12 @@ module Keelung.Monad
     Assignment (..),
 
     -- * Array
-    Referable (access),
+    Referable (),
     fromArray,
     toArray,
     lengthOf,
     update,
+    access,
     access2,
     access3,
 
@@ -199,6 +200,14 @@ toArray xs = do
   vars <- mapM alloc xs
   Ref <$> allocateArrayWithVars2 kind vars
 
+-- | Convert an array into a list of expressions
+fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
+fromArray (ArrayVal xs) = return xs
+fromArray (Ref (Array _ len addr)) = do
+  -- collect addresses or variables of each element
+  forM [0 .. pred len] $ \i -> do
+    Ref <$> readHeap (addr, i)
+
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
@@ -227,23 +236,8 @@ inputs3 sizeM sizeN sizeO = do
 
 --------------------------------------------------------------------------------
 
--- | Convert an array into a list of expressions
-fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
-fromArray (ArrayVal xs) = return xs
-fromArray (Ref (Array _ len addr)) = do
-  -- collect addresses or variables of each element
-  elems <- forM [0 .. pred len] $ \i -> do
-    readHeap (addr, i)
-  return $
-    map
-      (\(elemType, elemAddr) -> Ref $ constructElementRef elemType elemAddr)
-      elems
-
 -- | Typeclass for retrieving the element of an array
 class Referable t where
-  -- | Read the element of an array
-  access :: Val ('Arr t) n -> Int -> Comp n (Val t n)
-
   -- | Allocates a fresh variable for a value
   alloc :: Val t n -> Comp n (Ref t)
 
@@ -252,18 +246,6 @@ class Referable t where
   constructElementRef :: ElemType -> Addr -> Ref t
 
 instance Referable ref => Referable ('Arr ref) where
-  access (ArrayVal xs) i =
-    if i < length xs
-      then return $ xs !! i
-      else throwError $ IndexOutOfBoundsError2 (length xs) i
-  access (Ref (Array elemType _ addr)) i = do
-    (elemType', addr') <- readHeap (addr, i)
-    -- the element should be an array, we extract the length from its ElemType
-    let len' = case elemType' of
-          ArrElem _ l -> l
-          _ -> error "access: array element is not an array"
-    return $ Ref (Array elemType len' addr')
-
   alloc (ArrayVal []) = throwError EmptyArrayError
   alloc (ArrayVal (x : xs)) = do
     -- allocate a fresh variable for each element
@@ -282,12 +264,6 @@ instance Referable ref => Referable ('Arr ref) where
   constructElementRef _ _ = error "expecting element to be array"
 
 instance Referable 'Num where
-  access (ArrayVal xs) i =
-    if i < length xs
-      then return $ xs !! i
-      else throwError $ IndexOutOfBoundsError2 (length xs) i
-  access (Ref (Array _ _ addr)) i = Ref . NumVar . snd <$> readHeap (addr, i)
-
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compNumAsgns = Assignment (NumVar var) val : compNumAsgns st}
@@ -299,13 +275,6 @@ instance Referable 'Num where
   constructElementRef _ _ = error "expecting element to be of Num"
 
 instance Referable 'Bool where
-
-  access (ArrayVal xs) i =
-    if i < length xs
-      then return $ xs !! i
-      else throwError $ IndexOutOfBoundsError2 (length xs) i
-  access (Ref (Array _ _ addr)) i = Ref . BoolVar . snd <$> readHeap (addr, i)
-
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar var) val : compBoolAsgns st}
@@ -316,11 +285,19 @@ instance Referable 'Bool where
   constructElementRef BoolElem elemAddr = BoolVar elemAddr
   constructElementRef _ _ = error "expecting element to be of Bool"
 
--- | Access a variable from a 2-D array
+-- | Access an element from a 1-D array
+access :: Referable t => Val ('Arr t) n -> Int -> Comp n (Val t n)
+access (ArrayVal xs) i =
+  if i < length xs
+    then return $ xs !! i
+    else throwError $ IndexOutOfBoundsError2 (length xs) i
+access (Ref (Array _ _ addr)) i = Ref <$> readHeap (addr, i)
+
+-- | Access an element from a 2-D array
 access2 :: Referable t => Val ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Val t n)
 access2 addr (i, j) = access addr i >>= flip access j
 
--- | Access a variable from a 3-D array
+-- | Access an element from a 3-D array
 access3 :: Referable t => Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Val t n)
 access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
 
@@ -359,14 +336,14 @@ writeHeap addr kind array = do
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for access an array on the heap
-readHeap :: (Addr, Int) -> Comp n (ElemType, Int)
+readHeap :: Referable t => (Addr, Int) -> Comp n (Ref t)
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
     Nothing -> error "readHeap: address not found"
     Just (elemType, array) -> case IntMap.lookup i array of
       Nothing -> throwError $ IndexOutOfBoundsError addr i array
-      Just n -> return (elemType, n)
+      Just n -> return $ constructElementRef elemType n
 
 --------------------------------------------------------------------------------
 
