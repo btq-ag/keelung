@@ -4,7 +4,6 @@ module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
     module Keelung.Monad,
-    module Keelung.Error,
     compile,
     interpret,
     gf181,
