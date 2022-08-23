@@ -196,9 +196,7 @@ toArray xs = do
   let size = length xs
   when (size == 0) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
-  -- allocates fresh variables for each elements
-  vars <- mapM alloc xs
-  Ref <$> allocateArrayWithVars kind vars
+  Ref <$> allocArray kind xs
 
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
@@ -248,14 +246,10 @@ class Referable t where
 instance Referable ref => Referable ('Arr ref) where
   alloc (ArrayVal []) = throwError EmptyArrayError
   alloc (ArrayVal (x : xs)) = do
-    -- allocate a fresh variable for each element
-    vars <- mapM alloc (x : xs)
-    allocateArrayWithVars (typeOf x) vars
+    allocArray (typeOf x) (x : xs)
   alloc xs@(Ref (Array elemType len _)) = do
-    vars <- forM [0 .. len - 1] $ \i -> do
-      x <- access xs i
-      alloc x
-    allocateArrayWithVars elemType vars
+    elements <- mapM (access xs) [0 .. len - 1]
+    allocArray elemType elements
 
   typeOf (ArrayVal xs) = typeOf (head xs)
   typeOf (Ref (Array elemType len _)) = ArrElem elemType len
@@ -309,10 +303,12 @@ addrOfRef (BoolVar addr) = addr
 addrOfRef (NumVar addr) = addr
 addrOfRef (Array _ _ addr) = addr
 
--- | Internal helper function for allocating an array
--- and associate the address with a set of variables
-allocateArrayWithVars :: ElemType -> [Ref t] -> Comp n (Ref ('Arr ty))
-allocateArrayWithVars elemType refs = do
+-- | Internal helper function for allocating an array with values
+allocArray :: Referable t => ElemType -> [Val t n] -> Comp n (Ref ('Arr ty))
+allocArray elemType vals = do
+  -- allocate new variables for each element
+  refs <- mapM alloc vals
+  -- allocate new array for holding the variables of these elements
   addr <- allocOnHeap elemType refs
   return $ Array elemType (length refs) addr
 
