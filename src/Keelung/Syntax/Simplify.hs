@@ -32,11 +32,11 @@ readHeap addr i = do
     Nothing -> error "HeapM: address not found"
     Just (elemType, array) -> case IntMap.lookup i array of
       Nothing -> error "HeapM: index ouf of bounds"
-      Just n -> case elemType of
-        S.NumElem -> return $ Var $ NumVar n
-        S.BoolElem -> return $ Var $ NumVar n
+      Just addr' -> case elemType of
+        S.NumElem -> return $ Var $ NumVar addr'
+        S.BoolElem -> return $ Var $ BoolVar addr'
         S.ArrElem _ len -> do
-          Array <$> mapM (readHeap addr) [0 .. pred len]
+          Array <$> mapM (readHeap addr') [0 .. pred len]
 
 --------------------------------------------------------------------------------
 
