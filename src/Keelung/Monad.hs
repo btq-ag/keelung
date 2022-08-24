@@ -12,11 +12,10 @@ module Keelung.Monad
 
     -- * Array
     Referable (),
-    fromList,
-    fromArray,
-    toList,
-    fromIArray,
     toArray,
+    toArrayI,
+    toArrayI',
+    fromArray,
     lengthOf,
     update,
     access,
@@ -205,12 +204,12 @@ toArray xs = do
   Ref <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
-fromList :: Referable t => [Val t n] -> Val ('Arr t) n
-fromList xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
+toArrayI :: Referable t => [Val t n] -> Val ('Arr t) n
+toArrayI xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
 
 -- | Immutable version of `toArray`
-fromIArray :: Referable t => Array Int (Val t n) -> Val ('Arr t) n
-fromIArray = ArrayVal
+toArrayI' :: Referable t => Array Int (Val t n) -> Val ('Arr t) n
+toArrayI' = ArrayVal
 
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]

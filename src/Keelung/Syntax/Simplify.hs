@@ -40,7 +40,7 @@ readHeap addr i = do
 
 --------------------------------------------------------------------------------
 
-simplifyComputation :: (Integral n, AcceptedField n) => S.Computation n -> Computation
+simplifyComputation :: (AcceptedField n, Integral n) => S.Computation n -> Computation
 simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
