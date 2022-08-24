@@ -8,8 +8,12 @@
 module Main where
 
 -- import Control.Monad (forM_)
-import Keelung
+
 import Control.Monad (forM_)
+import Data.Bits (Bits (testBit))
+import Data.Word (Word8)
+import Keelung
+
 -- import Control.Monad
 
 -- | Outputs whether number is given.
@@ -36,16 +40,32 @@ tempConvert = do
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
 
+terminationProblem :: Comp GF181 (Val ('Arr ('Arr 'Bool)) GF181)
+terminationProblem = run "A"
+  where
+    -- Construct a W8 from a Word8
+    fromWord8 :: Word8 -> Comp GF181 (Val ('Arr 'Bool) GF181)
+    fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
+
+    -- Construct a W8 from a Char
+    fromChar :: Char -> Comp GF181 (Val ('Arr 'Bool) GF181)
+    fromChar = fromWord8 . toEnum . fromEnum
+
+    -- Construct an array of W8s from a String
+    run :: String -> Comp GF181 (Val ('Arr ('Arr 'Bool)) GF181)
+    run xs = mapM fromChar xs >>= toArray
+
 -- |
 main :: IO ()
 main = return ()
-  -- -- here goes the program you want to compile
-  -- let program = assertToBe42
 
-  -- let toR1CS = False
-  -- if toR1CS
-  --   then compileAsR1CS program -- compile as a R1CS
-  --   else compile program -- compile as a ConstraintSystem
+-- -- here goes the program you want to compile
+-- let program = assertToBe42
+
+-- let toR1CS = False
+-- if toR1CS
+--   then compileAsR1CS program -- compile as a R1CS
+--   else compile program -- compile as a ConstraintSystem
 
 -- assertArrayToBe42 :: Comp GF181 (Val 'Unit GF181)
 -- assertArrayToBe42 = do
@@ -93,7 +113,7 @@ loop3 n m = do
       x' <- access2 squares (i, j)
       assert (x' `Eq` (x * x))
 
-  return unit 
+  return unit
 
 --   --------------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (simplify) where
+module Keelung.Syntax.Simplify (simplify, simplifyM, simplifyComputation) where
 
 import Control.Monad.Reader
 import Data.Foldable (toList)
@@ -58,12 +58,10 @@ simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns a
 
 simplify :: (Integral n, AcceptedField n) => S.Elaborated t n -> Elaborated
 simplify (S.Elaborated expr comp) =
-  Elaborated
-    (runHeapM heap (simplifyM expr))
-    comp'
-  where
-    comp' = simplifyComputation comp
-    heap = compHeap comp'
+  let comp' = simplifyComputation comp
+   in Elaborated
+        (runHeapM (compHeap comp') (simplifyM expr))
+        comp'
 
 --------------------------------------------------------------------------------
 

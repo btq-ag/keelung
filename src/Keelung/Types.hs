@@ -68,4 +68,4 @@ instance Eq (Ref kind) where
 instance Show (Ref ref) where
   show (BoolVar v) = "$B" ++ show v
   show (NumVar v) = "$N" ++ show v
-  show (ArrayRef _ n a) = "$A" ++ show n ++ ":" ++ show a
+  show (ArrayRef _ n a) = "$A" ++ show a ++ "[" ++ show n ++ "]"

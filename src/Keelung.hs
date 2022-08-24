@@ -11,7 +11,7 @@ module Keelung
     b64,
     elaborate,
     Kind (..),
-    GaloisField
+    GaloisField,
   )
 where
 
@@ -70,7 +70,7 @@ bn128 prog xs = map N <$> printErrorInstead prog xs
 -- | Elaborate a program
 elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
 elaborate prog = do
-  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- runComp emptyComputation prog
   return $ simplify $ Elaborated expr comp'
 
 --------------------------------------------------------------------------------
