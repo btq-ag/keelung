@@ -27,8 +27,11 @@ module Keelung.Monad
     inputNum,
     inputBool,
     inputs,
+    inputsI,
     inputs2,
+    inputs2I,
     inputs3,
+    inputs3I,
 
     -- * Statements
     cond,
@@ -228,6 +231,12 @@ inputs size = do
   vars <- replicateM size input
   toArray vars
 
+inputsI :: (Proper t, Referable t) => Int -> Comp n (Val ('Arr t) n)
+inputsI 0 = throwError EmptyArrayError
+inputsI size = do
+  vars <- replicateM size input
+  return $ toArrayI vars
+
 -- | Requests a 2D-array of fresh input variables
 inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
 inputs2 0 _ = throwError EmptyArrayError
@@ -235,6 +244,13 @@ inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
   vars <- replicateM sizeM (inputs sizeN)
   toArray vars
+
+inputs2I :: (Proper t, Referable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
+inputs2I 0 _ = throwError EmptyArrayError
+inputs2I _ 0 = throwError EmptyArrayError
+inputs2I sizeM sizeN = do
+  vars <- replicateM sizeM (inputsI sizeN)
+  return $ toArrayI vars
 
 -- | Requests a 3D-array of fresh input variables
 inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
@@ -244,6 +260,15 @@ inputs3 _ _ 0 = throwError EmptyArrayError
 inputs3 sizeM sizeN sizeO = do
   vars <- replicateM sizeM (inputs2 sizeN sizeO)
   toArray vars
+
+-- | Requests a 3D-array of fresh input variables
+inputs3I :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
+inputs3I 0 _ _ = throwError EmptyArrayError
+inputs3I _ 0 _ = throwError EmptyArrayError
+inputs3I _ _ 0 = throwError EmptyArrayError
+inputs3I sizeM sizeN sizeO = do
+  vars <- replicateM sizeM (inputs2I sizeN sizeO)
+  return $ toArrayI vars
 
 --------------------------------------------------------------------------------
 
@@ -350,7 +375,7 @@ writeHeap addr elemType (index, var) = do
   modifyHeap (IntMap.insertWith (<>) addr (elemType, bindings))
 
 modifyHeap :: (Heap -> Heap) -> Comp n ()
-modifyHeap f = do 
+modifyHeap f = do
   heap <- gets compHeap
   let heap' = f heap
   modify (\st -> st {compHeap = heap'})
