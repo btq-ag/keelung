@@ -214,10 +214,10 @@ toArrayI' = ArrayVal
 -- | Convert an array into a list of expressions
 fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
 fromArray (ArrayVal xs) = return $ toList xs
-fromArray (Ref (ArrayRef _ len addr)) = do
-  -- collect addresses or variables of each element
-  forM [0 .. pred len] $ \i -> do
-    Ref <$> readHeap (addr, i)
+fromArray (Ref (ArrayRef _ _ addr)) = do
+  -- collect references of each element
+  refs <- readHeapArray addr
+  return $ map Ref refs
 
 --------------------------------------------------------------------------------
 
@@ -340,20 +340,22 @@ allocOnHeap elemType refs = do
   addr <- freshAddr
   let addresses = map addrOfRef refs
   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
-  heap <- gets compHeap
-  let heap' = IntMap.insert addr (elemType, bindings) heap
-  modify (\st -> st {compHeap = heap'})
+  modifyHeap (IntMap.insert addr (elemType, bindings))
   return addr
 
 -- | Internal helper function for updating an array entry on the heap
 writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp n ()
 writeHeap addr elemType (index, var) = do
   let bindings = IntMap.singleton index var
+  modifyHeap (IntMap.insertWith (<>) addr (elemType, bindings))
+
+modifyHeap :: (Heap -> Heap) -> Comp n ()
+modifyHeap f = do 
   heap <- gets compHeap
-  let heap' = IntMap.insertWith (<>) addr (elemType, bindings) heap
+  let heap' = f heap
   modify (\st -> st {compHeap = heap'})
 
--- | Internal helper function for access an array on the heap
+-- | Internal helper function for accessing an element of an array on the heap
 readHeap :: Referable t => (Addr, Int) -> Comp n (Ref t)
 readHeap (addr, i) = do
   heap <- gets compHeap
@@ -362,6 +364,14 @@ readHeap (addr, i) = do
     Just (elemType, array) -> case IntMap.lookup i array of
       Nothing -> throwError $ IndexOutOfBoundsError addr i array
       Just n -> return $ constructElementRef elemType n
+
+-- | Internal helper function for accessing an array on the heap
+readHeapArray :: Referable t => Addr -> Comp n [Ref t]
+readHeapArray addr = do
+  heap <- gets compHeap
+  case IntMap.lookup addr heap of
+    Nothing -> error "readHeap: address not found"
+    Just (elemType, array) -> return $ map (constructElementRef elemType) (IntMap.elems array)
 
 --------------------------------------------------------------------------------
 
