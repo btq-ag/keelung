@@ -24,11 +24,12 @@ dependencies:
 - array 
 - bytestring
 - cereal 
-- mtl
 - containers
-- semirings
+- deepseq
 - galois-field
+- mtl
 - process
+- semirings
 
 library:
   source-dirs: src

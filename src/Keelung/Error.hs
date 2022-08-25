@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Keelung.Error where
 
 import qualified Data.IntMap as IntMap
@@ -6,6 +7,7 @@ import Keelung.Types (Addr)
 import Data.IntMap (IntMap)
 import GHC.Generics (Generic)
 import Data.Serialize (Serialize)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -14,7 +16,7 @@ data Error
   | InstallError -- Cannot locate the Keelung compiler
   | ElabError ElabError
   | CompileError String
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, NFData)
 
 instance Show Error where
   show (DecodeError err) = "Decode Error: " ++ err
@@ -30,7 +32,7 @@ data ElabError
   = EmptyArrayError
   | IndexOutOfBoundsError Addr Int (IntMap Int)
   | IndexOutOfBoundsError2 Int Int 
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, NFData)
 
 instance Serialize ElabError
 

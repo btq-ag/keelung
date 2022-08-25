@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Syntax.Typed where
 
@@ -12,6 +13,7 @@ import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Types (Heap, Var)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -19,7 +21,7 @@ data Val
   = Number Integer
   | Boolean Bool
   | Unit
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, NFData)
 
 instance Show Val where
   show (Number n) = show n
@@ -33,7 +35,7 @@ instance Serialize Val
 data Ref
   = NumVar Var
   | BoolVar Var
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, NFData)
 
 instance Serialize Ref
 
@@ -59,7 +61,7 @@ data Expr
   | If Expr Expr Expr
   | ToBool Expr
   | ToNum Expr
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, NFData)
 
 sizeOfExpr :: Expr -> Int
 sizeOfExpr expr = case expr of
@@ -113,7 +115,7 @@ data Elaborated = Elaborated
     -- | The state of computation after elaboration
     elabComp :: Computation
   }
-  deriving (Generic)
+  deriving (Generic, NFData)
 
 instance Show Elaborated where
   show (Elaborated expr comp) =
@@ -129,7 +131,7 @@ instance Serialize Elaborated
 
 -- | An Assignment associates an expression with a reference
 data Assignment = Assignment Ref Expr
-  deriving (Generic)
+  deriving (Generic, NFData)
 
 instance Show Assignment where
   show (Assignment var expr) = show var <> " := " <> show expr
@@ -155,7 +157,7 @@ data Computation = Computation
     compAssertions :: [Expr],
     compFieldType :: FieldType
   }
-  deriving (Generic)
+  deriving (Generic, NFData)
 
 instance Show Computation where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions fieldType) =

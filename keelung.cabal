@@ -31,6 +31,7 @@ library
       Keelung.Constraint.R1CS
       Keelung.Error
       Keelung.Field
+      Keelung.Field.N
       Keelung.Monad
       Keelung.Syntax
       Keelung.Syntax.Kinded
@@ -48,6 +49,7 @@ library
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , mtl
     , process
@@ -67,6 +69,7 @@ executable tutorial
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , keelung
     , mtl
@@ -88,6 +91,7 @@ test-suite keelung-test
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , keelung
     , mtl

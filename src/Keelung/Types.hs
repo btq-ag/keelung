@@ -2,11 +2,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Keelung.Types where 
 import Data.IntMap (IntMap)
 import GHC.Generics (Generic)
 import Data.Serialize (Serialize)
 import Data.Kind (Type)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +32,7 @@ data ElemType
   = NumElem -- Field numbers
   | BoolElem -- Booleans
   | ArrElem ElemType Int -- Arrays
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, NFData)
 
 instance Serialize ElemType
 
