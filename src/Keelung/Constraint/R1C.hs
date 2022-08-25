@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Keelung.Constraint.R1C where
 
 import Data.Field.Galois (GaloisField)
@@ -8,13 +9,14 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Field (N (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
 data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (R1C n)
 

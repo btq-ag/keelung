@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Constraint.R1CS where
 
@@ -10,6 +11,7 @@ import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Types (Var)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -28,7 +30,7 @@ data R1CS n = R1CS
     r1csOutputVars :: IntSet,
     r1csCNQZPairs :: [(Var, Var)]
   }
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, NFData)
 
 instance Serialize n => Serialize (R1CS n)
 

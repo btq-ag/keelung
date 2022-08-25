@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Constraint.Polynomial
   ( Poly,
@@ -31,13 +32,14 @@ import Prelude hiding (negate)
 import qualified Prelude
 import GHC.Generics (Generic)
 import Data.Serialize (Serialize)
+import Control.DeepSeq (NFData)
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)
-  deriving (Functor, Generic)
+  deriving (Functor, Generic, NFData)
 
 instance Serialize n => Serialize (Poly n)
 
