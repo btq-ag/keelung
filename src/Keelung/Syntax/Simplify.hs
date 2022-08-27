@@ -7,7 +7,7 @@
 module Keelung.Syntax.Simplify (simplify, simplifyM, simplifyComputation) where
 
 import Control.Monad.Reader
-import Data.Foldable (toList)
+import qualified Data.Array.IArray as Array
 import qualified Data.IntMap as IntMap
 import Data.Proxy (Proxy (Proxy))
 import Keelung.Field (AcceptedField, encodeFieldType)
@@ -36,7 +36,8 @@ readHeap addr i = do
         S.NumElem -> return $ Var $ NumVar addr'
         S.BoolElem -> return $ Var $ BoolVar addr'
         S.ArrElem _ len -> do
-          Array <$> mapM (readHeap addr') [0 .. pred len]
+          Array
+            <$> mapM (readHeap addr') (Array.listArray (0, len) [0 .. pred len])
 
 --------------------------------------------------------------------------------
 
@@ -74,11 +75,11 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.Number n -> return $ Val (Number (toInteger n))
     S.Boolean b -> return $ Val (Boolean b)
     S.UnitVal -> return $ Val Unit
-    S.ArrayVal xs -> Array . toList <$> mapM simplifyM xs
+    S.ArrayVal xs -> Array <$> mapM simplifyM xs
     S.Ref x -> case x of
       S.BoolVar n -> return $ Var (BoolVar n)
       S.NumVar n -> return $ Var (NumVar n)
-      S.ArrayRef _ len addr -> Array <$> mapM (readHeap addr) [0 .. pred len]
+      S.ArrayRef _ len addr -> Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0 .. pred len])
     S.Add x y -> Add <$> simplifyM x <*> simplifyM y
     S.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
     S.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
