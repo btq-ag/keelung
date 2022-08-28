@@ -10,6 +10,7 @@ module Keelung
     bn128,
     b64,
     elaborate,
+    elaborateOnly,
     Kind (..),
     GaloisField,
   )
@@ -67,9 +68,15 @@ bn128 prog xs = map N <$> printErrorInstead prog xs
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program
+-- | Elaborate a program and simplify it
 elaborate :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
 elaborate prog = do
+  (expr, comp') <- runComp emptyComputation prog
+  return $ simplify $ Elaborated expr comp'
+
+-- | Elaborate a program
+elaborateOnly :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either ElabError C.Elaborated
+elaborateOnly prog = do
   (expr, comp') <- runComp emptyComputation prog
   return $ simplify $ Elaborated expr comp'
 

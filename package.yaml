@@ -36,9 +36,6 @@ library:
 
 ghc-options:
   - -Wall
-  - -threaded
-  - -rtsopts
-  - -with-rtsopts=-N
   - -Werror=incomplete-patterns
   - -fno-warn-orphans
 
@@ -47,6 +44,22 @@ executables:
     main:                Main.hs
     source-dirs:        
       - examples/
+    dependencies:
+    - keelung
+
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
+
+benchmarks:
+  profile:
+    main:                Main.hs
+    source-dirs:        
+      - benchmarks/
     dependencies:
     - keelung
 

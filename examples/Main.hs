@@ -13,6 +13,8 @@ import Control.Monad (forM_)
 import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
+import Control.DeepSeq (NFData(rnf))
+import Control.Exception (evaluate)
 
 -- import Control.Monad
 
@@ -57,7 +59,24 @@ terminationProblem = run "A"
 
 -- |
 main :: IO ()
-main = return ()
+main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
+  where
+
+    -- | `fromWord8` implemented with immutable arrays
+    fromWord8' :: Word8 -> Val ('Arr 'Bool) n
+    fromWord8' word = toArrayI $ Prelude.map (Boolean . testBit word) [0 .. 7]
+
+    -- | `fromChar` implemented with immutable arrays
+    fromChar' :: Char -> Val ('Arr 'Bool) n
+    fromChar' = fromWord8' . toEnum . fromEnum
+
+    -- | `fromString` implemented with immutable arrays
+    fromString' :: String -> Val ('Arr ('Arr 'Bool)) GF181 
+    fromString' = toArrayI . map fromChar'
+
+    string :: Int -> String
+    string n = concat $ replicate n "Hello world"
+
 
 -- -- here goes the program you want to compile
 -- let program = assertToBe42
