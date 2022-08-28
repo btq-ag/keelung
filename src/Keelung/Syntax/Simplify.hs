@@ -25,19 +25,20 @@ type HeapM = Reader Heap
 runHeapM :: Heap -> HeapM a -> a
 runHeapM h m = runReader m h
 
-readHeap :: Addr -> Int -> HeapM Expr
-readHeap addr i = do
-  heap <- ask
-  case IntMap.lookup addr heap of
-    Nothing -> error "HeapM: address not found"
-    Just (elemType, array) -> case IntMap.lookup i array of
-      Nothing -> error "HeapM: index ouf of bounds"
-      Just addr' -> case elemType of
-        S.NumElem -> return $ Var $ NumVar addr'
-        S.BoolElem -> return $ Var $ BoolVar addr'
-        S.ArrElem _ len -> do
-          Array
-            <$> mapM (readHeap addr') (Array.listArray (0, len) [0 .. pred len])
+readArray :: Addr -> Int -> HeapM Expr
+readArray addr len = Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0 .. pred len])
+  where
+    readHeap :: Addr -> Int -> HeapM Expr
+    readHeap addr' i = do
+      heap <- ask
+      case IntMap.lookup addr' heap of
+        Nothing -> error "HeapM: address not found"
+        Just (elemType, array) -> case IntMap.lookup i array of
+          Nothing -> error "HeapM: index ouf of bounds"
+          Just addr'' -> case elemType of
+            S.NumElem -> return $ Var $ NumVar addr''
+            S.BoolElem -> return $ Var $ BoolVar addr''
+            S.ArrElem _ len' -> readArray addr'' len'
 
 --------------------------------------------------------------------------------
 
@@ -79,7 +80,7 @@ instance Integral n => Simplify (S.Val t n) Expr where
     S.Ref x -> case x of
       S.BoolVar n -> return $ Var (BoolVar n)
       S.NumVar n -> return $ Var (NumVar n)
-      S.ArrayRef _ len addr -> Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0 .. pred len])
+      S.ArrayRef _ len addr -> readArray addr len
     S.Add x y -> Add <$> simplifyM x <*> simplifyM y
     S.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
     S.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
