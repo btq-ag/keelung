@@ -14,7 +14,7 @@ import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Types (Heap, Var)
 import Control.DeepSeq (NFData)
-import Data.Array.IArray (Array)
+import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------

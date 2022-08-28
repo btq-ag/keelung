@@ -20,7 +20,7 @@ import Data.Field.Galois (GaloisField (..))
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
-import Data.Array.IArray (Array)
+import Data.Array.Unboxed (Array)
 
 --------------------------------------------------------------------------------
 

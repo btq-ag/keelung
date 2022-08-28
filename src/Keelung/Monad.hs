@@ -43,8 +43,8 @@ where
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Array ((!))
-import Data.Array.IArray (Array)
-import qualified Data.Array.IArray as IArray
+import Data.Array.Unboxed (Array)
+import qualified Data.Array.Unboxed as IArray
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap

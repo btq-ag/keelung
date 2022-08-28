@@ -7,7 +7,7 @@
 module Keelung.Syntax.Simplify (simplify, simplifyM, simplifyComputation) where
 
 import Control.Monad.Reader
-import qualified Data.Array.IArray as Array
+import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
 import Data.Proxy (Proxy (Proxy))
 import Keelung.Field (AcceptedField, encodeFieldType)
