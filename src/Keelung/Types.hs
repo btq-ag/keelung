@@ -1,14 +1,16 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DeriveAnyClass #-}
-module Keelung.Types where 
-import Data.IntMap (IntMap)
-import GHC.Generics (Generic)
-import Data.Serialize (Serialize)
-import Data.Kind (Type)
+
+module Keelung.Types where
+
 import Control.DeepSeq (NFData)
+import Data.IntMap (IntMap)
+import Data.Kind (Type)
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
@@ -24,10 +26,10 @@ type Addr = Int
 type Heap =
   IntMap
     ( ElemType, -- kind of element
-      IntMap Int -- mapping of index to address of element variables 
+      IntMap Int -- mapping of index to address of element variables
     )
 
--- | Type of elements of a array 
+-- | Type of elements of a array
 data ElemType
   = NumElem -- Field numbers
   | BoolElem -- Booleans
@@ -50,7 +52,8 @@ data Kind
   = Num -- Field numbers
   | Bool -- Booleans
   | Unit -- Unit
-  | Arr Kind -- Arrays
+  | Arr Kind -- Immutable arrays
+  | ArrM Kind -- Mutable arrays
   deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
@@ -59,7 +62,7 @@ data Kind
 data Ref :: Kind -> Type where
   BoolVar :: Var -> Ref 'Bool
   NumVar :: Var -> Ref 'Num
-  ArrayRef :: ElemType -> Int -> Addr -> Ref ('Arr val)
+  ArrayRef :: ElemType -> Int -> Addr -> Ref ('ArrM val)
 
 -- | 2 references are equal if they refer to the same variable or array
 instance Eq (Ref kind) where

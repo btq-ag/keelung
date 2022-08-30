@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE EmptyCase #-}
 
 module Keelung.Monad
   ( Comp,
@@ -11,13 +12,18 @@ module Keelung.Monad
     Assignment (..),
 
     -- * Array
-    Referable (),
+    Mutable (),
+    toArrayM,
     toArray,
-    toArrayI,
-    toArrayI',
+    toArray',
     fromArray,
+    fromArrayM,
     lengthOf,
-    update,
+    lengthOfM,
+    updateM,
+    accessM,
+    accessM2,
+    accessM3,
     access,
     access2,
     access3,
@@ -27,11 +33,8 @@ module Keelung.Monad
     inputNum,
     inputBool,
     inputs,
-    inputsI,
     inputs2,
-    inputs2I,
     inputs3,
-    inputs3I,
 
     -- * Statements
     cond,
@@ -157,11 +160,10 @@ freshAddr = do
 -- | Update an entry of an array.
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
-update :: Referable t => Val ('Arr t) n -> Int -> Val t n -> Comp n ()
-update (ArrayVal _) _ _ = return () -- No-op since ArrayVal is immutable
-update (Ref (ArrayRef _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
-update (Ref (ArrayRef _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
-update (Ref (ArrayRef elemType _ addr)) i expr = do
+updateM :: Mutable t => Val ('ArrM t) n -> Int -> Val t n -> Comp n ()
+updateM (Ref (ArrayRef _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
+updateM (Ref (ArrayRef _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
+updateM (Ref (ArrayRef elemType _ addr)) i expr = do
   ref <- alloc expr
   writeHeap addr elemType (i, addrOfRef ref)
 
@@ -200,80 +202,61 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Converts a list of values to an 1D-array
-toArray :: Referable t => [Val t n] -> Comp n (Val ('Arr t) n)
-toArray xs = do
+toArrayM :: Mutable t => [Val t n] -> Comp n (Val ('ArrM t) n)
+toArrayM xs = do
   when (null xs) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
   Ref <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
-toArrayI :: Referable t => [Val t n] -> Val ('Arr t) n
-toArrayI xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
+toArray :: [Val t n] -> Val ('Arr t) n
+toArray xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
 
 -- | Immutable version of `toArray`
-toArrayI' :: Referable t => Array Int (Val t n) -> Val ('Arr t) n
-toArrayI' = ArrayVal
+toArray' :: Array Int (Val t n) -> Val ('Arr t) n
+toArray' = ArrayVal
 
 -- | Convert an array into a list of expressions
-fromArray :: Referable t => Val ('Arr t) n -> Comp n [Val t n]
-fromArray (ArrayVal xs) = return $ toList xs
-fromArray (Ref (ArrayRef _ _ addr)) = do
+fromArrayM :: Mutable t => Val ('ArrM t) n -> Comp n [Val t n]
+fromArrayM (Ref (ArrayRef _ _ addr)) = do
   -- collect references of each element
   refs <- readHeapArray addr
   return $ map Ref refs
 
+fromArray :: Val ('Arr t) n -> [Val t n]
+fromArray (ArrayVal xs) = toList xs
+fromArray (Ref ref) = case ref of {}
+
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Referable t) => Int -> Comp n (Val ('Arr t) n)
+inputs :: (Proper t, Mutable t) => Int -> Comp n (Val ('Arr t) n)
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
-  toArray vars
-
-inputsI :: (Proper t, Referable t) => Int -> Comp n (Val ('Arr t) n)
-inputsI 0 = throwError EmptyArrayError
-inputsI size = do
-  vars <- replicateM size input
-  return $ toArrayI vars
+  return $ toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Referable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
+inputs2 :: (Proper t, Mutable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
   vars <- replicateM sizeM (inputs sizeN)
-  toArray vars
-
-inputs2I :: (Proper t, Referable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
-inputs2I 0 _ = throwError EmptyArrayError
-inputs2I _ 0 = throwError EmptyArrayError
-inputs2I sizeM sizeN = do
-  vars <- replicateM sizeM (inputsI sizeN)
-  return $ toArrayI vars
+  return $ toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
+inputs3 :: (Proper t, Mutable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
 inputs3 sizeM sizeN sizeO = do
   vars <- replicateM sizeM (inputs2 sizeN sizeO)
-  toArray vars
-
--- | Requests a 3D-array of fresh input variables
-inputs3I :: (Proper t, Referable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
-inputs3I 0 _ _ = throwError EmptyArrayError
-inputs3I _ 0 _ = throwError EmptyArrayError
-inputs3I _ _ 0 = throwError EmptyArrayError
-inputs3I sizeM sizeN sizeO = do
-  vars <- replicateM sizeM (inputs2I sizeN sizeO)
-  return $ toArrayI vars
+  return $ toArray vars
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for retrieving the element of an array
-class Referable t where
+class Mutable t where
   -- | Allocates a fresh variable for a value
   alloc :: Val t n -> Comp n (Ref t)
 
@@ -281,21 +264,17 @@ class Referable t where
 
   constructElementRef :: ElemType -> Addr -> Ref t
 
-instance Referable ref => Referable ('Arr ref) where
-  alloc (ArrayVal xs) = do
-    when (null xs) $ throwError EmptyArrayError
-    allocArray (typeOf (xs ! 0)) (toList xs)
+instance Mutable ref => Mutable ('ArrM ref) where
   alloc xs@(Ref (ArrayRef elemType len _)) = do
-    elements <- mapM (access xs) [0 .. len - 1]
+    elements <- mapM (accessM xs) [0 .. len - 1]
     allocArray elemType elements
 
-  typeOf (ArrayVal xs) = typeOf (xs ! 0)
   typeOf (Ref (ArrayRef elemType len _)) = ArrElem elemType len
 
   constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
   constructElementRef _ _ = error "expecting element to be array"
 
-instance Referable 'Num where
+instance Mutable 'Num where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compNumAsgns = Assignment (NumVar var) val : compNumAsgns st}
@@ -306,7 +285,7 @@ instance Referable 'Num where
   constructElementRef NumElem elemAddr = NumVar elemAddr
   constructElementRef _ _ = error "expecting element to be of Num"
 
-instance Referable 'Bool where
+instance Mutable 'Bool where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compBoolAsgns = Assignment (BoolVar var) val : compBoolAsgns st}
@@ -318,20 +297,31 @@ instance Referable 'Bool where
   constructElementRef _ _ = error "expecting element to be of Bool"
 
 -- | Access an element from a 1-D array
-access :: Referable t => Val ('Arr t) n -> Int -> Comp n (Val t n)
-access (ArrayVal xs) i =
-  if i < length xs
-    then return $ xs ! i
-    else throwError $ IndexOutOfBoundsError2 (length xs) i
-access (Ref (ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
+accessM :: Mutable t => Val ('ArrM t) n -> Int -> Comp n (Val t n)
+accessM (Ref (ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
 
 -- | Access an element from a 2-D array
-access2 :: Referable t => Val ('Arr ('Arr t)) n -> (Int, Int) -> Comp n (Val t n)
-access2 addr (i, j) = access addr i >>= flip access j
+accessM2 :: Mutable t => Val ('ArrM ('ArrM t)) n -> (Int, Int) -> Comp n (Val t n)
+accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 
 -- | Access an element from a 3-D array
-access3 :: Referable t => Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Comp n (Val t n)
-access3 addr (i, j, k) = access addr i >>= flip access j >>= flip access k
+accessM3 :: Mutable t => Val ('ArrM ('ArrM ('ArrM t))) n -> (Int, Int, Int) -> Comp n (Val t n)
+accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
+
+access :: Val ('Arr t) n -> Int -> Val t n
+access (ArrayVal xs) i =
+  if i < length xs
+    then xs ! i
+    else error $ show $ IndexOutOfBoundsError2 (length xs) i
+access (Ref ref) _ = case ref of {}
+
+-- | Access an element from a 2-D array
+access2 :: Val ('Arr ('Arr t)) n -> (Int, Int) -> Val t n
+access2 addr (i, j) = access (access addr i) j
+
+-- | Access an element from a 3-D array
+access3 :: Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Val t n
+access3 addr (i, j, k) = access (access (access addr i) j) k
 
 --------------------------------------------------------------------------------
 
@@ -342,7 +332,7 @@ addrOfRef (NumVar addr) = addr
 addrOfRef (ArrayRef _ _ addr) = addr
 
 -- | Internal helper function for allocating an array with values
-allocArray :: Referable t => ElemType -> [Val t n] -> Comp n (Ref ('Arr ty))
+allocArray :: Mutable t => ElemType -> [Val t n] -> Comp n (Ref ('ArrM ty))
 allocArray elemType vals = do
   -- allocate new variables for each element
   refs <- mapM alloc vals
@@ -381,7 +371,7 @@ modifyHeap f = do
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for accessing an element of an array on the heap
-readHeap :: Referable t => (Addr, Int) -> Comp n (Ref t)
+readHeap :: Mutable t => (Addr, Int) -> Comp n (Ref t)
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -391,7 +381,7 @@ readHeap (addr, i) = do
       Just n -> return $ constructElementRef elemType n
 
 -- | Internal helper function for accessing an array on the heap
-readHeapArray :: Referable t => Addr -> Comp n [Ref t]
+readHeapArray :: Mutable t => Addr -> Comp n [Ref t]
 readHeapArray addr = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -404,9 +394,12 @@ readHeapArray addr = do
 reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
 reduce a xs f = foldM f a xs
 
+lengthOfM :: Val ('ArrM t) n -> Int
+lengthOfM (Ref (ArrayRef _ len _)) = len
+
 lengthOf :: Val ('Arr t) n -> Int
 lengthOf (ArrayVal xs) = length xs
-lengthOf (Ref (ArrayRef _ len _)) = len
+lengthOf (Ref ref) = case ref of {}
 
 --------------------------------------------------------------------------------
 

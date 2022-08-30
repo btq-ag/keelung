@@ -11,11 +11,11 @@ import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
 import Data.Proxy (Proxy (Proxy))
 import Keelung.Field (AcceptedField, encodeFieldType)
-import qualified Keelung.Monad as S
-import qualified Keelung.Syntax as S
+import qualified Keelung.Monad as Kinded
+import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
-import qualified Keelung.Types as S
+import qualified Keelung.Types as Kinded
 
 --------------------------------------------------------------------------------
 
@@ -36,14 +36,14 @@ readArray addr len = Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0
         Just (elemType, array) -> case IntMap.lookup i array of
           Nothing -> error "HeapM: index ouf of bounds"
           Just addr'' -> case elemType of
-            S.NumElem -> return $ Var $ NumVar addr''
-            S.BoolElem -> return $ Var $ BoolVar addr''
-            S.ArrElem _ len' -> readArray addr'' len'
+            Kinded.NumElem -> return $ Var $ NumVar addr''
+            Kinded.BoolElem -> return $ Var $ BoolVar addr''
+            Kinded.ArrElem _ len' -> readArray addr'' len'
 
 --------------------------------------------------------------------------------
 
-simplifyComputation :: (AcceptedField n, Integral n) => S.Computation n -> Computation
-simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+simplifyComputation :: (AcceptedField n, Integral n) => Kinded.Computation n -> Computation
+simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
       nextVar
@@ -55,11 +55,11 @@ simplifyComputation (S.Computation nextVar nextAddr inputVars heap asgns bsgns a
       <*> mapM simplifyM asgns'
       <*> return (encodeFieldType $ toProxy asgns')
   where
-    toProxy :: [S.Val kind n] -> Proxy n
+    toProxy :: [Kinded.Val kind n] -> Proxy n
     toProxy = const Proxy
 
-simplify :: (Integral n, AcceptedField n) => S.Elaborated t n -> Elaborated
-simplify (S.Elaborated expr comp) =
+simplify :: (Integral n, AcceptedField n) => Kinded.Elaborated t n -> Elaborated
+simplify (Kinded.Elaborated expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
         (runHeapM (compHeap comp') (simplifyM expr))
@@ -71,32 +71,32 @@ simplify (S.Elaborated expr comp) =
 class Simplify a b where
   simplifyM :: a -> HeapM b
 
-instance Integral n => Simplify (S.Val t n) Expr where
+instance Integral n => Simplify (Kinded.Val t n) Expr where
   simplifyM expr = case expr of
-    S.Number n -> return $ Val (Number (toInteger n))
-    S.Boolean b -> return $ Val (Boolean b)
-    S.UnitVal -> return $ Val Unit
-    S.ArrayVal xs -> Array <$> mapM simplifyM xs
-    S.Ref x -> case x of
-      S.BoolVar n -> return $ Var (BoolVar n)
-      S.NumVar n -> return $ Var (NumVar n)
-      S.ArrayRef _ len addr -> readArray addr len
-    S.Add x y -> Add <$> simplifyM x <*> simplifyM y
-    S.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
-    S.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
-    S.Div x y -> Div <$> simplifyM x <*> simplifyM y
-    S.Eq x y -> Eq <$> simplifyM x <*> simplifyM y
-    S.And x y -> And <$> simplifyM x <*> simplifyM y
-    S.Or x y -> Or <$> simplifyM x <*> simplifyM y
-    S.Xor x y -> Xor <$> simplifyM x <*> simplifyM y
-    S.BEq x y -> BEq <$> simplifyM x <*> simplifyM y
-    S.IfNum p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
-    S.IfBool p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
-    S.ToBool x -> ToBool <$> simplifyM x
-    S.ToNum x -> ToNum <$> simplifyM x
+    Kinded.Number n -> return $ Val (Number (toInteger n))
+    Kinded.Boolean b -> return $ Val (Boolean b)
+    Kinded.UnitVal -> return $ Val Unit
+    Kinded.ArrayVal xs -> Array <$> mapM simplifyM xs
+    Kinded.Ref x -> case x of
+      Kinded.BoolVar n -> return $ Var (BoolVar n)
+      Kinded.NumVar n -> return $ Var (NumVar n)
+      Kinded.ArrayRef _ len addr -> readArray addr len
+    Kinded.Add x y -> Add <$> simplifyM x <*> simplifyM y
+    Kinded.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
+    Kinded.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
+    Kinded.Div x y -> Div <$> simplifyM x <*> simplifyM y
+    Kinded.Eq x y -> Eq <$> simplifyM x <*> simplifyM y
+    Kinded.And x y -> And <$> simplifyM x <*> simplifyM y
+    Kinded.Or x y -> Or <$> simplifyM x <*> simplifyM y
+    Kinded.Xor x y -> Xor <$> simplifyM x <*> simplifyM y
+    Kinded.BEq x y -> BEq <$> simplifyM x <*> simplifyM y
+    Kinded.IfNum p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
+    Kinded.IfBool p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
+    Kinded.ToBool x -> ToBool <$> simplifyM x
+    Kinded.ToNum x -> ToNum <$> simplifyM x
 
-instance Integral n => Simplify (S.Assignment 'S.Num n) Assignment where
-  simplifyM (S.Assignment (S.NumVar n) e) = Assignment (NumVar n) <$> simplifyM e
+instance Integral n => Simplify (Kinded.Assignment 'Kinded.Num n) Assignment where
+  simplifyM (Kinded.Assignment (Kinded.NumVar n) e) = Assignment (NumVar n) <$> simplifyM e
 
-instance Integral n => Simplify (S.Assignment 'S.Bool n) Assignment where
-  simplifyM (S.Assignment (S.BoolVar n) e) = Assignment (BoolVar n) <$> simplifyM e
+instance Integral n => Simplify (Kinded.Assignment 'Kinded.Bool n) Assignment where
+  simplifyM (Kinded.Assignment (Kinded.BoolVar n) e) = Assignment (BoolVar n) <$> simplifyM e

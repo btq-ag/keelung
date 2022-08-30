@@ -19,7 +19,7 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 200000))
 
     -- | `fromWord8` implemented with immutable arrays
     fromWord8' :: Word8 -> Val ('Arr 'Bool) n
-    fromWord8' word = toArrayI $ Prelude.map (Boolean . testBit word) [0 .. 7]
+    fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- | `fromChar` implemented with immutable arrays
     fromChar' :: Char -> Val ('Arr 'Bool) n
@@ -27,7 +27,7 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 200000))
 
     -- | `fromString` implemented with immutable arrays
     fromString' :: String -> Val ('Arr ('Arr 'Bool)) GF181 
-    fromString' = toArrayI . map fromChar'
+    fromString' = toArray . map fromChar'
 
     string :: Int -> String
     string n = concat $ replicate n "Hello world"
