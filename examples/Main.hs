@@ -19,20 +19,20 @@ import Control.Exception (evaluate)
 -- import Control.Monad
 
 -- | Outputs whether number is given.
-echo :: Comp GF181 (Val 'Num GF181)
+echo :: Comp (Val 'Num)
 echo = do
   x <- input -- request for an input and bind it to 'x'
   return x -- return 'x'
 
 -- | A program that expects 2 inputs and returns no output
-useless :: Comp GF181 (Val 'Unit GF181)
+useless :: Comp (Val 'Unit)
 useless = do
   _x <- inputNum -- request for an input and bind it to 'x'
   _y <- inputBool -- request for an input and bind it to 'y'
   return unit -- return nothing
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
-tempConvert :: Comp GF181 (Val 'Num GF181)
+tempConvert :: Comp (Val 'Num)
 tempConvert = do
   toFahrenheit <- input
   degree <- input
@@ -42,19 +42,19 @@ tempConvert = do
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
 
-terminationProblem :: Comp GF181 (Val ('Arr ('Arr 'Bool)) GF181)
+terminationProblem :: Comp (Val ('Arr ('Arr 'Bool)))
 terminationProblem = return $ run "A"
   where
     -- Construct a W8 from a Word8
-    fromWord8 :: Word8 -> Val ('Arr 'Bool) GF181
+    fromWord8 :: Word8 -> Val ('Arr 'Bool)
     fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- Construct a W8 from a Char
-    fromChar :: Char -> Val ('Arr 'Bool) GF181
+    fromChar :: Char -> Val ('Arr 'Bool)
     fromChar = fromWord8 . toEnum . fromEnum
 
     -- Construct an array of W8s from a String
-    run :: String -> Val ('Arr ('Arr 'Bool)) GF181
+    run :: String -> Val ('Arr ('Arr 'Bool))
     run xs = toArray (map fromChar xs)
 
 -- |
@@ -63,15 +63,15 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
   where
 
     -- | `fromWord8` implemented with immutable arrays
-    fromWord8' :: Word8 -> Val ('Arr 'Bool) n
+    fromWord8' :: Word8 -> Val ('Arr 'Bool)
     fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- | `fromChar` implemented with immutable arrays
-    fromChar' :: Char -> Val ('Arr 'Bool) n
+    fromChar' :: Char -> Val ('Arr 'Bool)
     fromChar' = fromWord8' . toEnum . fromEnum
 
     -- | `fromString` implemented with immutable arrays
-    fromString' :: String -> Val ('Arr ('Arr 'Bool)) GF181 
+    fromString' :: String -> Val ('Arr ('Arr 'Bool)) 
     fromString' = toArray . map fromChar'
 
     string :: Int -> String
@@ -86,7 +86,7 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 --   then compileAsR1CS program -- compile as a R1CS
 --   else compile program -- compile as a ConstraintSystem
 
--- assertArrayToBe42 :: Comp GF181 (Val 'Unit GF181)
+-- assertArrayToBe42 :: Comp (Val 'Unit)
 -- assertArrayToBe42 = do
 --   let len = 8
 
@@ -99,12 +99,12 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 --   return unit
 
 -- -- | A program that outputs the square of its input
--- square :: Comp GF181 (Val 'Num GF181)
+-- square :: Comp (Val 'Num)
 -- square = do
 --   x <- input
 --   return (Var x * Var x)
 
-assertToBe42 :: Comp GF181 (Val 'Unit GF181)
+assertToBe42 :: Comp (Val 'Unit)
 assertToBe42 = do
   x <- input
   assert (x `Eq` 42)
@@ -112,14 +112,14 @@ assertToBe42 = do
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output (hence 'return unit')
-assertSquare :: Comp GF181 (Val 'Unit GF181)
+assertSquare :: Comp (Val 'Unit)
 assertSquare = do
   x <- input
   y <- input
   assert ((x * x) `Eq` y)
   return unit
 
-loop3 :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
+loop3 :: Int -> Int -> Comp (Val 'Unit)
 loop3 n m = do
   xs <- inputs2 n m
   -- expecting square of signatures as input
@@ -136,7 +136,7 @@ loop3 n m = do
 
 --   --------------------------------------------------------------------------------
 
---   -- loop1 :: Comp GF181 (Val 'Unit GF181)
+--   -- loop1 :: Comp (Val 'Unit)
 --   -- loop1 = do
 --   --   xs <- allocArray 4
 --   --   -- iterate through the array and assert them all to be 0
@@ -151,7 +151,7 @@ loop3 n m = do
 
 --   return unit
 
--- loop2 :: Comp GF181 (Val 'Unit GF181)
+-- loop2 :: Comp (Val 'Unit)
 -- loop2 = do
 --   x <- inputNum
 --   ys <- inputArray 4
@@ -161,7 +161,7 @@ loop3 n m = do
 
 --   return unit
 
--- loop3 :: Comp GF181 (Val 'Unit GF181)
+-- loop3 :: Comp (Val 'Unit)
 -- loop3 = do
 --   xs <- inputArray 4
 --   -- iterate through the array and assert them all to be 0
@@ -170,7 +170,7 @@ loop3 n m = do
 
 --   return unit
 
--- -- reduce1 :: Comp GF181 (Val 'Num GF181)
+-- -- reduce1 :: Comp (Val 'Num)
 -- -- reduce1 = do
 -- --   xs <- inputArray 4
 -- --   -- aggregate all variables in xs
@@ -179,11 +179,11 @@ loop3 n m = do
 
 -- --------------------------------------------------------------------------------
 
--- loop1 :: Comp GF181 (Val 'Unit GF181)
+-- loop1 :: Comp (Val 'Unit)
 -- loop1 = do
---   -- xs <- inputArray 2  :: Comp GF181 (Ref ('A ('V 'Num)))
---   -- ys <- inputArray 2  :: Comp GF181 (Ref ('A ('V 'Num)))
---   -- zs <- allocArray' [4, 5] :: Comp GF181 (Ref ('A ('V 'Num)))
+--   -- xs <- inputArray 2  :: Comp (Ref ('A ('V 'Num)))
+--   -- ys <- inputArray 2  :: Comp (Ref ('A ('V 'Num)))
+--   -- zs <- allocArray' [4, 5] :: Comp (Ref ('A ('V 'Num)))
 --   -- ws <- expose zs >>= allocArray'
 
 --   -- iterate through the array and assert them all to be 0

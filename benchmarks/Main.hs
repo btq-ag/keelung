@@ -18,15 +18,15 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 200000))
   where
 
     -- | `fromWord8` implemented with immutable arrays
-    fromWord8' :: Word8 -> Val ('Arr 'Bool) n
+    fromWord8' :: Word8 -> Val ('Arr 'Bool)
     fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- | `fromChar` implemented with immutable arrays
-    fromChar' :: Char -> Val ('Arr 'Bool) n
+    fromChar' :: Char -> Val ('Arr 'Bool)
     fromChar' = fromWord8' . toEnum . fromEnum
 
     -- | `fromString` implemented with immutable arrays
-    fromString' :: String -> Val ('Arr ('Arr 'Bool)) GF181 
+    fromString' :: String -> Val ('Arr ('Arr 'Bool)) 
     fromString' = toArray . map fromChar'
 
     string :: Int -> String
