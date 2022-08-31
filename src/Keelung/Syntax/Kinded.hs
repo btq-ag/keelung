@@ -16,18 +16,19 @@ module Keelung.Syntax.Kinded
   )
 where
 
+import Data.Array.Unboxed (Array)
 import Data.Field.Galois (GaloisField (..))
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
-import Data.Array.Unboxed (Array)
 
 --------------------------------------------------------------------------------
 
 -- | Values are indexed by 'Kind' and parameterised by some field
 data Val :: Kind -> Type -> Type where
-  -- Base Values 
-  Number :: n -> Val 'Num n -- Field numbers
+  -- Base Values
+  Integer :: Integer -> Val 'Num n -- Integers 
+  Rational :: Rational -> Val 'Num n -- Rationals 
   Boolean :: Bool -> Val 'Bool n -- Booleans
   UnitVal :: Val 'Unit n -- Unit
   ArrayVal :: Array Int (Val t n) -> Val ('Arr t) n -- Arrays
@@ -51,33 +52,35 @@ data Val :: Kind -> Type -> Type where
   ToBool :: Val 'Num n -> Val 'Bool n
   ToNum :: Val 'Bool n -> Val 'Num n
 
-instance Functor (Val ty) where
-  fmap f expr = case expr of
-    Number n -> Number (f n)
-    Boolean b -> Boolean b
-    UnitVal -> UnitVal
-    ArrayVal xs -> ArrayVal (fmap (fmap f) xs)
-    Ref ref -> Ref ref
-    Add x y -> Add (fmap f x) (fmap f y)
-    Sub x y -> Sub (fmap f x) (fmap f y)
-    Mul x y -> Mul (fmap f x) (fmap f y)
-    Div x y -> Div (fmap f x) (fmap f y)
-    Eq x y -> Eq (fmap f x) (fmap f y)
-    And x y -> And (fmap f x) (fmap f y)
-    Or x y -> Or (fmap f x) (fmap f y)
-    Xor x y -> Xor (fmap f x) (fmap f y)
-    BEq x y -> BEq (fmap f x) (fmap f y)
-    IfNum p x y -> IfNum (fmap f p) (fmap f x) (fmap f y)
-    IfBool p x y -> IfBool (fmap f p) (fmap f x) (fmap f y)
-    ToBool x -> ToBool (fmap f x)
-    ToNum x -> ToNum (fmap f x)
+-- instance Functor (Val ty) where
+--   fmap f expr = case expr of
+--     Integer n -> Integer n
+--     Rational n -> Rational n 
+--     Boolean b -> Boolean b
+--     UnitVal -> UnitVal
+--     ArrayVal xs -> ArrayVal (fmap (fmap f) xs)
+--     Ref ref -> Ref ref
+--     Add x y -> Add (fmap f x) (fmap f y)
+--     Sub x y -> Sub (fmap f x) (fmap f y)
+--     Mul x y -> Mul (fmap f x) (fmap f y)
+--     Div x y -> Div (fmap f x) (fmap f y)
+--     Eq x y -> Eq (fmap f x) (fmap f y)
+--     And x y -> And (fmap f x) (fmap f y)
+--     Or x y -> Or (fmap f x) (fmap f y)
+--     Xor x y -> Xor (fmap f x) (fmap f y)
+--     BEq x y -> BEq (fmap f x) (fmap f y)
+--     IfNum p x y -> IfNum (fmap f p) (fmap f x) (fmap f y)
+--     IfBool p x y -> IfBool (fmap f p) (fmap f x) (fmap f y)
+--     ToBool x -> ToBool (fmap f x)
+--     ToNum x -> ToNum (fmap f x)
 
-instance Show n => Show (Val ty n) where
+instance Show (Val ty n) where
   showsPrec prec expr = case expr of
-    Number n -> showsPrec prec n
+    Integer n -> showsPrec prec n
+    Rational n -> showsPrec prec n 
     Boolean b -> showsPrec prec b
     UnitVal -> showString "unit"
-    ArrayVal xs -> shows xs 
+    ArrayVal xs -> shows xs
     Ref ref -> shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
@@ -95,7 +98,8 @@ instance Show n => Show (Val ty n) where
 
 instance Eq n => Eq (Val ty n) where
   a == b = case (a, b) of
-    (Number x, Number y) -> x == y
+    (Integer x, Integer y) -> x == y
+    (Rational x, Rational y) -> x == y
     (Boolean x, Boolean y) -> x == y
     (UnitVal, UnitVal) -> True
     (Ref x, Ref y) -> x == y
@@ -121,20 +125,20 @@ instance GaloisField n => Num (Val 'Num n) where
   abs = id
 
   -- law of `signum`: abs x * signum x == x
-  signum = const (Number 1)
-  fromInteger = Number . fromNatural . fromInteger
+  signum = const (Integer 1)
+  fromInteger = Integer
 
 instance GaloisField n => Semiring (Val 'Num n) where
   plus = Add
   times = Mul
-  zero = Number 0
-  one = Number 1
+  zero = Integer 0
+  one = Integer 1
 
 instance GaloisField n => Ring (Val 'Num n) where
   negate = id
 
 instance GaloisField n => Fractional (Val 'Num n) where
-  fromRational = Number . fromRational
+  fromRational = Rational
   (/) = Div
 
 --------------------------------------------------------------------------------

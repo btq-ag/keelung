@@ -20,13 +20,15 @@ import Data.Foldable (toList)
 --------------------------------------------------------------------------------
 
 data Val
-  = Number Integer
+  = Integer Integer
+  | Rational Rational
   | Boolean Bool
   | Unit
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
-  show (Number n) = show n
+  show (Integer n) = show n 
+  show (Rational n) = show n 
   show (Boolean b) = show b
   show Unit = "unit"
 

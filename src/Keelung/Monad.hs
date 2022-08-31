@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE EmptyCase #-}
 
 module Keelung.Monad
   ( Comp,
@@ -48,13 +48,11 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Array ((!))
 import Data.Array.Unboxed (Array)
 import qualified Data.Array.Unboxed as IArray
-import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Keelung.Error
-import Keelung.Field
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
@@ -65,11 +63,11 @@ import Prelude hiding (product, sum)
 data Assignment t n = Assignment (Ref t) (Val t n)
   deriving (Eq)
 
-instance Show n => Show (Assignment t n) where
+instance Show (Assignment t n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Functor (Assignment t) where
-  fmap f (Assignment var expr) = Assignment var (fmap f expr)
+-- instance Functor (Assignment t) where
+--   fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
@@ -94,7 +92,7 @@ data Computation n = Computation
 emptyComputation :: Computation n
 emptyComputation = Computation 0 0 mempty mempty mempty mempty mempty
 
-instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
+instance Show (Computation n) where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
       ++ "\n  address counter: "
@@ -102,11 +100,11 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
       ++ "\n  input variables: "
       ++ show (IntSet.toList inputVars)
       ++ "\n  num assignments: "
-      ++ show (map (fmap N) numAsgns)
+      ++ show numAsgns
       ++ "\n  bool assignments: "
-      ++ show (map (fmap N) boolAsgns)
+      ++ show boolAsgns
       ++ "\n  assertions: "
-      ++ show (map (fmap N) assertions)
+      ++ show assertions
       ++ "\n\
          \}"
 
@@ -121,10 +119,10 @@ data Elaborated t n = Elaborated
   }
   deriving (Eq)
 
-instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated t n) where
+instance Show (Elaborated t n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap N expr)
+      ++ show expr
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"

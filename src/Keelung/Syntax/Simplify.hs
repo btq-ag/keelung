@@ -73,7 +73,8 @@ class Simplify a b where
 
 instance Integral n => Simplify (Kinded.Val t n) Expr where
   simplifyM expr = case expr of
-    Kinded.Number n -> return $ Val (Number (toInteger n))
+    Kinded.Integer n -> return $ Val (Integer (toInteger n))
+    Kinded.Rational n -> return $ Val (Rational n)
     Kinded.Boolean b -> return $ Val (Boolean b)
     Kinded.UnitVal -> return $ Val Unit
     Kinded.ArrayVal xs -> Array <$> mapM simplifyM xs
