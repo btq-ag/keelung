@@ -32,20 +32,20 @@ import qualified System.Info
 import qualified System.Process as Process
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: (Serialize n, Integral n) => FieldType -> Comp n (Val t n) -> IO (Either Error (R1CS n))
+compile :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> IO (Either Error (R1CS n))
 compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "toR1CS"] (fieldType, elab)
 
 -- | Interpret a program with inputs
-interpret :: (Serialize n, Integral n) => FieldType -> Comp n (Val t n) -> [n] -> IO (Either Error [n])
+interpret :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO (Either Error [n])
 interpret fieldType prog xs = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
 
 --------------------------------------------------------------------------------
 
-printErrorInstead :: (Serialize n, Integral n) => FieldType -> Comp n (Val t n) -> [n] -> IO [n]
+printErrorInstead :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO [n]
 printErrorInstead fieldType prog xs = do
   result <- interpret fieldType prog xs
   case result of
@@ -55,27 +55,27 @@ printErrorInstead fieldType prog xs = do
     Right values -> return values
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Comp GF181 (Val t GF181) -> [GF181] -> IO [N GF181]
+gf181 :: Comp (Val t) -> [GF181] -> IO [N GF181]
 gf181 prog xs = map N <$> printErrorInstead GF181 prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Comp B64 (Val t B64) -> [B64] -> IO [N B64]
+b64 :: Comp (Val t) -> [B64] -> IO [N B64]
 b64 prog xs = map N <$> printErrorInstead B64 prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Comp BN128 (Val t BN128) -> [BN128] -> IO [N BN128]
+bn128 :: Comp (Val t) -> [BN128] -> IO [N BN128]
 bn128 prog xs = map N <$> printErrorInstead BN128 prog xs
 
 --------------------------------------------------------------------------------
 
 -- | Elaborate a program and simplify it
-elaborate :: (Integral n) => Comp n (Val t n) -> Either ElabError C.Elaborated
+elaborate :: Comp (Val t) -> Either ElabError C.Elaborated
 elaborate prog = do
   (expr, comp') <- runComp emptyComputation prog
   return $ simplify $ Elaborated expr comp'
 
 -- | Elaborate a program
-elaborateOnly :: (Integral n) => Comp n (Val t n) -> Either ElabError C.Elaborated
+elaborateOnly :: Comp (Val t) -> Either ElabError C.Elaborated
 elaborateOnly prog = do
   (expr, comp') <- runComp emptyComputation prog
   return $ simplify $ Elaborated expr comp'

@@ -60,10 +60,10 @@ import Prelude hiding (product, sum)
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
-data Assignment t n = Assignment (Ref t) (Val t n)
+data Assignment t = Assignment (Ref t) (Val t)
   deriving (Eq)
 
-instance Show (Assignment t n) where
+instance Show (Assignment t) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
 -- instance Functor (Assignment t) where
@@ -72,7 +72,7 @@ instance Show (Assignment t n) where
 --------------------------------------------------------------------------------
 
 -- | Data structure for elaboration bookkeeping
-data Computation n = Computation
+data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
     -- Counter for allocating fresh heap addresses
@@ -82,17 +82,17 @@ data Computation n = Computation
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
-    compNumAsgns :: [Assignment 'Num n],
-    compBoolAsgns :: [Assignment 'Bool n],
+    compNumAsgns :: [Assignment 'Num],
+    compBoolAsgns :: [Assignment 'Bool],
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Val 'Bool n]
+    compAssertions :: [Val 'Bool]
   }
   deriving (Eq)
 
-emptyComputation :: Computation n
+emptyComputation :: Computation
 emptyComputation = Computation 0 0 mempty mempty mempty mempty mempty
 
-instance Show (Computation n) where
+instance Show Computation where
   show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
       ++ "\n  address counter: "
@@ -111,15 +111,15 @@ instance Show (Computation n) where
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
-data Elaborated t n = Elaborated
+data Elaborated t = Elaborated
   { -- | The resulting 'Expr'
-    elabVal :: !(Val t n),
+    elabVal :: !(Val t),
     -- | The state of computation after elaboration
-    elabComp :: Computation n
+    elabComp :: Computation
   }
   deriving (Eq)
 
-instance Show (Elaborated t n) where
+instance Show (Elaborated t) where
   show (Elaborated expr comp) =
     "{\n expression: "
       ++ show expr
@@ -130,10 +130,10 @@ instance Show (Elaborated t n) where
 --------------------------------------------------------------------------------
 
 -- | The type of a Keelung program
-type Comp n = StateT (Computation n) (Except ElabError)
+type Comp = StateT Computation (Except ElabError)
 
 -- | How to run the 'Comp' monad
-runComp :: Computation n -> Comp n a -> Either ElabError (a, Computation n)
+runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
 runComp comp f = runExcept (runStateT f comp)
 
 --------------------------------------------------------------------------------
@@ -141,13 +141,13 @@ runComp comp f = runExcept (runStateT f comp)
 --------------------------------------------------------------------------------
 
 -- | Allocate a fresh address.
-freshVar :: Comp n Var
+freshVar :: Comp Var
 freshVar = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = succ index})
   return index
 
-freshAddr :: Comp n Addr
+freshAddr :: Comp Addr
 freshAddr = do
   addr <- gets compNextAddr
   modify (\st -> st {compNextAddr = succ addr})
@@ -158,7 +158,7 @@ freshAddr = do
 -- | Update an entry of an array.
 -- When the assigned expression is a variable,
 -- we update the entry directly with the variable instead
-updateM :: Mutable t => Val ('ArrM t) n -> Int -> Val t n -> Comp n ()
+updateM :: Mutable t => Val ('ArrM t) -> Int -> Val t -> Comp ()
 updateM (Ref (ArrayRef _ _ addr)) i (Ref (NumVar n)) = writeHeap addr NumElem (i, n)
 updateM (Ref (ArrayRef _ _ addr)) i (Ref (BoolVar n)) = writeHeap addr BoolElem (i, n)
 updateM (Ref (ArrayRef elemType _ addr)) i expr = do
@@ -168,10 +168,10 @@ updateM (Ref (ArrayRef elemType _ addr)) i expr = do
 -- | Typeclass for operations on base types
 class Proper t where
   -- | Request a fresh input
-  input :: Comp n (Val t n)
+  input :: Comp (Val t)
 
   -- | Conditional clause
-  cond :: Val 'Bool n -> Val t n -> Val t n -> Val t n
+  cond :: Val 'Bool -> Val t -> Val t -> Val t
 
 instance Proper 'Num where
   input = inputNum
@@ -182,14 +182,14 @@ instance Proper 'Bool where
   cond = IfBool
 
 -- | Requests a fresh Num input variable
-inputNum :: Comp n (Val 'Num n)
+inputNum :: Comp (Val 'Num)
 inputNum = do
   var <- freshVar
   markVarAsInput var
   return $ Ref $ NumVar var
 
 -- | Requests a fresh Bool input variable
-inputBool :: Comp n (Val 'Bool n)
+inputBool :: Comp (Val 'Bool)
 inputBool = do
   var <- freshVar
   markVarAsInput var
@@ -200,42 +200,42 @@ inputBool = do
 --------------------------------------------------------------------------------
 
 -- | Converts a list of values to an 1D-array
-toArrayM :: Mutable t => [Val t n] -> Comp n (Val ('ArrM t) n)
+toArrayM :: Mutable t => [Val t] -> Comp (Val ('ArrM t))
 toArrayM xs = do
   when (null xs) $ throwError EmptyArrayError
   let kind = typeOf (head xs)
   Ref <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
-toArray :: [Val t n] -> Val ('Arr t) n
+toArray :: [Val t] -> Val ('Arr t)
 toArray xs = ArrayVal $ IArray.listArray (0, length xs - 1) xs
 
 -- | Immutable version of `toArray`
-toArray' :: Array Int (Val t n) -> Val ('Arr t) n
+toArray' :: Array Int (Val t) -> Val ('Arr t)
 toArray' = ArrayVal
 
 -- | Convert an array into a list of expressions
-fromArrayM :: Mutable t => Val ('ArrM t) n -> Comp n [Val t n]
+fromArrayM :: Mutable t => Val ('ArrM t) -> Comp [Val t]
 fromArrayM (Ref (ArrayRef _ _ addr)) = do
   -- collect references of each element
   refs <- readHeapArray addr
   return $ map Ref refs
 
-fromArray :: Val ('Arr t) n -> [Val t n]
+fromArray :: Val ('Arr t) -> [Val t]
 fromArray (ArrayVal xs) = toList xs
 fromArray (Ref ref) = case ref of {}
 
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Mutable t) => Int -> Comp n (Val ('Arr t) n)
+inputs :: (Proper t, Mutable t) => Int -> Comp (Val ('Arr t))
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   return $ toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Mutable t) => Int -> Int -> Comp n (Val ('Arr ('Arr t)) n)
+inputs2 :: (Proper t, Mutable t) => Int -> Int -> Comp (Val ('Arr ('Arr t)))
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
@@ -243,7 +243,7 @@ inputs2 sizeM sizeN = do
   return $ toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Mutable t) => Int -> Int -> Int -> Comp n (Val ('Arr ('Arr ('Arr t))) n)
+inputs3 :: (Proper t, Mutable t) => Int -> Int -> Int -> Comp (Val ('Arr ('Arr ('Arr t))))
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
@@ -256,9 +256,9 @@ inputs3 sizeM sizeN sizeO = do
 -- | Typeclass for retrieving the element of an array
 class Mutable t where
   -- | Allocates a fresh variable for a value
-  alloc :: Val t n -> Comp n (Ref t)
+  alloc :: Val t -> Comp (Ref t)
 
-  typeOf :: Val t n -> ElemType
+  typeOf :: Val t -> ElemType
 
   constructElementRef :: ElemType -> Addr -> Ref t
 
@@ -295,18 +295,18 @@ instance Mutable 'Bool where
   constructElementRef _ _ = error "expecting element to be of Bool"
 
 -- | Access an element from a 1-D array
-accessM :: Mutable t => Val ('ArrM t) n -> Int -> Comp n (Val t n)
+accessM :: Mutable t => Val ('ArrM t) -> Int -> Comp (Val t)
 accessM (Ref (ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
 
 -- | Access an element from a 2-D array
-accessM2 :: Mutable t => Val ('ArrM ('ArrM t)) n -> (Int, Int) -> Comp n (Val t n)
+accessM2 :: Mutable t => Val ('ArrM ('ArrM t)) -> (Int, Int) -> Comp (Val t)
 accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 
 -- | Access an element from a 3-D array
-accessM3 :: Mutable t => Val ('ArrM ('ArrM ('ArrM t))) n -> (Int, Int, Int) -> Comp n (Val t n)
+accessM3 :: Mutable t => Val ('ArrM ('ArrM ('ArrM t))) -> (Int, Int, Int) -> Comp (Val t)
 accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
 
-access :: Val ('Arr t) n -> Int -> Val t n
+access :: Val ('Arr t) -> Int -> Val t
 access (ArrayVal xs) i =
   if i < length xs
     then xs ! i
@@ -314,11 +314,11 @@ access (ArrayVal xs) i =
 access (Ref ref) _ = case ref of {}
 
 -- | Access an element from a 2-D array
-access2 :: Val ('Arr ('Arr t)) n -> (Int, Int) -> Val t n
+access2 :: Val ('Arr ('Arr t)) -> (Int, Int) -> Val t
 access2 addr (i, j) = access (access addr i) j
 
 -- | Access an element from a 3-D array
-access3 :: Val ('Arr ('Arr ('Arr t))) n -> (Int, Int, Int) -> Val t n
+access3 :: Val ('Arr ('Arr ('Arr t))) -> (Int, Int, Int) -> Val t
 access3 addr (i, j, k) = access (access (access addr i) j) k
 
 --------------------------------------------------------------------------------
@@ -330,7 +330,7 @@ addrOfRef (NumVar addr) = addr
 addrOfRef (ArrayRef _ _ addr) = addr
 
 -- | Internal helper function for allocating an array with values
-allocArray :: Mutable t => ElemType -> [Val t n] -> Comp n (Ref ('ArrM ty))
+allocArray :: Mutable t => ElemType -> [Val t] -> Comp (Ref ('ArrM ty))
 allocArray elemType vals = do
   -- allocate new variables for each element
   refs <- mapM alloc vals
@@ -339,16 +339,16 @@ allocArray elemType vals = do
   return $ ArrayRef elemType (length refs) addr
 
 -- | Internal helper function for marking a variable as input.
-markVarAsInput :: Var -> Comp n ()
+markVarAsInput :: Var -> Comp ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
 -- | Internal helper function for marking multiple variables as input
-markVarsAsInput :: IntSet -> Comp n ()
+markVarsAsInput :: IntSet -> Comp ()
 markVarsAsInput vars =
   modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- | Internal helper function for allocating an array on the heap
-allocOnHeap :: ElemType -> [Ref t] -> Comp n Addr
+allocOnHeap :: ElemType -> [Ref t] -> Comp Addr
 allocOnHeap elemType refs = do
   addr <- freshAddr
   let addresses = map addrOfRef refs
@@ -357,19 +357,19 @@ allocOnHeap elemType refs = do
   return addr
 
 -- | Internal helper function for updating an array entry on the heap
-writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp n ()
+writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp ()
 writeHeap addr elemType (index, var) = do
   let bindings = IntMap.singleton index var
   modifyHeap (IntMap.insertWith (<>) addr (elemType, bindings))
 
-modifyHeap :: (Heap -> Heap) -> Comp n ()
+modifyHeap :: (Heap -> Heap) -> Comp ()
 modifyHeap f = do
   heap <- gets compHeap
   let heap' = f heap
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for accessing an element of an array on the heap
-readHeap :: Mutable t => (Addr, Int) -> Comp n (Ref t)
+readHeap :: Mutable t => (Addr, Int) -> Comp (Ref t)
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -379,7 +379,7 @@ readHeap (addr, i) = do
       Just n -> return $ constructElementRef elemType n
 
 -- | Internal helper function for accessing an array on the heap
-readHeapArray :: Mutable t => Addr -> Comp n [Ref t]
+readHeapArray :: Mutable t => Addr -> Comp [Ref t]
 readHeapArray addr = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -389,18 +389,18 @@ readHeapArray addr = do
 --------------------------------------------------------------------------------
 
 -- | An alternative to 'foldM'
-reduce :: Foldable m => Val t n -> m a -> (Val t n -> a -> Comp n (Val t n)) -> Comp n (Val t n)
+reduce :: Foldable m => Val t -> m a -> (Val t -> a -> Comp (Val t)) -> Comp (Val t)
 reduce a xs f = foldM f a xs
 
-lengthOfM :: Val ('ArrM t) n -> Int
+lengthOfM :: Val ('ArrM t) -> Int
 lengthOfM (Ref (ArrayRef _ len _)) = len
 
-lengthOf :: Val ('Arr t) n -> Int
+lengthOf :: Val ('Arr t) -> Int
 lengthOf (ArrayVal xs) = length xs
 lengthOf (Ref ref) = case ref of {}
 
 --------------------------------------------------------------------------------
 
 -- | Assert that the given expression is true
-assert :: Val 'Bool n -> Comp n ()
+assert :: Val 'Bool -> Comp ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}

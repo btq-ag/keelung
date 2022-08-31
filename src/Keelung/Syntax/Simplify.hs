@@ -40,7 +40,7 @@ readArray addr len = Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0
 
 --------------------------------------------------------------------------------
 
-simplifyComputation :: Integral n => Kinded.Computation n -> Computation
+simplifyComputation :: Kinded.Computation -> Computation
 simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
@@ -52,7 +52,7 @@ simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bs
       <*> mapM simplifyM bsgns
       <*> mapM simplifyM asgns'
 
-simplify :: (Integral n) => Kinded.Elaborated t n -> Elaborated
+simplify :: Kinded.Elaborated t -> Elaborated
 simplify (Kinded.Elaborated expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
@@ -65,7 +65,7 @@ simplify (Kinded.Elaborated expr comp) =
 class Simplify a b where
   simplifyM :: a -> HeapM b
 
-instance Integral n => Simplify (Kinded.Val t n) Expr where
+instance Simplify (Kinded.Val t) Expr where
   simplifyM expr = case expr of
     Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
@@ -90,8 +90,8 @@ instance Integral n => Simplify (Kinded.Val t n) Expr where
     Kinded.ToBool x -> ToBool <$> simplifyM x
     Kinded.ToNum x -> ToNum <$> simplifyM x
 
-instance Integral n => Simplify (Kinded.Assignment 'Kinded.Num n) Assignment where
+instance Simplify (Kinded.Assignment 'Kinded.Num) Assignment where
   simplifyM (Kinded.Assignment (Kinded.NumVar n) e) = Assignment (NumVar n) <$> simplifyM e
 
-instance Integral n => Simplify (Kinded.Assignment 'Kinded.Bool n) Assignment where
+instance Simplify (Kinded.Assignment 'Kinded.Bool) Assignment where
   simplifyM (Kinded.Assignment (Kinded.BoolVar n) e) = Assignment (BoolVar n) <$> simplifyM e

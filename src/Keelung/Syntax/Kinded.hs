@@ -17,7 +17,6 @@ module Keelung.Syntax.Kinded
 where
 
 import Data.Array.Unboxed (Array)
-import Data.Field.Galois (GaloisField (..))
 import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
@@ -25,32 +24,32 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Values are indexed by 'Kind' and parameterised by some field
-data Val :: Kind -> Type -> Type where
+data Val :: Kind -> Type where
   -- Base Values
-  Integer :: Integer -> Val 'Num n -- Integers 
-  Rational :: Rational -> Val 'Num n -- Rationals 
-  Boolean :: Bool -> Val 'Bool n -- Booleans
-  UnitVal :: Val 'Unit n -- Unit
-  ArrayVal :: Array Int (Val t n) -> Val ('Arr t) n -- Arrays
+  Integer :: Integer -> Val 'Num -- Integers 
+  Rational :: Rational -> Val 'Num -- Rationals 
+  Boolean :: Bool -> Val 'Bool -- Booleans
+  UnitVal :: Val 'Unit -- Unit
+  ArrayVal :: Array Int (Val t) -> Val ('Arr t) -- Arrays
   -- Reference
-  Ref :: Ref t -> Val t n
+  Ref :: Ref t -> Val t
   -- Operators on numbers
-  Add :: Val 'Num n -> Val 'Num n -> Val 'Num n
-  Sub :: Val 'Num n -> Val 'Num n -> Val 'Num n
-  Mul :: Val 'Num n -> Val 'Num n -> Val 'Num n
-  Div :: Val 'Num n -> Val 'Num n -> Val 'Num n
-  Eq :: Val 'Num n -> Val 'Num n -> Val 'Bool n
+  Add :: Val 'Num -> Val 'Num -> Val 'Num
+  Sub :: Val 'Num -> Val 'Num -> Val 'Num
+  Mul :: Val 'Num -> Val 'Num -> Val 'Num
+  Div :: Val 'Num -> Val 'Num -> Val 'Num
+  Eq :: Val 'Num -> Val 'Num -> Val 'Bool
   -- Operators on booleans
-  And :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
-  Or :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
-  Xor :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
-  BEq :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+  And :: Val 'Bool -> Val 'Bool -> Val 'Bool
+  Or :: Val 'Bool -> Val 'Bool -> Val 'Bool
+  Xor :: Val 'Bool -> Val 'Bool -> Val 'Bool
+  BEq :: Val 'Bool -> Val 'Bool -> Val 'Bool
   -- if...then...else clause
-  IfNum :: Val 'Bool n -> Val 'Num n -> Val 'Num n -> Val 'Num n
-  IfBool :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+  IfNum :: Val 'Bool -> Val 'Num -> Val 'Num -> Val 'Num
+  IfBool :: Val 'Bool -> Val 'Bool -> Val 'Bool -> Val 'Bool
   -- Conversion between Booleans and Field numbers
-  ToBool :: Val 'Num n -> Val 'Bool n
-  ToNum :: Val 'Bool n -> Val 'Num n
+  ToBool :: Val 'Num -> Val 'Bool
+  ToNum :: Val 'Bool -> Val 'Num
 
 -- instance Functor (Val ty) where
 --   fmap f expr = case expr of
@@ -74,7 +73,7 @@ data Val :: Kind -> Type -> Type where
 --     ToBool x -> ToBool (fmap f x)
 --     ToNum x -> ToNum (fmap f x)
 
-instance Show (Val ty n) where
+instance Show (Val t) where
   showsPrec prec expr = case expr of
     Integer n -> showsPrec prec n
     Rational n -> showsPrec prec n 
@@ -96,7 +95,7 @@ instance Show (Val ty n) where
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
 
-instance Eq n => Eq (Val ty n) where
+instance Eq (Val t) where
   a == b = case (a, b) of
     (Integer x, Integer y) -> x == y
     (Rational x, Rational y) -> x == y
@@ -118,7 +117,7 @@ instance Eq n => Eq (Val ty n) where
     (ToNum x, ToNum y) -> x == y
     _ -> False
 
-instance GaloisField n => Num (Val 'Num n) where
+instance Num (Val 'Num) where
   (+) = Add
   (-) = Sub
   (*) = Mul
@@ -128,49 +127,49 @@ instance GaloisField n => Num (Val 'Num n) where
   signum = const (Integer 1)
   fromInteger = Integer
 
-instance GaloisField n => Semiring (Val 'Num n) where
+instance Semiring (Val 'Num) where
   plus = Add
   times = Mul
   zero = Integer 0
   one = Integer 1
 
-instance GaloisField n => Ring (Val 'Num n) where
+instance Ring (Val 'Num) where
   negate = id
 
-instance GaloisField n => Fractional (Val 'Num n) where
+instance Fractional (Val 'Num) where
   fromRational = Rational
   (/) = Div
 
 --------------------------------------------------------------------------------
 
 -- | An synonym of 'ToNum' for converting booleans to numbers
-fromBool :: GaloisField n => Val 'Bool n -> Val 'Num n
+fromBool :: Val 'Bool -> Val 'Num
 fromBool = ToNum
 
 -- | An synonym of 'ToBool' for converting numbers to booleans
-toBool :: GaloisField n => Val 'Num n -> Val 'Bool n
+toBool :: Val 'Num -> Val 'Bool
 toBool = ToBool
 
 -- | Smart constructor for 'True'
-true :: Val 'Bool n
+true :: Val 'Bool
 true = Boolean True
 
 -- | Smart constructor for 'False'
-false :: Val 'Bool n
+false :: Val 'Bool
 false = Boolean False
 
 -- | Smart constructor for 'Unit'
-unit :: Val 'Unit n
+unit :: Val 'Unit
 unit = UnitVal
 
 -- | Helper function for not-`Eq`
-neq :: Val 'Num n -> Val 'Num n -> Val 'Bool n
+neq :: Val 'Num -> Val 'Num -> Val 'Bool
 neq x y = IfBool (x `Eq` y) false true
 
 -- | Helper function for not-`BEq`
-nbeq :: Val 'Bool n -> Val 'Bool n -> Val 'Bool n
+nbeq :: Val 'Bool -> Val 'Bool -> Val 'Bool
 nbeq x y = IfBool (x `BEq` y) false true
 
 -- | Helper function for negating a boolean expression
-neg :: Val 'Bool n -> Val 'Bool n
+neg :: Val 'Bool -> Val 'Bool
 neg x = true `Xor` x
