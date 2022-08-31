@@ -9,7 +9,7 @@ module Keelung.Field
     GF181,
     BN128,
     FieldType (..),
-    AcceptedField(..),
+    -- AcceptedField(..),
     realizeAs,
     normalize,
     module Keelung.Field.N,
@@ -53,17 +53,17 @@ data FieldType
   deriving (Generic, Eq, Show, NFData)
 
 -- | Typeclass for reflecting the field type
-class AcceptedField n where
-  encodeFieldType :: forall proxy. proxy n -> FieldType
+-- class AcceptedField n where
+--   encodeFieldType :: forall proxy. proxy n -> FieldType
 
-instance AcceptedField B64 where
-  encodeFieldType = const B64
+-- instance AcceptedField B64 where
+--   encodeFieldType = const B64
 
-instance AcceptedField GF181 where
-  encodeFieldType = const GF181
+-- instance AcceptedField GF181 where
+--   encodeFieldType = const GF181
 
-instance AcceptedField BN128 where
-  encodeFieldType = const BN128
+-- instance AcceptedField BN128 where
+--   encodeFieldType = const BN128
 
 -- | Restore the field type from an Integer
 realizeAs :: Num n => FieldType -> Integer -> n

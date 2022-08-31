@@ -158,13 +158,12 @@ data Computation = Computation
     compNumAsgns :: [Assignment],
     compBoolAsgns :: [Assignment],
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Expr],
-    compFieldType :: FieldType
+    compAssertions :: [Expr]
   }
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions fieldType) =
+  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
       ++ "\n  address counter: "
       ++ show nextAddr
@@ -176,8 +175,6 @@ instance Show Computation where
       ++ show boolAsgns
       ++ "\n  assertions: "
       ++ show assertions
-      ++ "\n  field type: "
-      ++ show fieldType
       ++ "\n\
          \}"
 
@@ -194,9 +191,9 @@ runComp comp f = runExcept (runStateT f comp)
 evalComp :: Computation -> Comp a -> Either ElabError a
 evalComp comp f = runExcept (evalStateT f comp)
 
-elaborate :: FieldType -> Comp Expr -> Either String Elaborated
-elaborate fieldType prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty fieldType) prog
+elaborate :: Comp Expr -> Either String Elaborated
+elaborate prog = do
+  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.

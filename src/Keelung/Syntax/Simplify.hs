@@ -9,8 +9,6 @@ module Keelung.Syntax.Simplify (simplify, simplifyM, simplifyComputation) where
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
-import Data.Proxy (Proxy (Proxy))
-import Keelung.Field (AcceptedField, encodeFieldType)
 import qualified Keelung.Monad as Kinded
 import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
@@ -42,7 +40,7 @@ readArray addr len = Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0
 
 --------------------------------------------------------------------------------
 
-simplifyComputation :: (AcceptedField n, Integral n) => Kinded.Computation n -> Computation
+simplifyComputation :: Integral n => Kinded.Computation n -> Computation
 simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
@@ -53,12 +51,8 @@ simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bs
       <$> mapM simplifyM asgns
       <*> mapM simplifyM bsgns
       <*> mapM simplifyM asgns'
-      <*> return (encodeFieldType $ toProxy asgns')
-  where
-    toProxy :: [Kinded.Val kind n] -> Proxy n
-    toProxy = const Proxy
 
-simplify :: (Integral n, AcceptedField n) => Kinded.Elaborated t n -> Elaborated
+simplify :: (Integral n) => Kinded.Elaborated t n -> Elaborated
 simplify (Kinded.Elaborated expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
@@ -73,7 +67,7 @@ class Simplify a b where
 
 instance Integral n => Simplify (Kinded.Val t n) Expr where
   simplifyM expr = case expr of
-    Kinded.Integer n -> return $ Val (Integer (toInteger n))
+    Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
     Kinded.Boolean b -> return $ Val (Boolean b)
     Kinded.UnitVal -> return $ Val Unit
