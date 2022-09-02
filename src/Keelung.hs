@@ -6,6 +6,7 @@ module Keelung
     module Keelung.Monad,
     compile,
     interpret,
+    interpret_,
     gf181,
     bn128,
     b64,
@@ -39,32 +40,32 @@ compile fieldType prog = case elaborate prog of
 
 --------------------------------------------------------------------------------
 
-interpret_ :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO [n]
-interpret_ fieldType prog xs = do
-  result <- case elaborate prog of
-    Left err -> return $ Left (ElabError err)
-    Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
-  case result of
-    Left err -> do
-      print err
-      return []
-    Right values -> return values
+interpret_ :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO (Either Error [n])
+interpret_ fieldType prog xs = case elaborate prog of
+  Left err -> return $ Left (ElabError err)
+  Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
+
+printErrorInstead :: Show e => Either e [a] -> IO [a]
+printErrorInstead (Left err) = do
+  print err
+  return []
+printErrorInstead (Right values) = return values
 
 -- | Interpret a program with inputs
 interpret :: FieldType -> Comp (Val t) -> [Integer] -> IO [Integer]
-interpret = interpret_
+interpret fieldType prog xs = interpret_ fieldType prog xs >>= printErrorInstead
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
 gf181 :: Comp (Val t) -> [GF181] -> IO [N GF181]
-gf181 prog xs = map N <$> interpret_ GF181 prog xs
+gf181 prog xs = map N <$> (interpret_ GF181 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
 b64 :: Comp (Val t) -> [B64] -> IO [N B64]
-b64 prog xs = map N <$> interpret_ B64 prog xs
+b64 prog xs = map N <$> (interpret_ B64 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
 bn128 :: Comp (Val t) -> [BN128] -> IO [N BN128]
-bn128 prog xs = map N <$> interpret_ BN128 prog xs
+bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
