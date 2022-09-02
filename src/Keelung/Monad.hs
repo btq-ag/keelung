@@ -18,6 +18,8 @@ module Keelung.Monad
     toArray',
     fromArray,
     fromArrayM,
+    freeze,
+    thaw,
     lengthOf,
     lengthOfM,
     updateM,
@@ -250,6 +252,16 @@ inputs3 _ _ 0 = throwError EmptyArrayError
 inputs3 sizeM sizeN sizeO = do
   vars <- replicateM sizeM (inputs2 sizeN sizeO)
   return $ toArray vars
+
+--------------------------------------------------------------------------------
+
+-- | Convert a mutable array to an immutable array
+freeze :: Mutable t => Val ('ArrM t) -> Comp (Val ('Arr t))
+freeze xs = toArray <$> fromArrayM xs
+
+-- | Convert an immutable array to a mutable array
+thaw :: Mutable t => Val ('Arr t) -> Comp (Val ('ArrM t))
+thaw = toArrayM . fromArray
 
 --------------------------------------------------------------------------------
 
