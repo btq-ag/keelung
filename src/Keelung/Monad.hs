@@ -19,7 +19,11 @@ module Keelung.Monad
     fromArray,
     fromArrayM,
     freeze,
+    freeze2,
+    freeze3,
     thaw,
+    thaw2,
+    thaw3,
     lengthOf,
     lengthOfM,
     updateM,
@@ -259,9 +263,25 @@ inputs3 sizeM sizeN sizeO = do
 freeze :: Mutable t => Val ('ArrM t) -> Comp (Val ('Arr t))
 freeze xs = toArray <$> fromArrayM xs
 
+freeze2 :: Mutable t => Val ('ArrM ('ArrM t)) -> Comp (Val ('Arr ('Arr t)))
+freeze2 xs = do
+  xs' <- fromArrayM xs
+  toArray <$> mapM freeze xs'
+
+freeze3 :: Mutable t => Val ('ArrM ('ArrM ('ArrM t))) -> Comp (Val ('Arr ('Arr ('Arr t))))
+freeze3 xs = do 
+  xs' <- fromArrayM xs
+  toArray <$> mapM freeze2 xs'
+
 -- | Convert an immutable array to a mutable array
 thaw :: Mutable t => Val ('Arr t) -> Comp (Val ('ArrM t))
 thaw = toArrayM . fromArray
+
+thaw2 :: Mutable t => Val ('Arr ('Arr t)) -> Comp (Val ('ArrM ('ArrM t)))
+thaw2 xs = mapM thaw (fromArray xs) >>= toArrayM
+
+thaw3 :: Mutable t => Val ('Arr ('Arr ('Arr t))) -> Comp (Val ('ArrM ('ArrM ('ArrM t))))
+thaw3 xs = mapM thaw2 (fromArray xs) >>= toArrayM
 
 --------------------------------------------------------------------------------
 
