@@ -24,8 +24,11 @@ runHeapM :: Heap -> HeapM a -> a
 runHeapM h m = runReader m h
 
 readArray :: Addr -> Int -> HeapM Expr
-readArray addr len = Array <$> mapM (readHeap addr) (Array.listArray (0, len) [0 .. pred len])
+readArray addr len = Array <$> mapM (readHeap addr) indices
   where
+    indices :: Array.Array Int Int
+    indices = Array.listArray (0, pred len) [0 .. pred len]
+
     readHeap :: Addr -> Int -> HeapM Expr
     readHeap addr' i = do
       heap <- ask
