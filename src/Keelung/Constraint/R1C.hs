@@ -10,7 +10,6 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Field (N (..))
 
 --------------------------------------------------------------------------------
 
@@ -27,7 +26,18 @@ instance Functor R1C where
 
 instance Serialize n => Serialize (R1C n)
 
-instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
+-- instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
+--   show (R1C aX bX cX) = case (aX, bX, cX) of
+--     (Left 0, _, _) -> "0 = " ++ showVec cX
+--     (_, Left 0, _) -> "0 = " ++ showVec cX
+--     (Left 1, _, _) -> showVec bX ++ " = " ++ showVec cX
+--     (_, Left 1, _) -> showVec aX ++ " = " ++ showVec cX
+--     (_, _, _) -> showVec aX ++ " * " ++ showVec bX ++ " = " ++ showVec cX
+--     where
+--       showVec (Left c) = show (N c)
+--       showVec (Right xs) = show xs
+
+instance (Show n, Integral n) => Show (R1C n) where
   show (R1C aX bX cX) = case (aX, bX, cX) of
     (Left 0, _, _) -> "0 = " ++ showVec cX
     (_, Left 0, _) -> "0 = " ++ showVec cX
@@ -35,7 +45,7 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
     (_, Left 1, _) -> showVec aX ++ " = " ++ showVec cX
     (_, _, _) -> showVec aX ++ " * " ++ showVec bX ++ " = " ++ showVec cX
     where
-      showVec (Left c) = show (N c)
+      showVec (Left c) = show c
       showVec (Right xs) = show xs
 
 -- | See if a R1C is satified by a given assignment

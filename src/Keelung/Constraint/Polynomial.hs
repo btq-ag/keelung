@@ -26,7 +26,6 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
-import Keelung.Field (N (..))
 import Keelung.Types (Var)
 import Prelude hiding (negate)
 import qualified Prelude
@@ -55,10 +54,10 @@ instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
+instance (Show n, Integral n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 = go (IntMap.toList xs)
-    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
+    | otherwise = show n <> " + " <> go (IntMap.toList xs)
     where
       go [] = "<empty>"
       go [term] = printTerm term
@@ -66,7 +65,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
       printTerm (_, 0) = error "printTerm: coefficient of 0"
       printTerm (x, 1) = "$" ++ show x
       printTerm (x, -1) = "-$" ++ show x
-      printTerm (x, c) = show (N c) ++ "$" ++ show x
+      printTerm (x, c) = show c ++ "$" ++ show x
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
