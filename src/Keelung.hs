@@ -32,39 +32,39 @@ import qualified System.Info
 import qualified System.Process as Process
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> IO (Either Error (R1CS n))
+compile :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
 compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "toR1CS"] (fieldType, elab)
 
--- | Interpret a program with inputs
-interpret :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO (Either Error [n])
-interpret fieldType prog xs = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
-
 --------------------------------------------------------------------------------
 
-printErrorInstead :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO [n]
-printErrorInstead fieldType prog xs = do
-  result <- interpret fieldType prog xs
+interpret_ :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO [n]
+interpret_ fieldType prog xs = do
+  result <- case elaborate prog of
+    Left err -> return $ Left (ElabError err)
+    Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
   case result of
     Left err -> do
       print err
       return []
     Right values -> return values
 
+-- | Interpret a program with inputs
+interpret :: FieldType -> Comp (Val t) -> [Integer] -> IO [Integer]
+interpret = interpret_
+
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
 gf181 :: Comp (Val t) -> [GF181] -> IO [N GF181]
-gf181 prog xs = map N <$> printErrorInstead GF181 prog xs
+gf181 prog xs = map N <$> interpret_ GF181 prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
 b64 :: Comp (Val t) -> [B64] -> IO [N B64]
-b64 prog xs = map N <$> printErrorInstead B64 prog xs
+b64 prog xs = map N <$> interpret_ B64 prog xs
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
 bn128 :: Comp (Val t) -> [BN128] -> IO [N BN128]
-bn128 prog xs = map N <$> printErrorInstead BN128 prog xs
+bn128 prog xs = map N <$> interpret_ BN128 prog xs
 
 --------------------------------------------------------------------------------
 
