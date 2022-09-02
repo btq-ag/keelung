@@ -31,12 +31,16 @@ import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
+import Control.Arrow (right)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
 compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
-  Right elab -> wrapper ["protocol", "toR1CS"] (fieldType, elab)
+  Right elab -> case fieldType of 
+    GF181 -> right (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+    BN128 -> right (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+    B64 -> right (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
 --------------------------------------------------------------------------------
 
