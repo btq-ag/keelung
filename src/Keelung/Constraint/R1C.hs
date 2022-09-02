@@ -1,15 +1,16 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Constraint.R1C where
 
+import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Field (N (..))
-import Data.Serialize (Serialize)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -17,6 +18,12 @@ import Control.DeepSeq (NFData)
 --      Ax * Bx = Cx
 data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
   deriving (Eq, Generic, NFData)
+
+instance Functor R1C where
+  fmap f (R1C a b c) = R1C (fmapE a) (fmapE b) (fmapE c)
+    where
+      fmapE (Left x) = Left (f x)
+      fmapE (Right xs) = Right (fmap f xs)
 
 instance Serialize n => Serialize (R1C n)
 

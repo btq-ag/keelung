@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Constraint.R1CS where
 
@@ -30,7 +31,7 @@ data R1CS n = R1CS
     r1csOutputVars :: IntSet,
     r1csCNQZPairs :: [(Var, Var)]
   }
-  deriving (Generic, Eq, NFData)
+  deriving (Generic, Eq, NFData, Functor)
 
 instance Serialize n => Serialize (R1CS n)
 
