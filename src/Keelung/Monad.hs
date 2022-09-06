@@ -234,14 +234,14 @@ fromArray (Ref ref) = case ref of {}
 --------------------------------------------------------------------------------
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: (Proper t, Mutable t) => Int -> Comp (Val ('Arr t))
+inputs :: Proper t => Int -> Comp (Val ('Arr t))
 inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   return $ toArray vars
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: (Proper t, Mutable t) => Int -> Int -> Comp (Val ('Arr ('Arr t)))
+inputs2 :: Proper t => Int -> Int -> Comp (Val ('Arr ('Arr t)))
 inputs2 0 _ = throwError EmptyArrayError
 inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
@@ -249,7 +249,7 @@ inputs2 sizeM sizeN = do
   return $ toArray vars
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: (Proper t, Mutable t) => Int -> Int -> Int -> Comp (Val ('Arr ('Arr ('Arr t))))
+inputs3 :: Proper t => Int -> Int -> Int -> Comp (Val ('Arr ('Arr ('Arr t))))
 inputs3 0 _ _ = throwError EmptyArrayError
 inputs3 _ 0 _ = throwError EmptyArrayError
 inputs3 _ _ 0 = throwError EmptyArrayError
