@@ -6,6 +6,7 @@ module Keelung.Field.N where
 
 import Data.Euclidean (Euclidean, GcdDomain)
 import Data.Field (Field)
+import Data.Field.Galois (GaloisField (order))
 import Data.Semiring (Ring, Semiring)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
@@ -41,24 +42,15 @@ deriving instance Enum n => Enum (N n)
 
 deriving instance Real n => Real (N n)
 
-instance (Integral n, Bounded n, Fractional n) => Integral (N n) where
+instance (GaloisField n, Integral n) => Integral (N n) where
   quotRem n m = (N q, N r)
     where
       (q, r) = quotRem (unN n) (unN m)
   toInteger (N x) =
-    let halfway = maxBound / 2
+    let halfway = fromIntegral (order x `div` 2)
      in if x >= halfway
-          then negate (toInteger (maxBound - x) + 1)
+          then negate ((toInteger (order x) - toInteger x) + 1)
           else toInteger x
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (N n) where
-  show (N coeff) = show $ prettify coeff
-
--- | Helper function for prettifying field numbers
---   Numbers in the second half of the field are represented as negative numbers
-prettify :: (Show n, Bounded n, Integral n, Fractional n) => n -> Integer
-prettify coeff =
-  let halfway = maxBound / 2
-   in if coeff >= halfway
-        then negate (toInteger (maxBound - coeff) + 1)
-        else toInteger coeff
+instance (GaloisField n, Integral n) => Show (N n) where
+  show = show . toInteger . unN

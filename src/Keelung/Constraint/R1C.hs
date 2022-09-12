@@ -26,18 +26,7 @@ instance Functor R1C where
 
 instance Serialize n => Serialize (R1C n)
 
--- instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
---   show (R1C aX bX cX) = case (aX, bX, cX) of
---     (Left 0, _, _) -> "0 = " ++ showVec cX
---     (_, Left 0, _) -> "0 = " ++ showVec cX
---     (Left 1, _, _) -> showVec bX ++ " = " ++ showVec cX
---     (_, Left 1, _) -> showVec aX ++ " = " ++ showVec cX
---     (_, _, _) -> showVec aX ++ " * " ++ showVec bX ++ " = " ++ showVec cX
---     where
---       showVec (Left c) = show (N c)
---       showVec (Right xs) = show xs
-
-instance (Show n, Integral n) => Show (R1C n) where
+instance (GaloisField n, Integral n) => Show (R1C n) where
   show (R1C aX bX cX) = case (aX, bX, cX) of
     (Left 0, _, _) -> "0 = " ++ showVec cX
     (_, Left 0, _) -> "0 = " ++ showVec cX

@@ -12,8 +12,8 @@ import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Types (Var)
-import Keelung.Field (N(..))
 import qualified Data.List as List
+import Data.Field.Galois (GaloisField)
 
 --------------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ data R1CS n = R1CS
 
 instance Serialize n => Serialize (R1CS n)
 
-instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
+instance (GaloisField n, Integral n) => Show (R1CS n) where
   show r1cs@(R1CS cs n is bis os _) =
     "R1CS {\n\
     \  R1C constraints ("
@@ -71,7 +71,7 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
       showConstraints =
         if null constraints
           then "none"
-          else unlines (map (\s -> "    " ++ show (fmap N s)) constraints)
+          else unlines (map (\s -> "    " ++ show s) constraints)
 
       showBooleanInputVarNumber =
         if null constraints
@@ -80,10 +80,10 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean input variables)
-toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
+toR1Cs :: GaloisField n => R1CS n -> [R1C n]
 toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
   where
-    booleanInputVarConstraints :: (Num n, Eq n) => [R1C n]
+    booleanInputVarConstraints :: GaloisField n => [R1C n]
     booleanInputVarConstraints =
       map
         ( \var ->

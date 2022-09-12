@@ -31,7 +31,6 @@ import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
-import qualified Keelung.Field.N as N
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
@@ -39,9 +38,9 @@ compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
     case fieldType of
-      GF181 -> fmap (fmap N.prettify) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap N.prettify) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap N.prettify) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+      GF181 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
 --------------------------------------------------------------------------------
 
