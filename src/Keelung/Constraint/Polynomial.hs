@@ -1,6 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Constraint.Polynomial
   ( Poly,
@@ -22,18 +22,18 @@ module Keelung.Constraint.Polynomial
   )
 where
 
+import Control.DeepSeq (NFData)
+import Data.Field.Galois (GaloisField (..))
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
+import Keelung.Field (N (..))
 import Keelung.Types (Var)
 import Prelude hiding (negate)
 import qualified Prelude
-import GHC.Generics (Generic)
-import Data.Serialize (Serialize)
-import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField (..))
-import Keelung.Field (N(..))
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -50,7 +50,7 @@ instance GaloisField n => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
     if c1 == c2
       then v1 == v2 || v1 == IntMap.map Prelude.negate v2
-      else (c1 == (- c2)) && (v1 == IntMap.map Prelude.negate v2)
+      else (c1 == (-c2)) && (v1 == IntMap.map Prelude.negate v2)
 
 instance GaloisField n => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
@@ -58,18 +58,23 @@ instance GaloisField n => Ord (Poly n) where
 
 instance (GaloisField n, Integral n) => Show (Poly n) where
   show (Poly n xs)
-    | n == 0 = go (IntMap.toList xs)
-    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
+    | n == 0 =
+      if firstSign == " + "
+        then concat restOfTerms
+        else "- " ++ concat restOfTerms
+    | otherwise = concat (show (N n) : termStrings)
     where
-      go [] = "<empty>"
-      go [term] = printTerm term
-      go (term : terms) = printTerm term ++ " + " ++ go terms
+      (firstSign : restOfTerms) = termStrings
 
+      termStrings = concatMap printTerm $ IntMap.toList xs
+      -- return a pair of the sign ("+" or "-") and the string representation
+      printTerm :: (GaloisField n, Integral n) => (Var, n) -> [String]
       printTerm (x, c)
         | c == zero = error "printTerm: coefficient of 0"
-        | c == one = "$" ++ show x
-        | c == fromIntegral (order c) - 1 = "-$" ++ show x
-        | otherwise = show (N c) ++ "$" ++ show x
+        | c == one = [" + ", "$" ++ show x]
+        | c == fromIntegral (order c) - 1 = [" - ", "$" ++ show x]
+        | c >= fromIntegral (order c `div` 2) = [" - ", show (Prelude.negate (N c)) ++ "$" ++ show x]
+        | otherwise = [" + ", show (N c) ++ "$" ++ show x]
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
@@ -135,7 +140,7 @@ merge (Poly c xs) (Poly d ys) = buildMaybe (c + d) (mergeCoeffs xs ys)
 
 -- | Negate a polynomial.
 negate :: GaloisField n => Poly n -> Poly n
-negate (Poly c xs) = Poly (- c) (fmap Prelude.negate xs)
+negate (Poly c xs) = Poly (-c) (fmap Prelude.negate xs)
 
 -- | Substitute a variable in a polynomial with another polynomial.
 substitute :: GaloisField n => Poly n -> Var -> Poly n -> Maybe (Poly n)
