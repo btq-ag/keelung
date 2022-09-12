@@ -59,7 +59,7 @@ instance GaloisField n => Ord (Poly n) where
 instance (GaloisField n, Integral n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 = go (IntMap.toList xs)
-    | otherwise = show n <> " + " <> go (IntMap.toList xs)
+    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
     where
       go [] = "<empty>"
       go [term] = printTerm term

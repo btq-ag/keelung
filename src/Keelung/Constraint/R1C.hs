@@ -10,6 +10,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Field.N (N(N))
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +35,7 @@ instance (GaloisField n, Integral n) => Show (R1C n) where
     (_, Left 1, _) -> showVec aX ++ " = " ++ showVec cX
     (_, _, _) -> showVec aX ++ " * " ++ showVec bX ++ " = " ++ showVec cX
     where
-      showVec (Left c) = show c
+      showVec (Left c) = show (N c)
       showVec (Right xs) = show xs
 
 -- | See if a R1C is satified by a given assignment

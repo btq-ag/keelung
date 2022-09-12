@@ -49,8 +49,8 @@ instance (GaloisField n, Integral n) => Integral (N n) where
   toInteger (N x) =
     let halfway = fromIntegral (order x `div` 2)
      in if x >= halfway
-          then negate ((toInteger (order x) - toInteger x) + 1)
+          then negate (toInteger (order x) - toInteger x)
           else toInteger x
 
 instance (GaloisField n, Integral n) => Show (N n) where
-  show = show . toInteger . unN
+  show = show . toInteger
