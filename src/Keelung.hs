@@ -80,10 +80,10 @@ elaborate prog = do
   return $ simplify $ Elaborated expr comp'
 
 -- | Elaborate a program
-elaborateOnly :: Comp (Val t) -> Either ElabError C.Elaborated
+elaborateOnly :: Comp (Val t) -> Either ElabError (Elaborated t)
 elaborateOnly prog = do
   (expr, comp') <- runComp emptyComputation prog
-  return $ simplify $ Elaborated expr comp'
+  return $ Elaborated expr comp'
 
 --------------------------------------------------------------------------------
 
