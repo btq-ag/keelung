@@ -33,7 +33,7 @@ type Heap =
 data ElemType
   = NumElem -- Field numbers
   | BoolElem -- Booleans
-  | ArrElem ElemType Int -- Arrays
+  | ArrElem ElemType Int -- Arrays (with type of its elements and its size)
   deriving (Show, Eq, Generic, NFData)
 
 instance Serialize ElemType
