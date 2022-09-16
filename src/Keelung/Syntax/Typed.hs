@@ -38,14 +38,18 @@ instance Serialize Val
 
 data Ref
   = NumVar Var
+  | NumInputVar Var 
   | BoolVar Var
+  | BoolInputVar Var
   deriving (Generic, Eq, NFData)
 
 instance Serialize Ref
 
 instance Show Ref where
   show (NumVar n) = "$N" ++ show n
+  show (NumInputVar n) = "$NI" ++ show n
   show (BoolVar n) = "$B" ++ show n
+  show (BoolInputVar n) = "$BI" ++ show n
 
 --------------------------------------------------------------------------------
 
@@ -148,6 +152,8 @@ instance Serialize Assignment
 data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
+    -- Counter for generating fresh input variables 
+    compNextInputVar :: Int,
     -- Counter for allocating fresh heap addresses
     compNextAddr :: Int,
     -- Variables marked as inputs
@@ -163,8 +169,10 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+  show (Computation nextVar nextInputVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
+      ++ "\n  input variable counter: " 
+      ++ show nextInputVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
@@ -193,7 +201,7 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation 0 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
@@ -214,7 +222,9 @@ freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
   Var (NumVar n) -> IntSet.singleton n
+  Var (NumInputVar n) -> IntSet.singleton n
   Var (BoolVar n) -> IntSet.singleton n
+  Var (BoolInputVar n) -> IntSet.singleton n
   Array xs -> IntSet.unions (fmap freeVars xs)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y

@@ -61,16 +61,23 @@ data Kind
 -- | References to variables or arrays
 data Ref :: Kind -> Type where
   BoolVar :: Var -> Ref 'Bool
+  BoolInputVar :: Var -> Ref 'Bool
   NumVar :: Var -> Ref 'Num
+  NumInputVar :: Var -> Ref 'Num
   ArrayRef :: ElemType -> Int -> Addr -> Ref ('ArrM val)
 
 -- | 2 references are equal if they refer to the same variable or array
 instance Eq (Ref kind) where
   BoolVar i == BoolVar j = i == j
+  BoolInputVar i == BoolInputVar j = i == j
   NumVar i == NumVar j = i == j
+  NumInputVar i == NumInputVar j = i == j
   ArrayRef _ _ addr == ArrayRef _ _ addr' = addr == addr'
+  _ == _ = False
 
 instance Show (Ref ref) where
   show (BoolVar v) = "$B" ++ show v
+  show (BoolInputVar v) = "$BI" ++ show v
   show (NumVar v) = "$N" ++ show v
+  show (NumInputVar v) = "$NI" ++ show v
   show (ArrayRef _ n a) = "$A" ++ show a ++ "[" ++ show n ++ "]"

@@ -44,10 +44,11 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
 --------------------------------------------------------------------------------
 
 simplifyComputation :: Kinded.Computation -> Computation
-simplifyComputation (Kinded.Computation nextVar nextAddr inputVars heap asgns bsgns asgns') =
+simplifyComputation (Kinded.Computation nextVar nextInputVar nextAddr inputVars heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
       nextVar
+      nextInputVar
       nextAddr
       inputVars
       heap
@@ -77,7 +78,9 @@ instance Simplify (Kinded.Val t) Expr where
     Kinded.ArrayVal xs -> Array <$> mapM simplifyM xs
     Kinded.Ref x -> case x of
       Kinded.BoolVar n -> return $ Var (BoolVar n)
+      Kinded.BoolInputVar n -> return $ Var (BoolInputVar n)
       Kinded.NumVar n -> return $ Var (NumVar n)
+      Kinded.NumInputVar n -> return $ Var (BoolInputVar n)
       Kinded.ArrayRef _ len addr -> readArray addr len
     Kinded.Add x y -> Add <$> simplifyM x <*> simplifyM y
     Kinded.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
@@ -95,6 +98,8 @@ instance Simplify (Kinded.Val t) Expr where
 
 instance Simplify (Kinded.Assignment 'Kinded.Num) Assignment where
   simplifyM (Kinded.Assignment (Kinded.NumVar n) e) = Assignment (NumVar n) <$> simplifyM e
+  simplifyM (Kinded.Assignment (Kinded.NumInputVar n) e) = Assignment (NumInputVar n) <$> simplifyM e
 
 instance Simplify (Kinded.Assignment 'Kinded.Bool) Assignment where
   simplifyM (Kinded.Assignment (Kinded.BoolVar n) e) = Assignment (BoolVar n) <$> simplifyM e
+  simplifyM (Kinded.Assignment (Kinded.BoolInputVar n) e) = Assignment (BoolInputVar n) <$> simplifyM e

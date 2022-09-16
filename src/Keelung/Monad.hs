@@ -81,6 +81,8 @@ instance Show (Assignment t) where
 data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
+    -- Counter for generating fresh input variables
+    compNextInputVar :: Int,
     -- Counter for allocating fresh heap addresses
     compNextAddr :: Int,
     -- Variables marked as inputs
@@ -96,11 +98,13 @@ data Computation = Computation
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation 0 0 mempty mempty mempty mempty mempty
+emptyComputation = Computation 0 0 0 mempty mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+  show (Computation nextVar nextInputVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
+      ++ "\n  input variable counter: " 
+      ++ show nextInputVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
@@ -352,7 +356,9 @@ access3 addr (i, j, k) = access (access (access addr i) j) k
 -- | Internal helper function extracting the address of a reference
 addrOfRef :: Ref t -> Addr
 addrOfRef (BoolVar addr) = addr
+addrOfRef (BoolInputVar addr) = addr
 addrOfRef (NumVar addr) = addr
+addrOfRef (NumInputVar addr) = addr
 addrOfRef (ArrayRef _ _ addr) = addr
 
 -- | Internal helper function for allocating an array with values
