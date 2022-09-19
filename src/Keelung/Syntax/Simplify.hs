@@ -44,13 +44,12 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
 --------------------------------------------------------------------------------
 
 simplifyComputation :: Kinded.Computation -> Computation
-simplifyComputation (Kinded.Computation nextVar nextInputVar nextAddr inputVars heap asgns bsgns asgns') =
+simplifyComputation (Kinded.Computation nextVar nextInputVar nextAddr heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
       nextVar
       nextInputVar
       nextAddr
-      inputVars
       heap
       <$> mapM simplifyM asgns
       <*> mapM simplifyM bsgns
@@ -80,7 +79,7 @@ instance Simplify (Kinded.Val t) Expr where
       Kinded.BoolVar n -> return $ Var (BoolVar n)
       Kinded.BoolInputVar n -> return $ Var (BoolInputVar n)
       Kinded.NumVar n -> return $ Var (NumVar n)
-      Kinded.NumInputVar n -> return $ Var (BoolInputVar n)
+      Kinded.NumInputVar n -> return $ Var (NumInputVar n)
       Kinded.ArrayRef _ len addr -> readArray addr len
     Kinded.Add x y -> Add <$> simplifyM x <*> simplifyM y
     Kinded.Sub x y -> Sub <$> simplifyM x <*> simplifyM y

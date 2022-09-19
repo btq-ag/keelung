@@ -56,8 +56,6 @@ import Data.Array.Unboxed (Array)
 import qualified Data.Array.Unboxed as IArray
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Types
@@ -85,8 +83,6 @@ data Computation = Computation
     compNextInputVar :: Int,
     -- Counter for allocating fresh heap addresses
     compNextAddr :: Int,
-    -- Variables marked as inputs
-    compInputVars :: IntSet,
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
@@ -98,17 +94,17 @@ data Computation = Computation
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation 0 0 0 mempty mempty mempty mempty mempty
+emptyComputation = Computation 0 0 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation nextVar nextInputVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+  show (Computation nextVar nextInputVar nextAddr _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
-      ++ "\n  input variable counter: " 
+      ++ "\n  input variable counter: "
       ++ show nextInputVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
-      ++ show (IntSet.toList inputVars)
+      ++ showInputVars
       ++ "\n  num assignments: "
       ++ show numAsgns
       ++ "\n  bool assignments: "
@@ -117,6 +113,11 @@ instance Show Computation where
       ++ show assertions
       ++ "\n\
          \}"
+    where
+      showInputVars = case nextInputVar of 
+        0 -> "none"
+        1 -> "$0"
+        _ -> "[ $0 .. $" ++ show (nextInputVar - 1) ++ " ]"
 
 --------------------------------------------------------------------------------
 
@@ -150,11 +151,18 @@ runComp comp f = runExcept (runStateT f comp)
 -- Variable & Input Variable
 --------------------------------------------------------------------------------
 
--- | Allocate a fresh address.
+-- | Allocate a fresh variable.
 freshVar :: Comp Var
 freshVar = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = succ index})
+  return index
+
+-- | Allocate a fresh input variable.
+freshInputVar :: Comp Var
+freshInputVar = do
+  index <- gets compNextInputVar
+  modify (\st -> st {compNextInputVar = succ index})
   return index
 
 --------------------------------------------------------------------------------
@@ -187,17 +195,11 @@ instance Proper 'Bool where
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp (Val 'Num)
-inputNum = do
-  var <- freshVar
-  markVarAsInput var
-  return $ Ref $ NumVar var
+inputNum = Ref . NumInputVar <$> freshInputVar
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp (Val 'Bool)
-inputBool = do
-  var <- freshVar
-  markVarAsInput var
-  return $ Ref $ BoolVar var
+inputBool = Ref . BoolInputVar <$> freshInputVar
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
@@ -372,15 +374,6 @@ allocArray elemType vals = do
   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
   modifyHeap (IntMap.insert addr (elemType, bindings))
   return $ ArrayRef elemType (length addresses) addr
-
--- | Internal helper function for marking a variable as input.
-markVarAsInput :: Var -> Comp ()
-markVarAsInput = markVarsAsInput . IntSet.singleton
-
--- | Internal helper function for marking multiple variables as input
-markVarsAsInput :: IntSet -> Comp ()
-markVarsAsInput vars =
-  modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- | Internal helper function for updating an array entry on the heap
 writeHeap :: Addr -> ElemType -> (Int, Ref t) -> Comp ()

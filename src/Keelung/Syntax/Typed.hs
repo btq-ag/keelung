@@ -1,11 +1,14 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Syntax.Typed where
 
 import Control.Arrow (left)
+import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Array.Unboxed (Array)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
@@ -13,9 +16,6 @@ import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Types (Heap, Var)
-import Control.DeepSeq (NFData)
-import Data.Array.Unboxed (Array)
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -27,8 +27,8 @@ data Val
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
-  show (Integer n) = show n 
-  show (Rational n) = show n 
+  show (Integer n) = show n
+  show (Rational n) = show n
   show (Boolean b) = show b
   show Unit = "unit"
 
@@ -38,7 +38,7 @@ instance Serialize Val
 
 data Ref
   = NumVar Var
-  | NumInputVar Var 
+  | NumInputVar Var
   | BoolVar Var
   | BoolInputVar Var
   deriving (Generic, Eq, NFData)
@@ -152,12 +152,10 @@ instance Serialize Assignment
 data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
-    -- Counter for generating fresh input variables 
+    -- Counter for generating fresh input variables
     compNextInputVar :: Int,
     -- Counter for allocating fresh heap addresses
     compNextAddr :: Int,
-    -- Variables marked as inputs
-    compInputVars :: IntSet,
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
@@ -169,14 +167,14 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation nextVar nextInputVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+  show (Computation nextVar nextInputVar nextAddr _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
-      ++ "\n  input variable counter: " 
+      ++ "\n  input variable counter: "
       ++ show nextInputVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
-      ++ show (IntSet.toList inputVars)
+      ++ showInputVars
       ++ "\n  num assignments: "
       ++ show numAsgns
       ++ "\n  bool assignments: "
@@ -185,6 +183,11 @@ instance Show Computation where
       ++ show assertions
       ++ "\n\
          \}"
+    where
+      showInputVars = case nextInputVar of
+        0 -> "none"
+        1 -> "$0"
+        _ -> "[ $0 .. $" ++ show (nextInputVar - 1) ++ " ]"
 
 instance Serialize Computation
 
@@ -201,7 +204,7 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation 0 0 0 mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
