@@ -220,14 +220,14 @@ assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNum
 assignBool :: Ref -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
 
--- collect free variables of an expression
+-- collect free variables of an expression (input variables are not free variables!)
 freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
   Var (NumVar n) -> IntSet.singleton n
-  Var (NumInputVar n) -> IntSet.singleton n
+  Var (NumInputVar _) -> mempty
   Var (BoolVar n) -> IntSet.singleton n
-  Var (BoolInputVar n) -> IntSet.singleton n
+  Var (BoolInputVar _) -> mempty
   Array xs -> IntSet.unions (fmap freeVars xs)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
