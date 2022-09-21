@@ -18,7 +18,7 @@ import Keelung.Field.N (N (N))
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
 data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Functor R1C where
   fmap f (R1C a b c) = R1C (fmapE a) (fmapE b) (fmapE c)
@@ -49,7 +49,7 @@ instance (GaloisField n, Integral n) => Show (R1C n) where
                 + if Poly.constant xs == 0
                   then 0
                   else 1
-         in if termNumber < 2 
+         in if termNumber < 2
               then showVec (Right xs)
               else "(" ++ showVec (Right xs) ++ ")"
 

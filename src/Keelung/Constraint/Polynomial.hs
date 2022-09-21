@@ -46,13 +46,13 @@ instance Serialize n => Serialize (Poly n)
 
 -- 2 Poly's are the same, if they have the same coefficients and variables
 -- or one is the negation of the other
-instance GaloisField n => Eq (Poly n) where
+instance (Eq n, Num n) => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
     if c1 == c2
       then v1 == v2 || v1 == IntMap.map Prelude.negate v2
       else (c1 == (-c2)) && (v1 == IntMap.map Prelude.negate v2)
 
-instance GaloisField n => Ord (Poly n) where
+instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
