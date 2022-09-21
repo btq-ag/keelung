@@ -44,16 +44,20 @@ library
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal
     , containers
     , deepseq
     , galois-field
+    , groups
     , mtl
     , process
+    , random
     , semirings
+    , wl-pprint-text
   default-language: Haskell2010
 
 executable tutorial
@@ -64,17 +68,21 @@ executable tutorial
       examples/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal
     , containers
     , deepseq
     , galois-field
+    , groups
     , keelung
     , mtl
     , process
+    , random
     , semirings
+    , wl-pprint-text
   default-language: Haskell2010
 
 test-suite keelung-test
@@ -86,17 +94,21 @@ test-suite keelung-test
       test
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal
     , containers
     , deepseq
     , galois-field
+    , groups
     , keelung
     , mtl
     , process
+    , random
     , semirings
+    , wl-pprint-text
   default-language: Haskell2010
 
 benchmark profile
@@ -108,15 +120,19 @@ benchmark profile
       benchmarks/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal
     , containers
     , deepseq
     , galois-field
+    , groups
     , keelung
     , mtl
     , process
+    , random
     , semirings
+    , wl-pprint-text
   default-language: Haskell2010

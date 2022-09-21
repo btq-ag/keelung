@@ -27,9 +27,13 @@ dependencies:
 - containers
 - deepseq
 - galois-field
+- groups
 - mtl
 - process
+- random
 - semirings
+- QuickCheck
+- wl-pprint-text
 
 library:
   source-dirs: src

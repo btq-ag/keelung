@@ -5,7 +5,6 @@
 module Keelung.Constraint.R1CS where
 
 import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
@@ -50,7 +49,7 @@ data R1CS n = R1CS
 
 instance Serialize n => Serialize (R1CS n)
 
-instance (GaloisField n, Integral n) => Show (R1CS n) where
+instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
   show r1cs@(R1CS cs n is bis os _) =
     "R1CS {\n\
     \  R1C constraints ("
@@ -94,10 +93,9 @@ instance (GaloisField n, Integral n) => Show (R1CS n) where
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean input variables)
-toR1Cs :: GaloisField n => R1CS n -> [R1C n]
+toR1Cs :: Num n => R1CS n -> [R1C n]
 toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
   where
-    booleanInputVarConstraints :: GaloisField n => [R1C n]
     booleanInputVarConstraints =
       map
         ( \var ->
