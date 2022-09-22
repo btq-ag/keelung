@@ -38,9 +38,9 @@ compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
     case fieldType of
-      GF181 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap toInteger) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
 --------------------------------------------------------------------------------
 
@@ -80,10 +80,10 @@ elaborate prog = do
   return $ simplify $ Elaborated expr comp'
 
 -- | Elaborate a program
-elaborateOnly :: Comp (Val t) -> Either ElabError C.Elaborated
+elaborateOnly :: Comp (Val t) -> Either ElabError (Elaborated t)
 elaborateOnly prog = do
   (expr, comp') <- runComp emptyComputation prog
-  return $ simplify $ Elaborated expr comp'
+  return $ Elaborated expr comp'
 
 --------------------------------------------------------------------------------
 

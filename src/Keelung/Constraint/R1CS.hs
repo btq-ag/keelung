@@ -12,36 +12,49 @@ import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Types (Var)
-import qualified Data.List as List
-import Data.Field.Galois (GaloisField)
 
 --------------------------------------------------------------------------------
 
 -- | Rank-1 Constraint System
+--
+--    Layout of variables:
+--  
+--      ┌─────────────────┐
+--      │     Input Vars  │
+--      ├─────────────────┤
+--      │    Output Vars  │
+--      ├─────────────────┤
+--      │                 │
+--      │                 │
+--      │  Ordinary Vars  │
+--      │                 │
+--      │                 │
+--      └─────────────────┘
+--
 data R1CS n = R1CS
   { -- List of constraints
     r1csConstraints :: [R1C n],
-    -- Number of variables in the constraint system
-    r1csNumOfVars :: Int,
-    -- Number of input variables in the system
-    -- Input variables are placed in the front
-    -- (so we don't have to enumerate them all here)
-    r1csNumOfInputVars :: Int,
-    -- Set of Boolean input vars
-    r1csBooleanInputVars :: IntSet,
-    r1csOutputVars :: IntSet,
+    -- Number of all variables in the constraint system
+    r1csVarSize :: Int,
+    -- Number of input variables
+    r1csInputVarSize :: Int,
+    -- Set of Boolean input variables
+    r1csBoolInputVars :: IntSet,
+    -- Number of output variables
+    r1csOutputVarSize :: Int,
+    -- List of pairs for restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNQZPairs :: [(Var, Var)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
 instance Serialize n => Serialize (R1CS n)
 
-instance (GaloisField n, Integral n) => Show (R1CS n) where
+instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
   show r1cs@(R1CS cs n is bis os _) =
     "R1CS {\n\
     \  R1C constraints ("
       <> show (length cs + IntSet.size bis)
-      <> "):\n\n"
+      <> "): "
       <> showConstraints
       ++ "\n  Number of variables: "
       ++ show n
@@ -51,7 +64,7 @@ instance (GaloisField n, Integral n) => Show (R1CS n) where
       <> "): "
       ++ inputVars
       ++ "\n  Output variables ("
-      <> show (IntSet.size os)
+      <> show os
       <> "): "
       ++ outputVars
       ++ "\n}"
@@ -59,19 +72,19 @@ instance (GaloisField n, Integral n) => Show (R1CS n) where
       -- prettify input variables
       inputVars = case is of
         0 -> "none"
-        1 -> "[ $0 ]"
-        _ -> "[ $0 .. $" <> show (is - 1) <> " ]"
+        1 -> "$0"
+        _ -> "$0 .. $" <> show (is - 1)
       -- prettify output variables
-      outputVars =
-        if IntSet.null os
-          then "none"
-          else "[ " <> List.intercalate ", " (map (\v -> "$" <> show v) (IntSet.toList os)) <> " ]"
+      outputVars = case os of
+        0 -> "none"
+        1 -> "$" <> show is
+        _ -> "$" <> show is <> " .. $" <> show (is + os - 1)
 
       constraints = toR1Cs r1cs
       showConstraints =
         if null constraints
           then "none"
-          else unlines (map (\s -> "    " ++ show s) constraints)
+          else "\n\n" <> unlines (map (\s -> "    " <> show s) constraints)
 
       showBooleanInputVarNumber =
         if null constraints
@@ -80,10 +93,9 @@ instance (GaloisField n, Integral n) => Show (R1CS n) where
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean input variables)
-toR1Cs :: GaloisField n => R1CS n -> [R1C n]
+toR1Cs :: Num n => R1CS n -> [R1C n]
 toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
   where
-    booleanInputVarConstraints :: GaloisField n => [R1C n]
     booleanInputVarConstraints =
       map
         ( \var ->

@@ -1,11 +1,14 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Syntax.Typed where
 
 import Control.Arrow (left)
+import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Array.Unboxed (Array)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
@@ -13,9 +16,6 @@ import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Types (Heap, Var)
-import Control.DeepSeq (NFData)
-import Data.Array.Unboxed (Array)
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -27,8 +27,8 @@ data Val
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
-  show (Integer n) = show n 
-  show (Rational n) = show n 
+  show (Integer n) = show n
+  show (Rational n) = show n
   show (Boolean b) = show b
   show Unit = "unit"
 
@@ -38,14 +38,18 @@ instance Serialize Val
 
 data Ref
   = NumVar Var
+  | NumInputVar Var
   | BoolVar Var
+  | BoolInputVar Var
   deriving (Generic, Eq, NFData)
 
 instance Serialize Ref
 
 instance Show Ref where
-  show (NumVar n) = "$N" ++ show n
-  show (BoolVar n) = "$B" ++ show n
+  show (NumVar n) = "$" ++ show n
+  show (NumInputVar n) = "$I" ++ show n
+  show (BoolVar n) = "$" ++ show n
+  show (BoolInputVar n) = "$I" ++ show n
 
 --------------------------------------------------------------------------------
 
@@ -123,13 +127,33 @@ data Elaborated = Elaborated
 
 instance Show Elaborated where
   show (Elaborated expr comp) =
-    "{\n expression: "
-      ++ show expr
+    "{\n  expression: "
+      ++ showExpr
       ++ "\n  compuation state: \n"
-      ++ show comp
+      ++ indent (lines (show comp))
       ++ "\n}"
+    where
+      showExpr = case expr of
+        Array xs -> prettyList2 4 (toList xs)
+        _ -> show expr
+      indent = unlines . map ("    " <>)
 
 instance Serialize Elaborated
+
+-- | Prettify list of stuff
+prettyList :: Show a => [a] -> [String]
+prettyList [] = ["[]"]
+prettyList [x] = ["[" <> show x <> "]"]
+prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
+
+prettyList2 :: Show a => Int -> [a] -> String
+prettyList2 indent list = case list of
+  [] -> "[]"
+  [x] -> "[" <> show x <> "]"
+  (x : xs) ->
+    unlines $
+      map (replicate indent ' ' <>) $
+        "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
 
 --------------------------------------------------------------------------------
 
@@ -148,10 +172,10 @@ instance Serialize Assignment
 data Computation = Computation
   { -- Counter for generating fresh variables
     compNextVar :: Int,
+    -- Counter for generating fresh input variables
+    compNextInputVar :: Int,
     -- Counter for allocating fresh heap addresses
     compNextAddr :: Int,
-    -- Variables marked as inputs
-    compInputVars :: IntSet,
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
@@ -163,20 +187,27 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+  show (Computation nextVar nextInputVar nextAddr _ numAsgns boolAsgns assertions) =
     "{\n  variable counter: " ++ show nextVar
+      ++ "\n  input variable counter: "
+      ++ show nextInputVar
       ++ "\n  address counter: "
       ++ show nextAddr
       ++ "\n  input variables: "
-      ++ show (IntSet.toList inputVars)
+      ++ showInputVars
       ++ "\n  num assignments: "
-      ++ show numAsgns
+      ++ prettyList2 8 numAsgns
       ++ "\n  bool assignments: "
-      ++ show boolAsgns
+      ++ prettyList2 8 boolAsgns
       ++ "\n  assertions: "
-      ++ show assertions
+      ++ prettyList2 8 assertions
       ++ "\n\
          \}"
+    where
+      showInputVars = case nextInputVar of
+        0 -> "none"
+        1 -> "$I0"
+        _ -> "[ $I0 .. $I" ++ show (nextInputVar - 1) ++ " ]"
 
 instance Serialize Computation
 
@@ -193,7 +224,7 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation 0 0 0 mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
@@ -209,12 +240,14 @@ assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNum
 assignBool :: Ref -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
 
--- collect free variables of an expression
+-- collect free variables of an expression (input variables are not free variables!)
 freeVars :: Expr -> IntSet
 freeVars expr = case expr of
   Val _ -> mempty
   Var (NumVar n) -> IntSet.singleton n
+  Var (NumInputVar _) -> mempty
   Var (BoolVar n) -> IntSet.singleton n
+  Var (BoolInputVar _) -> mempty
   Array xs -> IntSet.unions (fmap freeVars xs)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y

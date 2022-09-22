@@ -30,7 +30,6 @@ import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Field (N (..))
 import Keelung.Types (Var)
 import Prelude hiding (negate)
 import qualified Prelude
@@ -46,35 +45,35 @@ instance Serialize n => Serialize (Poly n)
 
 -- 2 Poly's are the same, if they have the same coefficients and variables
 -- or one is the negation of the other
-instance GaloisField n => Eq (Poly n) where
+instance (Eq n, Num n) => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
     if c1 == c2
       then v1 == v2 || v1 == IntMap.map Prelude.negate v2
       else (c1 == (-c2)) && (v1 == IntMap.map Prelude.negate v2)
 
-instance GaloisField n => Ord (Poly n) where
+instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
-instance (GaloisField n, Integral n) => Show (Poly n) where
+instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 =
       if firstSign == " + "
         then concat restOfTerms
         else "- " ++ concat restOfTerms
-    | otherwise = concat (show (N n) : termStrings)
+    | otherwise = concat (show n : termStrings)
     where
       (firstSign : restOfTerms) = termStrings
 
       termStrings = concatMap printTerm $ IntMap.toList xs
       -- return a pair of the sign ("+" or "-") and the string representation
-      printTerm :: (GaloisField n, Integral n) => (Var, n) -> [String]
+      printTerm :: (Show n, Ord n, Eq n, Num n) => (Var, n) -> [String]
       printTerm (x, c)
-        | c == zero = error "printTerm: coefficient of 0"
-        | c == one = [" + ", "$" ++ show x]
-        | c == fromIntegral (order c) - 1 = [" - ", "$" ++ show x]
-        | c >= fromIntegral (order c `div` 2) = [" - ", show (Prelude.negate (N c)) ++ "$" ++ show x]
-        | otherwise = [" + ", show (N c) ++ "$" ++ show x]
+        | c == 0 = error "printTerm: coefficient of 0"
+        | c == 1 = [" + ", "$" ++ show x]
+        | c == - 1 = [" - ", "$" ++ show x]
+        | c < 0 = [" - ", show (Prelude.negate c) ++ "$" ++ show x]
+        | otherwise = [" + ", show c ++ "$" ++ show x]
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
@@ -95,7 +94,7 @@ buildMaybe c xs =
         else Just (Poly c xs')
 
 -- | Create a polynomial from a single variable and its coefficient.
-singleVar :: GaloisField n => Var -> Poly n
+singleVar :: Num n => Var -> Poly n
 singleVar x = Poly 0 (IntMap.singleton x 1)
 
 -- | Return the set of variables.
