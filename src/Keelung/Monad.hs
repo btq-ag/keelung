@@ -46,6 +46,7 @@ module Keelung.Monad
     cond,
     assert,
     reduce,
+    reuse
   )
 where
 
@@ -436,3 +437,12 @@ lengthOf (Ref ref) = case ref of {}
 -- | Assert that the given expression is true
 assert :: Val 'Bool -> Comp ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
+
+
+--------------------------------------------------------------------------------
+
+-- | Allow an expression to be referenced and reused in the future
+reuse :: Mutable t => Val t -> Comp (Val t)
+reuse val = do
+  xs <- toArrayM [val]
+  accessM xs 0
