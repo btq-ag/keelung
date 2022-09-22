@@ -5,6 +5,8 @@ module Keelung
     module Keelung.Field,
     module Keelung.Monad,
     compile,
+    compileO0,
+    compileO2,
     interpret,
     interpret_,
     gf181,
@@ -38,9 +40,27 @@ compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
     case fieldType of
-      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toR1CS"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+
+compileO0 :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
+compileO0 fieldType prog = case elaborate prog of
+  Left err -> return $ Left (ElabError err)
+  Right elab ->
+    case fieldType of
+      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+
+compileO2 :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
+compileO2 fieldType prog = case elaborate prog of
+  Left err -> return $ Left (ElabError err)
+  Right elab ->
+    case fieldType of
+      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
 --------------------------------------------------------------------------------
 
@@ -73,13 +93,13 @@ bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program and simplify it
+-- | Elaborate a program and simplify it to the Typed Syntax
 elaborate :: Comp (Val t) -> Either ElabError C.Elaborated
 elaborate prog = do
   (expr, comp') <- runComp emptyComputation prog
   return $ simplify $ Elaborated expr comp'
 
--- | Elaborate a program
+-- | Elaborate a program as the Kinded Syntax
 elaborateOnly :: Comp (Val t) -> Either ElabError (Elaborated t)
 elaborateOnly prog = do
   (expr, comp') <- runComp emptyComputation prog
