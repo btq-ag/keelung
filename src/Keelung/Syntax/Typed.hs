@@ -46,10 +46,10 @@ data Ref
 instance Serialize Ref
 
 instance Show Ref where
-  show (NumVar n) = "$N" ++ show n
-  show (NumInputVar n) = "$NI" ++ show n
-  show (BoolVar n) = "$B" ++ show n
-  show (BoolInputVar n) = "$BI" ++ show n
+  show (NumVar n) = "$" ++ show n
+  show (NumInputVar n) = "$I" ++ show n
+  show (BoolVar n) = "$" ++ show n
+  show (BoolInputVar n) = "$I" ++ show n
 
 --------------------------------------------------------------------------------
 
@@ -127,13 +127,33 @@ data Elaborated = Elaborated
 
 instance Show Elaborated where
   show (Elaborated expr comp) =
-    "{\n expression: "
-      ++ show expr
+    "{\n  expression: "
+      ++ showExpr
       ++ "\n  compuation state: \n"
-      ++ show comp
+      ++ indent (lines (show comp))
       ++ "\n}"
+    where
+      showExpr = case expr of
+        Array xs -> prettyList2 4 (toList xs)
+        _ -> show expr
+      indent = unlines . map ("    " <>)
 
 instance Serialize Elaborated
+
+-- | Prettify list of stuff
+prettyList :: Show a => [a] -> [String]
+prettyList [] = ["[]"]
+prettyList [x] = ["[" <> show x <> "]"]
+prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
+
+prettyList2 :: Show a => Int -> [a] -> String
+prettyList2 indent list = case list of
+  [] -> "[]"
+  [x] -> "[" <> show x <> "]"
+  (x : xs) ->
+    unlines $
+      map (replicate indent ' ' <>) $
+        "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
 
 --------------------------------------------------------------------------------
 
@@ -176,18 +196,18 @@ instance Show Computation where
       ++ "\n  input variables: "
       ++ showInputVars
       ++ "\n  num assignments: "
-      ++ show numAsgns
+      ++ prettyList2 8 numAsgns
       ++ "\n  bool assignments: "
-      ++ show boolAsgns
+      ++ prettyList2 8 boolAsgns
       ++ "\n  assertions: "
-      ++ show assertions
+      ++ prettyList2 8 assertions
       ++ "\n\
          \}"
     where
       showInputVars = case nextInputVar of
         0 -> "none"
-        1 -> "$0"
-        _ -> "[ $0 .. $" ++ show (nextInputVar - 1) ++ " ]"
+        1 -> "$I0"
+        _ -> "[ $I0 .. $I" ++ show (nextInputVar - 1) ++ " ]"
 
 instance Serialize Computation
 

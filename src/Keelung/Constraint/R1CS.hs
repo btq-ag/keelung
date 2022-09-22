@@ -18,7 +18,7 @@ import Keelung.Types (Var)
 -- | Rank-1 Constraint System
 --
 --    Layout of variables:
-
+--  
 --      ┌─────────────────┐
 --      │     Input Vars  │
 --      ├─────────────────┤
@@ -54,7 +54,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
     "R1CS {\n\
     \  R1C constraints ("
       <> show (length cs + IntSet.size bis)
-      <> "):\n\n"
+      <> "): "
       <> showConstraints
       ++ "\n  Number of variables: "
       ++ show n
@@ -84,7 +84,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
       showConstraints =
         if null constraints
           then "none"
-          else unlines (map (\s -> "    " ++ show s) constraints)
+          else "\n\n" <> unlines (map (\s -> "    " <> show s) constraints)
 
       showBooleanInputVarNumber =
         if null constraints
