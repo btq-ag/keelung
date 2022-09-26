@@ -101,6 +101,10 @@ instance Simplify t => Simplify (Kinded.Arr t) where
   simplifyM expr = case expr of
     Kinded.Arr xs -> Array <$> mapM simplifyM xs
 
+instance Simplify t => Simplify (Kinded.ArrM t) where
+  simplifyM expr = case expr of
+    Kinded.ArrayRef _ len addr -> readArray addr len
+
 -- instance Simplify (Kinded.Val t) Expr where
 --   simplifyM expr = case expr of
 --     Kinded.Integer n -> return $ Val (Integer n)

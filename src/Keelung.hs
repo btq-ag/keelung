@@ -116,6 +116,11 @@ instance Elaborable t => Elaborable (Arr t) where
     (expr, comp') <- runComp emptyComputation prog
     return $ Elaborated expr comp'
 
+instance Elaborable t => Elaborable (ArrM t) where 
+  elaborate' prog = do
+    (expr, comp') <- runComp emptyComputation prog
+    return $ Elaborated expr comp'
+
 -- -- | Elaborate a program as the Kinded Syntax
 -- elaborateOnly :: Comp t -> Either ElabError (Elaborated t)
 -- elaborateOnly prog = do
