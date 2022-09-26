@@ -19,20 +19,20 @@ import Control.Exception (evaluate)
 -- import Control.Monad
 
 -- | Outputs whether number is given.
-echo :: Comp (Val 'Num)
+echo :: Comp Number
 echo = do
   x <- input -- request for an input and bind it to 'x'
   return x -- return 'x'
 
 -- | A program that expects 2 inputs and returns no output
-useless :: Comp (Val 'Unit)
+useless :: Comp Unit
 useless = do
   _x <- inputNum -- request for an input and bind it to 'x'
   _y <- inputBool -- request for an input and bind it to 'y'
   return unit -- return nothing
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
-tempConvert :: Comp (Val 'Num)
+tempConvert :: Comp Number
 tempConvert = do
   toFahrenheit <- input
   degree <- input
@@ -42,19 +42,19 @@ tempConvert = do
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
 
-terminationProblem :: Comp (Val ('Arr ('Arr 'Bool)))
+terminationProblem :: Comp (Arr (Arr Boolean))
 terminationProblem = return $ run "A"
   where
     -- Construct a W8 from a Word8
-    fromWord8 :: Word8 -> Val ('Arr 'Bool)
+    fromWord8 :: Word8 -> Arr Boolean
     fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- Construct a W8 from a Char
-    fromChar :: Char -> Val ('Arr 'Bool)
+    fromChar :: Char -> Arr Boolean
     fromChar = fromWord8 . toEnum . fromEnum
 
     -- Construct an array of W8s from a String
-    run :: String -> Val ('Arr ('Arr 'Bool))
+    run :: String -> Arr (Arr Boolean)
     run xs = toArray (map fromChar xs)
 
 -- |
@@ -63,15 +63,15 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
   where
 
     -- | `fromWord8` implemented with immutable arrays
-    fromWord8' :: Word8 -> Val ('Arr 'Bool)
+    fromWord8' :: Word8 -> Arr Boolean
     fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- | `fromChar` implemented with immutable arrays
-    fromChar' :: Char -> Val ('Arr 'Bool)
+    fromChar' :: Char -> Arr Boolean
     fromChar' = fromWord8' . toEnum . fromEnum
 
     -- | `fromString` implemented with immutable arrays
-    fromString' :: String -> Val ('Arr ('Arr 'Bool)) 
+    fromString' :: String -> Arr (Arr Boolean)
     fromString' = toArray . map fromChar'
 
     string :: Int -> String
@@ -86,7 +86,7 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 --   then compileAsR1CS program -- compile as a R1CS
 --   else compile program -- compile as a ConstraintSystem
 
--- assertArrayToBe42 :: Comp (Val 'Unit)
+-- assertArrayToBe42 :: Comp Unit
 -- assertArrayToBe42 = do
 --   let len = 8
 
@@ -99,12 +99,12 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 --   return unit
 
 -- -- | A program that outputs the square of its input
--- square :: Comp (Val 'Num)
+-- square :: Comp Number
 -- square = do
 --   x <- input
 --   return (Var x * Var x)
 
-assertToBe42 :: Comp (Val 'Unit)
+assertToBe42 :: Comp Unit
 assertToBe42 = do
   x <- input
   assert (x `Eq` 42)
@@ -112,14 +112,14 @@ assertToBe42 = do
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output (hence 'return unit')
-assertSquare :: Comp (Val 'Unit)
+assertSquare :: Comp Unit
 assertSquare = do
   x <- input
   y <- input
   assert ((x * x) `Eq` y)
   return unit
 
-loop3 :: Int -> Int -> Comp (Val 'Unit)
+loop3 :: Int -> Int -> Comp Unit
 loop3 n m = do
   xs <- inputs2 n m
   -- expecting square of signatures as input
@@ -136,7 +136,7 @@ loop3 n m = do
 
 --   --------------------------------------------------------------------------------
 
---   -- loop1 :: Comp (Val 'Unit)
+--   -- loop1 :: Comp Unit
 --   -- loop1 = do
 --   --   xs <- allocArray 4
 --   --   -- iterate through the array and assert them all to be 0
@@ -151,7 +151,7 @@ loop3 n m = do
 
 --   return unit
 
--- loop2 :: Comp (Val 'Unit)
+-- loop2 :: Comp Unit
 -- loop2 = do
 --   x <- inputNum
 --   ys <- inputArray 4
@@ -161,7 +161,7 @@ loop3 n m = do
 
 --   return unit
 
--- loop3 :: Comp (Val 'Unit)
+-- loop3 :: Comp Unit
 -- loop3 = do
 --   xs <- inputArray 4
 --   -- iterate through the array and assert them all to be 0
@@ -170,7 +170,7 @@ loop3 n m = do
 
 --   return unit
 
--- -- reduce1 :: Comp (Val 'Num)
+-- -- reduce1 :: Comp Number
 -- -- reduce1 = do
 -- --   xs <- inputArray 4
 -- --   -- aggregate all variables in xs
@@ -179,7 +179,7 @@ loop3 n m = do
 
 -- --------------------------------------------------------------------------------
 
--- loop1 :: Comp (Val 'Unit)
+-- loop1 :: Comp Unit
 -- loop1 = do
 --   -- xs <- inputArray 2  :: Comp (Ref ('A ('V 'Num)))
 --   -- ys <- inputArray 2  :: Comp (Ref ('A ('V 'Num)))

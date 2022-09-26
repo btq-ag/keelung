@@ -21,7 +21,6 @@ module Keelung.Syntax.Kinded
 where
 
 import Data.Array.Unboxed (Array)
-import Data.Kind (Type)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
 
@@ -81,11 +80,12 @@ newtype Arr t = Arr (Array Int t)
   deriving (Eq)
 
 data ArrM t
-  = BoolVar Var
-  | BoolInputVar Var
-  | NumVar Var
-  | NumInputVar Var
-  | ArrayRef ElemType Int Addr
+  = 
+  --   BoolVar Var
+  -- | BoolInputVar Var
+  -- | NumVar Var
+  -- | NumInputVar Var
+   ArrayRef ElemType Int Addr
   deriving (Eq)
 
 -- UnitVal -> showString "unit"

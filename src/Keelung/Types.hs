@@ -8,7 +8,6 @@ module Keelung.Types where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap (IntMap)
-import Data.Kind (Type)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 

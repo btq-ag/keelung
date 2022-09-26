@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
@@ -12,27 +11,26 @@ module Keelung.Monad
     Assignment (..),
 
     -- * Array
-    -- Mutable (),
-    -- toArrayM,
+    Mutable (updateM),
+    toArrayM,
     toArray,
     toArray',
     fromArray,
-    -- fromArrayM,
-    -- freeze,
-    -- freeze2,
-    -- freeze3,
-    -- thaw,
-    -- thaw2,
-    -- thaw3,
-    -- lengthOf,
-    -- lengthOfM,
-    -- updateM,
-    -- accessM,
-    -- accessM2,
-    -- accessM3,
-    -- access,
-    -- access2,
-    -- access3,
+    fromArrayM,
+    freeze,
+    freeze2,
+    freeze3,
+    thaw,
+    thaw2,
+    thaw3,
+    lengthOf,
+    lengthOfM,
+    accessM,
+    accessM2,
+    accessM3,
+    access,
+    access2,
+    access3,
 
     -- * Inputs
     input,
@@ -44,9 +42,9 @@ module Keelung.Monad
 
     -- * Statements
     cond,
-    -- assert,
-    -- reduce,
-    -- reuse,
+    assert,
+    reduce,
+    reuse,
   )
 where
 
@@ -126,7 +124,7 @@ instance Show Computation where
 data Elaborated t 
   = ElaboratedNum Number Computation
   | ElaboratedBool Boolean Computation
-  | ElaboratedArray (Arr t) Computation
+  | ElaboratedArray t Computation
   | ElaboratedUnit Unit Computation
   -- { -- | The resulting 'Expr'
   --   elab:: !(t),
@@ -178,7 +176,7 @@ freshInputVar = do
 -- -- we update the entry directly with the variable instead
 -- updateM :: Mutable t => ArrM t -> Int -> t -> Comp ()
 -- updateM ((ArrayRef _ _ addr)) i ( (NumberRef n)) = writeHeap addr NumElem (i, NumVar n)
--- updateM ( (ArrayRef _ _ addr)) i ( (BoolVar n)) = writeHeap addr BoolElem (i, BoolVar n)
+-- updateM ( (ArrayRef _ _ addr)) i ( (BooleanRef n)) = writeHeap addr BoolElem (i, BoolVar n)
 -- updateM ((ArrayRef elemType _ addr)) i expr = do
 --   ref <- alloc expr
 --   writeHeap addr elemType (i, ref)
@@ -212,11 +210,11 @@ inputBool = BooleanRef <$> freshInputVar
 --------------------------------------------------------------------------------
 
 -- | Converts a list of values to an 1D-array
--- toArrayM :: Mutable t => [t] -> Comp (ArrM t)
--- toArrayM xs = do
---   when (null xs) $ throwError EmptyArrayError
---   let kind = typeOf (head xs)
---   allocArray kind xs
+toArrayM :: Mutable t => [t] -> Comp (ArrM t)
+toArrayM xs = do
+  when (null xs) $ throwError EmptyArrayError
+  let kind = typeOf (head xs)
+  snd <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
 toArray :: [t] -> Arr t
@@ -227,11 +225,10 @@ toArray' :: Array Int t -> Arr t
 toArray' = Arr
 
 -- | Convert an array into a list of expressions
--- fromArrayM :: Mutable t => ArrM t -> Comp [t]
--- fromArrayM ((ArrayRef _ _ addr)) = do
---   -- collect references of each element
---   refs <- readHeapArray addr
---   return $ map Ref refs
+fromArrayM :: Mutable t => ArrM t -> Comp [t]
+fromArrayM ((ArrayRef _ _ addr)) = do
+  -- collect references of each element
+  readHeapArray addr
 
 fromArray :: Arr t -> [t]
 fromArray (Arr xs) = toList xs
@@ -265,101 +262,118 @@ inputs3 sizeM sizeN sizeO = do
 --------------------------------------------------------------------------------
 
 -- | Convert a mutable array to an immutable array
--- freeze :: Mutable t => ArrM t -> Comp (Arr t)
--- freeze xs = toArray <$> fromArrayM xs
+freeze :: Mutable t => ArrM t -> Comp (Arr t)
+freeze xs = toArray <$> fromArrayM xs
 
--- freeze2 :: Mutable t => ArrM (ArrM t) -> Comp (Arr (Arr t))
--- freeze2 xs = do
---   xs' <- fromArrayM xs
---   toArray <$> mapM freeze xs'
+freeze2 :: Mutable t => ArrM (ArrM t) -> Comp (Arr (Arr t))
+freeze2 xs = do
+  xs' <- fromArrayM xs
+  toArray <$> mapM freeze xs'
 
--- freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp (Arr (Arr (Arr t)))
--- freeze3 xs = do
---   xs' <- fromArrayM xs
---   toArray <$> mapM freeze2 xs'
+freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp (Arr (Arr (Arr t)))
+freeze3 xs = do
+  xs' <- fromArrayM xs
+  toArray <$> mapM freeze2 xs'
 
 -- | Convert an immutable array to a mutable array
--- thaw :: Mutable t => Arr t -> Comp (ArrM t)
--- thaw = toArrayM . fromArray
+thaw :: Mutable t => Arr t -> Comp (ArrM t)
+thaw = toArrayM . fromArray
 
--- thaw2 :: Mutable t => Arr (Arr t) -> Comp (ArrM (ArrM t))
--- thaw2 xs = mapM thaw (fromArray xs) >>= toArrayM
+thaw2 :: Mutable t => Arr (Arr t) -> Comp (ArrM (ArrM t))
+thaw2 xs = mapM thaw (fromArray xs) >>= toArrayM
 
--- thaw3 :: Mutable t => Arr (Arr (Arr t)) -> Comp (ArrM (ArrM (ArrM t)))
--- thaw3 xs = mapM thaw2 (fromArray xs) >>= toArrayM
+thaw3 :: Mutable t => Arr (Arr (Arr t)) -> Comp (ArrM (ArrM (ArrM t)))
+thaw3 xs = mapM thaw2 (fromArray xs) >>= toArrayM
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for retrieving the element of an array
--- class Mutable t where
---   -- | Allocates a fresh variable for a value
---   alloc :: t -> Comp (ArrM t)
+class Mutable t where
+  -- | Allocates a fresh variable for a value
+  alloc :: t -> Comp (Var, t)
 
---   typeOf :: t -> ElemType
+  typeOf :: t -> ElemType
 
---   constructElementRef :: ElemType -> Addr -> t
+  -- | Update an entry of an array.
+  updateM :: ArrM t -> Int -> t -> Comp ()
 
--- instance Mutable ref => Mutable (ArrM ref) where
---   alloc xs@((ArrayRef elemType len _)) = do
---     elements <- mapM (accessM xs) [0 .. len - 1]
---     allocArray elemType elements
+  constructElementRef :: ElemType -> Addr -> t
 
---   typeOf ((ArrayRef elemType len _)) = ArrElem elemType len
+instance Mutable ref => Mutable (ArrM ref) where
+  alloc xs@((ArrayRef elemType len _)) = do
+    elements <- mapM (accessM xs) [0 .. len - 1]
+    allocArray elemType elements
 
---   constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
---   constructElementRef _ _ = error "expecting element to be array"
+  typeOf ((ArrayRef elemType len _)) = ArrElem elemType len
 
--- instance Mutable Number where
---   alloc val = do
---     var <- freshVar
---     modify' $ \st -> st {compNumAsgns = NumAssignment var val : compNumAsgns st}
---     return $ NumVar var
+  constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
+  constructElementRef _ _ = error "expecting element to be array"
 
---   typeOf _ = NumElem
+  updateM (ArrayRef elemType _ addr) i expr = do
+    (var, _) <- alloc expr
+    writeHeap addr elemType (i, var)
 
---   constructElementRef NumElem elemAddr = NumberRef elemAddr
---   constructElementRef _ _ = error "expecting element to be of Num"
+instance Mutable Number where
+  alloc val = do
+    var <- freshVar
+    modify' $ \st -> st {compNumAsgns = NumAssignment var val : compNumAsgns st}
+    return (var, NumberRef var)
 
--- instance Mutable Boolean where
---   alloc val = do
---     var <- freshVar
---     modify' $ \st -> st {compBoolAsgns = BoolAssignment var val : compBoolAsgns st}
---     return $ BoolVar var
+  typeOf _ = NumElem
 
---   typeOf _ = BoolElem
+  updateM (ArrayRef _ _ addr) i (NumberRef n) = writeHeap addr NumElem (i, n)
+  updateM (ArrayRef elemType _ addr) i expr = do
+    (var, _) <- alloc expr
+    writeHeap addr elemType (i, var)
 
---   constructElementRef BoolElem elemAddr = BooleanRef elemAddr
---   constructElementRef _ _ = error "expecting element to be of Bool"
+  constructElementRef NumElem elemAddr = NumberRef elemAddr
+  constructElementRef _ _ = error "expecting element to be of Num"
 
--- -- -- | Access an element from a 1-D array
--- -- accessM :: Mutable t => ArrM t -> Int -> Comp t
--- -- accessM ((ArrayRef _ _ addr)) i = Ref <$> readHeap (addr, i)
+instance Mutable Boolean where
+  alloc val = do
+    var <- freshVar
+    modify' $ \st -> st {compBoolAsgns = BoolAssignment var val : compBoolAsgns st}
+    return (var, BooleanRef var)
 
--- -- -- | Access an element from a 2-D array
--- -- accessM2 :: Mutable t => ArrM (ArrM t) -> (Int, Int) -> Comp t
--- -- accessM2 addr (i, j) = accessM addr i >>= flip accessM j
+  typeOf _ = BoolElem
 
--- -- -- | Access an element from a 3-D array
--- -- accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
--- -- accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
+  updateM (ArrayRef _ _ addr) i (BooleanRef n) = writeHeap addr BoolElem (i, n)
+  updateM (ArrayRef elemType _ addr) i expr = do
+    (var, _) <- alloc expr
+    writeHeap addr elemType (i, var)
 
--- -- access :: Arr t -> Int -> t
--- -- access (Arr xs) i =
--- --   if i < length xs
--- --     then xs ! i
--- --     else error $ show $ IndexOutOfBoundsError2 (length xs) i
+  constructElementRef BoolElem elemAddr = BooleanRef elemAddr
+  constructElementRef _ _ = error "expecting element to be of Bool"
 
--- -- -- | Access an element from a 2-D array
--- -- access2 :: Arr (Arr t) -> (Int, Int) -> t
--- -- access2 addr (i, j) = access (access addr i) j
+-- -- | Access an element from a 1-D array
+accessM :: Mutable t => ArrM t -> Int -> Comp t
+accessM ((ArrayRef _ _ addr)) i = readHeap (addr, i)
 
--- -- -- | Access an element from a 3-D array
--- -- access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
--- -- access3 addr (i, j, k) = access (access (access addr i) j) k
+-- | Access an element from a 2-D array
+accessM2 :: Mutable t => ArrM (ArrM t) -> (Int, Int) -> Comp t
+accessM2 addr (i, j) = accessM addr i >>= flip accessM j
+
+-- | Access an element from a 3-D array
+accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
+accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
+
+access :: Arr t -> Int -> t
+access (Arr xs) i =
+  if i < length xs
+    then xs ! i
+    else error $ show $ IndexOutOfBoundsError2 (length xs) i
+
+-- | Access an element from a 2-D array
+access2 :: Arr (Arr t) -> (Int, Int) -> t
+access2 addr (i, j) = access (access addr i) j
+
+-- | Access an element from a 3-D array
+access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
+access3 addr (i, j, k) = access (access (access addr i) j) k
 
 -- --------------------------------------------------------------------------------
 
--- -- | Internal helper function extracting the address of a reference
+-- | Internal helper function extracting the address of a reference
 -- addrOfRef :: ArrM t -> Addr
 -- addrOfRef (BoolVar addr) = addr
 -- addrOfRef (BoolInputVar addr) = addr
@@ -367,71 +381,70 @@ inputs3 sizeM sizeN sizeO = do
 -- addrOfRef (NumInputVar addr) = addr
 -- addrOfRef (ArrayRef _ _ addr) = addr
 
--- -- | Internal helper function for allocating an array with values
--- allocArray :: Mutable t => ElemType -> [t] -> Comp (ArrM u)
--- allocArray elemType vals = do
---   -- allocate a new array for holding the variables of these elements
---   addr <- gets compNextAddr
---   modify (\st -> st {compNextAddr = succ addr})
---   -- allocate new variables for each element
---   addresses <- map addrOfRef <$> mapM alloc vals
---   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
---   modifyHeap (IntMap.insert addr (elemType, bindings))
---   return $ ArrayRef elemType (length addresses) addr
+-- | Internal helper function for allocating an array with values
+allocArray :: Mutable t => ElemType -> [t] -> Comp (Addr, ArrM u)
+allocArray elemType vals = do
+  -- allocate a new array for holding the variables of these elements
+  addr <- gets compNextAddr
+  modify (\st -> st {compNextAddr = succ addr})
+  -- allocate new variables for each element
+  addresses <- map fst <$> mapM alloc vals
+  let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
+  modifyHeap (IntMap.insert addr (elemType, bindings))
+  return (addr, ArrayRef elemType (length addresses) addr)
 
--- -- | Internal helper function for updating an array entry on the heap
--- writeHeap :: Addr -> ElemType -> (Int, ArrM t) -> Comp ()
--- writeHeap addr elemType (index, ref) = do
---   let bindings = IntMap.singleton index (addrOfRef ref)
---   modifyHeap (IntMap.insertWith (<>) addr (elemType, bindings))
+-- | Internal helper function for updating an array entry on the heap
+writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp ()
+writeHeap addr elemType (index, ref) = do
+  let bindings = IntMap.singleton index ref
+  modifyHeap (IntMap.insertWith (<>) addr (elemType, bindings))
 
--- modifyHeap :: (Heap -> Heap) -> Comp ()
--- modifyHeap f = do
---   heap <- gets compHeap
---   let heap' = f heap
---   modify (\st -> st {compHeap = heap'})
+modifyHeap :: (Heap -> Heap) -> Comp ()
+modifyHeap f = do
+  heap <- gets compHeap
+  let heap' = f heap
+  modify (\st -> st {compHeap = heap'})
 
--- -- | Internal helper function for accessing an element of an array on the heap
--- readHeap :: Mutable t => (Addr, Int) -> Comp (ArrM t)
--- readHeap (addr, i) = do
---   heap <- gets compHeap
---   case IntMap.lookup addr heap of
---     Nothing -> error "readHeap: address not found"
---     Just (elemType, array) -> case IntMap.lookup i array of
---       Nothing -> throwError $ IndexOutOfBoundsError addr i array
---       Just n -> return $ constructElementRef elemType n
+-- | Internal helper function for accessing an element of an array on the heap
+readHeap :: Mutable t => (Addr, Int) -> Comp t
+readHeap (addr, i) = do
+  heap <- gets compHeap
+  case IntMap.lookup addr heap of
+    Nothing -> error "readHeap: address not found"
+    Just (elemType, array) -> case IntMap.lookup i array of
+      Nothing -> throwError $ IndexOutOfBoundsError addr i array
+      Just n -> return $ constructElementRef elemType n
 
--- -- | Internal helper function for accessing an array on the heap
--- readHeapArray :: Mutable t => Addr -> Comp [t]
--- readHeapArray addr = do
---   heap <- gets compHeap
---   case IntMap.lookup addr heap of
---     Nothing -> error "readHeap: address not found"
---     Just (elemType, array) -> return $ map (constructElementRef elemType) (IntMap.elems array)
-
--- --------------------------------------------------------------------------------
-
--- -- | An alternative to 'foldM'
--- reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
--- reduce a xs f = foldM f a xs
-
--- lengthOfM :: ArrM t -> Int
--- lengthOfM ((ArrayRef _ len _)) = len
-
--- lengthOf :: Arr t -> Int
--- lengthOf (Arr xs) = length xs
--- -- lengthOf (Ref ref) = case ref of {}
+-- | Internal helper function for accessing an array on the heap
+readHeapArray :: Mutable t => Addr -> Comp [t]
+readHeapArray addr = do
+  heap <- gets compHeap
+  case IntMap.lookup addr heap of
+    Nothing -> error "readHeap: address not found"
+    Just (elemType, array) -> return $ map (constructElementRef elemType) (IntMap.elems array)
 
 -- --------------------------------------------------------------------------------
 
--- -- | Assert that the given expression is true
--- assert :: Boolean -> Comp ()
--- assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
+-- | An alternative to 'foldM'
+reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
+reduce a xs f = foldM f a xs
 
--- --------------------------------------------------------------------------------
+lengthOfM :: ArrM t -> Int
+lengthOfM ((ArrayRef _ len _)) = len
 
--- -- | Allow an expression to be referenced and reused in the future
--- reuse :: Mutable t => t -> Comp t
--- reuse val = do
---   xs <- toArrayM [val]
---   accessM xs 0
+lengthOf :: Arr t -> Int
+lengthOf (Arr xs) = length xs
+
+--------------------------------------------------------------------------------
+
+-- | Assert that the given expression is true
+assert :: Boolean -> Comp ()
+assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
+
+--------------------------------------------------------------------------------
+
+-- | Allow an expression to be referenced and reused in the future
+reuse :: Mutable t => t -> Comp t
+reuse val = do
+  xs <- toArrayM [val]
+  accessM xs 0

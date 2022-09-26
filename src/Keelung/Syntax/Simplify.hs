@@ -1,11 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (simplify, simplifyM, simplifyComputation) where
+module Keelung.Syntax.Simplify (Simplify, simplify, simplifyM, simplifyComputation) where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
@@ -52,11 +46,15 @@ simplifyComputation (Kinded.Computation nextVar nextInputVar nextAddr heap asgns
       nextInputVar
       nextAddr
       heap
-      <$> mapM simplifyM asgns
-      <*> mapM simplifyM bsgns
+      <$> mapM simplifyAssignment asgns
+      <*> mapM simplifyAssignment bsgns
       <*> mapM simplifyM asgns'
 
-simplify :: Simplify t Expr => Kinded.Elaborated t -> Elaborated
+simplifyAssignment :: Kinded.Assignment -> HeapM Assignment
+simplifyAssignment (Kinded.BoolAssignment var e) = Assignment (NumVar var) <$> simplifyM e
+simplifyAssignment (Kinded.NumAssignment var e) = Assignment (BoolVar var) <$> simplifyM e
+
+simplify :: Simplify t => Kinded.Elaborated t -> Elaborated
 simplify (Kinded.ElaboratedNum expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
@@ -72,7 +70,6 @@ simplify (Kinded.ElaboratedArray expr comp) =
    in Elaborated
         (runHeapM (compHeap comp') (simplifyM expr))
         comp'
-
 simplify (Kinded.ElaboratedUnit expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
@@ -82,10 +79,10 @@ simplify (Kinded.ElaboratedUnit expr comp) =
 --------------------------------------------------------------------------------
 
 -- | Typeclass for removing kinds
-class Simplify a b where
-  simplifyM :: a -> HeapM b
+class Simplify a where
+  simplifyM :: a -> HeapM Expr
 
-instance Simplify Kinded.Number Expr where
+instance Simplify Kinded.Number where
   simplifyM expr = case expr of
     Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
@@ -97,7 +94,7 @@ instance Simplify Kinded.Number Expr where
     Kinded.IfNum p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
     Kinded.ToNum x -> ToNum <$> simplifyM x
 
-instance Simplify Kinded.Boolean Expr where
+instance Simplify Kinded.Boolean where
   simplifyM expr = case expr of
     Kinded.Boolean b -> return $ Val (Boolean b)
     Kinded.BooleanRef var -> return $ Var (BoolVar var)
@@ -109,11 +106,11 @@ instance Simplify Kinded.Boolean Expr where
     Kinded.IfBool p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
     Kinded.ToBool x -> ToBool <$> simplifyM x
 
-instance Simplify Kinded.Unit Expr where
+instance Simplify Kinded.Unit where
   simplifyM expr = case expr of
     Kinded.Unit -> return $ Val Unit
 
-instance Simplify t Expr => Simplify (Kinded.Arr t) Expr where
+instance Simplify t => Simplify (Kinded.Arr t) where
   simplifyM expr = case expr of
     Kinded.Arr xs -> Array <$> mapM simplifyM xs
 
@@ -144,10 +141,3 @@ instance Simplify t Expr => Simplify (Kinded.Arr t) Expr where
 --     Kinded.ToBool x -> ToBool <$> simplifyM x
 --     Kinded.ToNum x -> ToNum <$> simplifyM x
 
-instance Simplify Kinded.Assignment Assignment where
-  simplifyM (Kinded.BoolAssignment var e) = Assignment (NumVar var) <$> simplifyM e
-  simplifyM (Kinded.NumAssignment var e) = Assignment (BoolVar var) <$> simplifyM e
-
--- instance Simplify (Kinded.Assignment 'Kinded.Bool) Assignment where
---   simplifyM (Kinded.Assignment (Kinded.BoolVar n) e) = Assignment (BoolVar n) <$> simplifyM e
---   simplifyM (Kinded.Assignment (Kinded.BoolInputVar n) e) = Assignment (BoolInputVar n) <$> simplifyM e
