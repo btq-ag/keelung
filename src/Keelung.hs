@@ -99,22 +99,22 @@ class Elaborable t where
 instance Elaborable Number where 
   elaborate' prog = do
     (expr, comp') <- runComp emptyComputation prog
-    return $ ElaboratedNum expr comp'
+    return $ Elaborated expr comp'
 
 instance Elaborable Boolean where 
   elaborate' prog = do
     (expr, comp') <- runComp emptyComputation prog
-    return $ ElaboratedBool expr comp'
+    return $ Elaborated expr comp'
 
 instance Elaborable Unit where 
   elaborate' prog = do
     (expr, comp') <- runComp emptyComputation prog
-    return $ ElaboratedUnit expr comp'
+    return $ Elaborated expr comp'
 
 instance Elaborable t => Elaborable (Arr t) where 
   elaborate' prog = do
     (expr, comp') <- runComp emptyComputation prog
-    return $ ElaboratedArray expr comp'
+    return $ Elaborated expr comp'
 
 -- -- | Elaborate a program as the Kinded Syntax
 -- elaborateOnly :: Comp t -> Either ElabError (Elaborated t)

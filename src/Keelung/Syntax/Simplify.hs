@@ -55,22 +55,7 @@ simplifyAssignment (Kinded.BoolAssignment var e) = Assignment (NumVar var) <$> s
 simplifyAssignment (Kinded.NumAssignment var e) = Assignment (BoolVar var) <$> simplifyM e
 
 simplify :: Simplify t => Kinded.Elaborated t -> Elaborated
-simplify (Kinded.ElaboratedNum expr comp) =
-  let comp' = simplifyComputation comp
-   in Elaborated
-        (runHeapM (compHeap comp') (simplifyM expr))
-        comp'
-simplify (Kinded.ElaboratedBool expr comp) =
-  let comp' = simplifyComputation comp
-   in Elaborated
-        (runHeapM (compHeap comp') (simplifyM expr))
-        comp'
-simplify (Kinded.ElaboratedArray expr comp) =
-  let comp' = simplifyComputation comp
-   in Elaborated
-        (runHeapM (compHeap comp') (simplifyM expr))
-        comp'
-simplify (Kinded.ElaboratedUnit expr comp) =
+simplify (Kinded.Elaborated expr comp) =
   let comp' = simplifyComputation comp
    in Elaborated
         (runHeapM (compHeap comp') (simplifyM expr))
@@ -87,6 +72,7 @@ instance Simplify Kinded.Number where
     Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
     Kinded.NumberRef var -> return $ Var (NumVar var)
+    Kinded.NumberInputRef var -> return $ Var (NumInputVar var)
     Kinded.Add x y -> Add <$> simplifyM x <*> simplifyM y
     Kinded.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
     Kinded.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
@@ -98,6 +84,7 @@ instance Simplify Kinded.Boolean where
   simplifyM expr = case expr of
     Kinded.Boolean b -> return $ Val (Boolean b)
     Kinded.BooleanRef var -> return $ Var (BoolVar var)
+    Kinded.BooleanInputRef var -> return $ Var (BoolInputVar var)
     Kinded.Eq x y -> Eq <$> simplifyM x <*> simplifyM y
     Kinded.And x y -> And <$> simplifyM x <*> simplifyM y
     Kinded.Or x y -> Or <$> simplifyM x <*> simplifyM y
@@ -140,4 +127,3 @@ instance Simplify t => Simplify (Kinded.Arr t) where
 --     Kinded.IfBool p x y -> If <$> simplifyM p <*> simplifyM x <*> simplifyM y
 --     Kinded.ToBool x -> ToBool <$> simplifyM x
 --     Kinded.ToNum x -> ToNum <$> simplifyM x
-

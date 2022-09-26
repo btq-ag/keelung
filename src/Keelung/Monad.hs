@@ -121,17 +121,29 @@ instance Show Computation where
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
-data Elaborated t 
-  = ElaboratedNum Number Computation
-  | ElaboratedBool Boolean Computation
-  | ElaboratedArray t Computation
-  | ElaboratedUnit Unit Computation
-  -- { -- | The resulting 'Expr'
-  --   elab:: !(t),
+data Elaborated t = Elaborated t Computation 
+  -- { -- | The resulting expression
+  --   elabExpr:: !t,
   --   -- | The state of computation after elaboration
-  --   elabComp :: Computation
+  --   elabComp :: Computation,
   -- }
+  -- = ElaboratedNum Number Computation
+  -- | ElaboratedBool Boolean Computation
+  -- | ElaboratedArray t Computation
+  -- | ElaboratedUnit Unit Computation
   deriving (Eq)
+
+-- elabComp :: Elaborated t -> Computation
+-- elabComp (ElaboratedNum _ comp) = comp
+-- elabComp (ElaboratedBool _ comp) = comp
+-- elabComp (ElaboratedArray _ comp) = comp
+-- elabComp (ElaboratedUnit _ comp) = comp
+
+-- elabExpr :: Elaborated t -> t
+-- elabExpr (ElaboratedNum expr _) = expr
+-- elabExpr (ElaboratedBool expr _) = expr
+-- elabExpr (ElaboratedArray expr _) = expr
+-- elabExpr (ElaboratedUnit expr _) = expr
 
 instance Show (Elaborated t) where
   show _ = "Elaborated"
@@ -199,11 +211,11 @@ instance Proper Boolean where
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number
-inputNum = NumberRef <$> freshInputVar
+inputNum = NumberInputRef <$> freshInputVar
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
-inputBool = BooleanRef <$> freshInputVar
+inputBool = BooleanInputRef <$> freshInputVar
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
