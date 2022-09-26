@@ -1,7 +1,4 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Keelung.Syntax.Kinded
   ( Number (..),
@@ -61,7 +58,7 @@ instance Show Number where
 -- | Booleans
 data Boolean
   = Boolean Bool
-  | BooleanRef Var -- Boolean Variables 
+  | BooleanRef Var -- Boolean Variables
   | BooleanInputRef Var -- Input Boolean Variables
   -- Operators on Booleans
   | And Boolean Boolean
@@ -80,14 +77,10 @@ data Unit = Unit
   deriving (Eq)
 
 newtype Arr t = Arr (Array Int t)
-  deriving (Eq)
+  deriving (Eq, Functor, Foldable, Traversable)
 
 data ArrM t = ArrayRef ElemType Int Addr
   deriving (Eq)
-
--- UnitVal -> showString "unit"
--- ArrayVal xs -> shows xs
--- Ref ref -> shows ref
 
 instance Show Boolean where
   showsPrec prec expr = case expr of

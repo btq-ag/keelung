@@ -24,7 +24,6 @@ module Keelung.Monad
     thaw2,
     thaw3,
     lengthOf,
-    lengthOfM,
     accessM,
     accessM2,
     accessM3,
@@ -441,11 +440,8 @@ readHeapArray addr = do
 reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
 reduce a xs f = foldM f a xs
 
-lengthOfM :: ArrM t -> Int
-lengthOfM ((ArrayRef _ len _)) = len
-
-lengthOf :: Arr t -> Int
-lengthOf (Arr xs) = length xs
+lengthOf :: ArrM t -> Int
+lengthOf ((ArrayRef _ len _)) = len
 
 --------------------------------------------------------------------------------
 
