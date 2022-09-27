@@ -120,38 +120,22 @@ instance Show Computation where
 --------------------------------------------------------------------------------
 
 -- | The result of elaborating a computation
-data Elaborated t = Elaborated t Computation 
-  -- { -- | The resulting expression
-  --   elabExpr:: !t,
-  --   -- | The state of computation after elaboration
-  --   elabComp :: Computation,
-  -- }
+data Elaborated t = Elaborated
+  { -- | The resulting expression
+    elabExpr :: !t,
+    -- | The state of computation after elaboration
+    elabComp :: Computation
+  }
   -- = ElaboratedNum Number Computation
-  -- | ElaboratedBool Boolean Computation
-  -- | ElaboratedArray t Computation
-  -- | ElaboratedUnit Unit Computation
   deriving (Eq)
 
--- elabComp :: Elaborated t -> Computation
--- elabComp (ElaboratedNum _ comp) = comp
--- elabComp (ElaboratedBool _ comp) = comp
--- elabComp (ElaboratedArray _ comp) = comp
--- elabComp (ElaboratedUnit _ comp) = comp
-
--- elabExpr :: Elaborated t -> t
--- elabExpr (ElaboratedNum expr _) = expr
--- elabExpr (ElaboratedBool expr _) = expr
--- elabExpr (ElaboratedArray expr _) = expr
--- elabExpr (ElaboratedUnit expr _) = expr
-
-instance Show (Elaborated t) where
-  show _ = "Elaborated"
-  -- show (Elaborated expr comp) =
-  --   "{\n expression: "
-  --     ++ show expr
-  --     ++ "\n  compuation state: \n"
-  --     ++ show comp
-  --     ++ "\n}"
+instance Show t => Show (Elaborated t) where
+  show (Elaborated expr comp) =
+    "{\n expression: "
+      ++ show expr
+      ++ "\n  compuation state: \n"
+      ++ show comp
+      ++ "\n}"
 
 --------------------------------------------------------------------------------
 
@@ -182,16 +166,6 @@ freshInputVar = do
 
 --------------------------------------------------------------------------------
 
--- -- | Update an entry of an array.
--- -- When the assigned expression is a variable,
--- -- we update the entry directly with the variable instead
--- updateM :: Mutable t => ArrM t -> Int -> t -> Comp ()
--- updateM ((ArrayRef _ _ addr)) i ( (NumberRef n)) = writeHeap addr NumElem (i, NumVar n)
--- updateM ( (ArrayRef _ _ addr)) i ( (BooleanRef n)) = writeHeap addr BoolElem (i, BoolVar n)
--- updateM ((ArrayRef elemType _ addr)) i expr = do
---   ref <- alloc expr
---   writeHeap addr elemType (i, ref)
-
 -- | Typeclass for operations on base types
 class Proper t where
   -- | Request a fresh input
@@ -210,11 +184,11 @@ instance Proper Boolean where
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number
-inputNum = NumberInputRef <$> freshInputVar
+inputNum = NumInputVar <$> freshInputVar
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
-inputBool = BooleanInputRef <$> freshInputVar
+inputBool = BoolInputVar <$> freshInputVar
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
@@ -237,9 +211,7 @@ toArray' = Arr
 
 -- | Convert an array into a list of expressions
 fromArrayM :: Mutable t => ArrM t -> Comp [t]
-fromArrayM ((ArrayRef _ _ addr)) = do
-  -- collect references of each element
-  readHeapArray addr
+fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
 
 fromArray :: Arr t -> [t]
 fromArray (Arr xs) = toList xs
@@ -288,13 +260,13 @@ freeze3 xs = do
 
 -- | Convert an immutable array to a mutable array
 thaw :: Mutable t => Arr t -> Comp (ArrM t)
-thaw = toArrayM . fromArray
+thaw = toArrayM . toList
 
 thaw2 :: Mutable t => Arr (Arr t) -> Comp (ArrM (ArrM t))
-thaw2 xs = mapM thaw (fromArray xs) >>= toArrayM
+thaw2 xs = mapM thaw (toList xs) >>= toArrayM
 
 thaw3 :: Mutable t => Arr (Arr (Arr t)) -> Comp (ArrM (ArrM (ArrM t)))
-thaw3 xs = mapM thaw2 (fromArray xs) >>= toArrayM
+thaw3 xs = mapM thaw2 (toList xs) >>= toArrayM
 
 --------------------------------------------------------------------------------
 
@@ -308,7 +280,7 @@ class Mutable t where
   -- | Update an entry of an array.
   updateM :: ArrM t -> Int -> t -> Comp ()
 
-  constructElementRef :: ElemType -> Addr -> t
+  constructElement :: ElemType -> Addr -> t
 
 instance Mutable ref => Mutable (ArrM ref) where
   alloc xs@((ArrayRef elemType len _)) = do
@@ -317,8 +289,8 @@ instance Mutable ref => Mutable (ArrM ref) where
 
   typeOf ((ArrayRef elemType len _)) = ArrElem elemType len
 
-  constructElementRef (ArrElem l k) elemAddr = ArrayRef l k elemAddr
-  constructElementRef _ _ = error "expecting element to be array"
+  constructElement (ArrElem l k) elemAddr = ArrayRef l k elemAddr
+  constructElement _ _ = error "expecting element to be array"
 
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
@@ -328,33 +300,33 @@ instance Mutable Number where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compNumAsgns = NumAssignment var val : compNumAsgns st}
-    return (var, NumberRef var)
+    return (var, NumVar var)
 
   typeOf _ = NumElem
 
-  updateM (ArrayRef _ _ addr) i (NumberRef n) = writeHeap addr NumElem (i, n)
+  updateM (ArrayRef _ _ addr) i (NumVar n) = writeHeap addr NumElem (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElementRef NumElem elemAddr = NumberRef elemAddr
-  constructElementRef _ _ = error "expecting element to be of Num"
+  constructElement NumElem elemAddr = NumVar elemAddr
+  constructElement _ _ = error "expecting element to be of Num"
 
 instance Mutable Boolean where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compBoolAsgns = BoolAssignment var val : compBoolAsgns st}
-    return (var, BooleanRef var)
+    return (var, BoolVar var)
 
   typeOf _ = BoolElem
 
-  updateM (ArrayRef _ _ addr) i (BooleanRef n) = writeHeap addr BoolElem (i, n)
+  updateM (ArrayRef _ _ addr) i (BoolVar n) = writeHeap addr BoolElem (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElementRef BoolElem elemAddr = BooleanRef elemAddr
-  constructElementRef _ _ = error "expecting element to be of Bool"
+  constructElement BoolElem elemAddr = BoolVar elemAddr
+  constructElement _ _ = error "expecting element to be of Bool"
 
 -- -- | Access an element from a 1-D array
 accessM :: Mutable t => ArrM t -> Int -> Comp t
@@ -382,15 +354,7 @@ access2 addr (i, j) = access (access addr i) j
 access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
 access3 addr (i, j, k) = access (access (access addr i) j) k
 
--- --------------------------------------------------------------------------------
-
--- | Internal helper function extracting the address of a reference
--- addrOfRef :: ArrM t -> Addr
--- addrOfRef (BoolVar addr) = addr
--- addrOfRef (BoolInputVar addr) = addr
--- addrOfRef (NumVar addr) = addr
--- addrOfRef (NumInputVar addr) = addr
--- addrOfRef (ArrayRef _ _ addr) = addr
+--------------------------------------------------------------------------------
 
 -- | Internal helper function for allocating an array with values
 allocArray :: Mutable t => ElemType -> [t] -> Comp (Addr, ArrM u)
@@ -424,7 +388,7 @@ readHeap (addr, i) = do
     Nothing -> error "readHeap: address not found"
     Just (elemType, array) -> case IntMap.lookup i array of
       Nothing -> throwError $ IndexOutOfBoundsError addr i array
-      Just n -> return $ constructElementRef elemType n
+      Just var -> return $ constructElement elemType var
 
 -- | Internal helper function for accessing an array on the heap
 readHeapArray :: Mutable t => Addr -> Comp [t]
@@ -432,14 +396,15 @@ readHeapArray addr = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
     Nothing -> error "readHeap: address not found"
-    Just (elemType, array) -> return $ map (constructElementRef elemType) (IntMap.elems array)
+    Just (elemType, array) -> return $ map (constructElement elemType) (IntMap.elems array)
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 -- | An alternative to 'foldM'
 reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
 reduce a xs f = foldM f a xs
 
+-- | Length of a mutable array
 lengthOf :: ArrM t -> Int
 lengthOf ((ArrayRef _ len _)) = len
 

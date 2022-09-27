@@ -27,8 +27,8 @@ import Keelung.Types
 data Number
   = Integer Integer -- Integers
   | Rational Rational -- Rationals
-  | NumberRef Var -- Number Variables
-  | NumberInputRef Var -- Input Number Variables
+  | NumVar Var -- Number Variables
+  | NumInputVar Var -- Input Number Variables
   -- Operators on numbers
   | Add Number Number
   | Sub Number Number
@@ -44,8 +44,8 @@ instance Show Number where
   showsPrec prec expr = case expr of
     Integer n -> showsPrec prec n
     Rational n -> showsPrec prec n
-    NumberRef ref -> shows ref
-    NumberInputRef ref -> shows ref
+    NumVar ref -> shows ref
+    NumInputVar ref -> shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -58,8 +58,8 @@ instance Show Number where
 -- | Booleans
 data Boolean
   = Boolean Bool
-  | BooleanRef Var -- Boolean Variables
-  | BooleanInputRef Var -- Input Boolean Variables
+  | BoolVar Var -- Boolean Variables
+  | BoolInputVar Var -- Input Boolean Variables
   -- Operators on Booleans
   | And Boolean Boolean
   | Or Boolean Boolean
@@ -85,8 +85,8 @@ data ArrM t = ArrayRef ElemType Int Addr
 instance Show Boolean where
   showsPrec prec expr = case expr of
     Boolean b -> showsPrec prec b
-    BooleanRef ref -> shows ref
-    BooleanInputRef ref -> shows ref
+    BoolVar ref -> shows ref
+    BoolInputVar ref -> shows ref
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y

@@ -11,7 +11,6 @@ module Keelung
     bn128,
     b64,
     elaborate,
-    Kind (..),
     Elaborable(..),
     Simplify,
     GaloisField,
@@ -28,7 +27,6 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Simplify (Simplify, simplify)
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process

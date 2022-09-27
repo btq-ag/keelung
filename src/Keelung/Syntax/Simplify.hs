@@ -71,8 +71,8 @@ instance Simplify Kinded.Number where
   simplifyM expr = case expr of
     Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
-    Kinded.NumberRef var -> return $ Var (NumVar var)
-    Kinded.NumberInputRef var -> return $ Var (NumInputVar var)
+    Kinded.NumVar var -> return $ Var (NumVar var)
+    Kinded.NumInputVar var -> return $ Var (NumInputVar var)
     Kinded.Add x y -> Add <$> simplifyM x <*> simplifyM y
     Kinded.Sub x y -> Sub <$> simplifyM x <*> simplifyM y
     Kinded.Mul x y -> Mul <$> simplifyM x <*> simplifyM y
@@ -83,8 +83,8 @@ instance Simplify Kinded.Number where
 instance Simplify Kinded.Boolean where
   simplifyM expr = case expr of
     Kinded.Boolean b -> return $ Val (Boolean b)
-    Kinded.BooleanRef var -> return $ Var (BoolVar var)
-    Kinded.BooleanInputRef var -> return $ Var (BoolInputVar var)
+    Kinded.BoolVar var -> return $ Var (BoolVar var)
+    Kinded.BoolInputVar var -> return $ Var (BoolInputVar var)
     Kinded.Eq x y -> Eq <$> simplifyM x <*> simplifyM y
     Kinded.And x y -> And <$> simplifyM x <*> simplifyM y
     Kinded.Or x y -> Or <$> simplifyM x <*> simplifyM y
