@@ -4,6 +4,7 @@ module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
     module Keelung.Monad,
+    run,
     compile,
     compileO0,
     compileO2,
@@ -74,6 +75,10 @@ printErrorInstead (Left err) = do
   print err
   return []
 printErrorInstead (Right values) = return values
+
+-- | Interpret a program with private and public inputs 
+run :: Comp (Val t) -> [Integer] -> [Integer] -> IO [Integer]
+run prog private public = interpret_ GF181 prog (private ++ public) >>= printErrorInstead
 
 -- | Interpret a program with inputs
 interpret :: FieldType -> Comp (Val t) -> [Integer] -> IO [Integer]
