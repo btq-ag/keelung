@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
@@ -14,8 +12,8 @@ module Keelung
     bn128,
     b64,
     elaborate,
-    elaborateOnly,
-    Kind (..),
+    Elaborable(..),
+    Simplify,
     GaloisField,
   )
 where
@@ -28,15 +26,14 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Syntax.Simplify (simplify)
+import Keelung.Syntax.Simplify (Simplify, simplify)
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Types
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
+compile :: (Elaborable t, Simplify t) => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
@@ -45,7 +42,7 @@ compile fieldType prog = case elaborate prog of
       BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
       B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
-compileO0 :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
+compileO0 :: (Elaborable t, Simplify t) => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
@@ -54,7 +51,7 @@ compileO0 fieldType prog = case elaborate prog of
       BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
       B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
-compileO2 :: FieldType -> Comp (Val t) -> IO (Either Error (R1CS Integer))
+compileO2 :: (Elaborable t, Simplify t) => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab ->
@@ -65,7 +62,7 @@ compileO2 fieldType prog = case elaborate prog of
 
 --------------------------------------------------------------------------------
 
-interpret_ :: (Serialize n, Integral n) => FieldType -> Comp (Val t) -> [n] -> IO (Either Error [n])
+interpret_ :: (Serialize n, Integral n, Elaborable t, Simplify t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
 interpret_ fieldType prog xs = case elaborate prog of
   Left err -> return $ Left (ElabError err)
   Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
@@ -81,34 +78,61 @@ run :: Comp (Val t) -> [Integer] -> [Integer] -> IO [Integer]
 run prog private public = interpret_ GF181 prog (private ++ public) >>= printErrorInstead
 
 -- | Interpret a program with inputs
-interpret :: FieldType -> Comp (Val t) -> [Integer] -> IO [Integer]
+interpret :: (Elaborable t, Simplify t) => FieldType -> Comp t -> [Integer] -> IO [Integer]
 interpret fieldType prog xs = interpret_ fieldType prog xs >>= printErrorInstead
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Comp (Val t) -> [GF181] -> IO [N GF181]
+gf181 :: (Elaborable t, Simplify t) => Comp t -> [GF181] -> IO [N GF181]
 gf181 prog xs = map N <$> (interpret_ GF181 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Comp (Val t) -> [B64] -> IO [N B64]
+b64 :: (Elaborable t, Simplify t) => Comp t -> [B64] -> IO [N B64]
 b64 prog xs = map N <$> (interpret_ B64 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Comp (Val t) -> [BN128] -> IO [N BN128]
+bn128 :: (Elaborable t, Simplify t) => Comp t -> [BN128] -> IO [N BN128]
 bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program and simplify it to the Typed Syntax
-elaborate :: Comp (Val t) -> Either ElabError C.Elaborated
-elaborate prog = do
-  (expr, comp') <- runComp emptyComputation prog
-  return $ simplify $ Elaborated expr comp'
+-- | Elaborate a program to the Kinded Syntax
+class Elaborable t where
+  elaborate' :: Comp t -> Either ElabError (Elaborated t)
 
--- | Elaborate a program as the Kinded Syntax
-elaborateOnly :: Comp (Val t) -> Either ElabError (Elaborated t)
-elaborateOnly prog = do
-  (expr, comp') <- runComp emptyComputation prog
-  return $ Elaborated expr comp'
+instance Elaborable Number where 
+  elaborate' prog = do
+    (expr, comp') <- runComp emptyComputation prog
+    return $ Elaborated expr comp'
+
+instance Elaborable Boolean where 
+  elaborate' prog = do
+    (expr, comp') <- runComp emptyComputation prog
+    return $ Elaborated expr comp'
+
+instance Elaborable () where 
+  elaborate' prog = do
+    ((), comp') <- runComp emptyComputation prog
+    return $ Elaborated () comp'
+
+instance Elaborable t => Elaborable (Arr t) where 
+  elaborate' prog = do
+    (expr, comp') <- runComp emptyComputation prog
+    return $ Elaborated expr comp'
+
+instance Elaborable t => Elaborable (ArrM t) where 
+  elaborate' prog = do
+    (expr, comp') <- runComp emptyComputation prog
+    return $ Elaborated expr comp'
+
+-- -- | Elaborate a program as the Kinded Syntax
+-- elaborateOnly :: Comp t -> Either ElabError (Elaborated t)
+-- elaborateOnly prog = do
+--   (expr, comp') <- runComp emptyComputation prog
+--   return $ Elaborated expr comp'
+
+-- | Elaborate a program and simplify it to the Typed Syntax
+elaborate :: (Elaborable t, Simplify t) => Comp t -> Either ElabError C.Elaborated
+elaborate prog = simplify <$> elaborate' prog 
 
 --------------------------------------------------------------------------------
 
