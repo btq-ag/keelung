@@ -3,14 +3,12 @@
 module Keelung.Syntax.Kinded
   ( Number (..),
     Boolean (..),
-    Unit (..),
     Arr (..),
     ArrM (..),
     fromBool,
     toBool,
     true,
     false,
-    unit,
     nbeq,
     neq,
     neg,
@@ -73,9 +71,6 @@ data Boolean
     ToBool Number
   deriving (Eq)
 
-data Unit = Unit
-  deriving (Eq)
-
 newtype Arr t = Arr (Array Int t)
   deriving (Eq, Functor, Foldable, Traversable)
 
@@ -135,10 +130,6 @@ true = Boolean True
 -- | Smart constructor for 'False'
 false :: Boolean
 false = Boolean False
-
--- | Smart constructor for 'Unit'
-unit :: Unit
-unit = Unit
 
 -- | Helper function for not-`Eq`
 neq :: Number -> Number -> Boolean

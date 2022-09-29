@@ -30,7 +30,7 @@ instance Show Val where
   show (Integer n) = show n
   show (Rational n) = show n
   show (Boolean b) = show b
-  show Unit = "unit"
+  show Unit = "()"
 
 instance Serialize Val
 

@@ -104,10 +104,10 @@ instance Elaborable Boolean where
     (expr, comp') <- runComp emptyComputation prog
     return $ Elaborated expr comp'
 
-instance Elaborable Unit where 
+instance Elaborable () where 
   elaborate' prog = do
-    (expr, comp') <- runComp emptyComputation prog
-    return $ Elaborated expr comp'
+    ((), comp') <- runComp emptyComputation prog
+    return $ Elaborated () comp'
 
 instance Elaborable t => Elaborable (Arr t) where 
   elaborate' prog = do
