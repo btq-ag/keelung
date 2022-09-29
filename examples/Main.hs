@@ -43,7 +43,7 @@ tempConvert = do
       (degree - 32 * 5 / 9)
 
 terminationProblem :: Comp (Arr (Arr Boolean))
-terminationProblem = return $ run "A"
+terminationProblem = return $ go "A"
   where
     -- Construct a W8 from a Word8
     fromWord8 :: Word8 -> Arr Boolean
@@ -54,8 +54,8 @@ terminationProblem = return $ run "A"
     fromChar = fromWord8 . toEnum . fromEnum
 
     -- Construct an array of W8s from a String
-    run :: String -> Arr (Arr Boolean)
-    run xs = toArray (map fromChar xs)
+    go :: String -> Arr (Arr Boolean)
+    go xs = toArray (map fromChar xs)
 
 -- |
 main :: IO ()
