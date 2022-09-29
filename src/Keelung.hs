@@ -10,6 +10,7 @@ module Keelung
     gf181,
     bn128,
     b64,
+    elaborate',
     elaborate,
     Elaborable,
     GaloisField,
@@ -96,12 +97,6 @@ elaborate' :: Comp t -> Either ElabError (Elaborated t)
 elaborate' prog = do
   (expr, comp') <- runComp emptyComputation prog
   return $ Elaborated expr comp'
-
--- -- | Elaborate a program as the Kinded Syntax
--- elaborateOnly :: Comp t -> Either ElabError (Elaborated t)
--- elaborateOnly prog = do
---   (expr, comp') <- runComp emptyComputation prog
---   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
 elaborate :: Elaborable t => Comp t -> Either ElabError C.Elaborated
