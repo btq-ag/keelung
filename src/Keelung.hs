@@ -13,6 +13,7 @@ module Keelung
     elaborate,
     Elaborable,
     GaloisField,
+    keelungVersion
   )
 where
 
@@ -29,6 +30,7 @@ import qualified Keelung.Syntax.Typed as C
 import System.IO.Error
 import qualified System.Info
 import qualified System.Process as Process
+import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
@@ -114,12 +116,19 @@ wrapper args' payload = do
   case path of
     Nothing -> return $ Left InstallError
     Just (cmd, args) -> do
-      blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
-      let result = decode (BSC.pack blob)
-      case result of
-        Left err -> return $ Left $ DecodeError err
-        Right (Left err) -> return $ Left $ CompileError err
-        Right (Right x) -> return $ Right x
+      version' <- readKeelungVersion cmd args
+      case version' of
+        Nothing -> return $ Left CannotReadVersionError
+        Just (major, minor, patch) -> do
+          if major == 0 && minor >= 5 && minor < 6
+            then do
+              blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
+              let result = decode (BSC.pack blob)
+              case result of
+                Left err -> return $ Left $ DecodeError err
+                Right (Left err) -> return $ Left $ CompileError err
+                Right (Right x) -> return $ Right x
+            else return $ Left (VersionMismatchError major minor patch)
 
 -- | Locate the Keelung compiler
 --      1. see if "keelungc" is in PATH
@@ -152,19 +161,29 @@ findKeelungc = do
         (Process.readProcess whichCmd [cmd] mempty >> return True)
         (\_ -> return False)
 
--- -- | Check the version of the Keelung compiler
--- checkKeelungVersion :: IO (Maybe (Int, Int, Int))
--- checkKeelungVersion =
---   catchIOError
---     (Process.readProcess whichCmd [cmd] mempty >> return True)
---     (\_ -> return False)
+-- | Check the version of the Keelung compiler
+readKeelungVersion :: FilePath -> [String] -> IO (Maybe (Int, Int, Int))
+readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
+  rawString <- Process.readProcess cmd (args ++ ["--version"]) mempty
+  case splitAt 9 rawString of
+    ("Keelung v", versionString) -> return $ parseVersion versionString
+    _ -> return Nothing
+  where
+    parseVersion :: String -> Maybe (Int, Int, Int)
+    parseVersion versionString = do
+      (major, minor, patch) <- case span (/= '.') versionString of
+        (m, '.' : rest) -> case span (/= '.') rest of
+          (n, '.' : p) -> Just (m, n, p)
+          _ -> Nothing
+        _ -> Nothing
+      (,,) <$> readMaybe major <*> readMaybe minor <*> readMaybe patch
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
--- keelungVersion_ :: (Int, Int, Int)
--- keelungVersion_ = (0, 5, 0)
+-- | The version of Keelung is a triple of three numbers, we're not going full semver yet
+keelungVersion_ :: (Int, Int, Int)
+keelungVersion_ = (0, 5, 0)
 
--- -- | String of Keelung version exposed to the user
--- keelungVersion :: String
--- keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
+-- | String of Keelung version exposed to the user
+keelungVersion :: String
+keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
