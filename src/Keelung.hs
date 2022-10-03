@@ -6,6 +6,7 @@ module Keelung
     compile,
     compileO0,
     compileO2,
+    generate,
     interpret,
     interpret_,
     gf181,
@@ -61,6 +62,18 @@ compileO2 fieldType prog = case elaborate prog of
       GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
       BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
       B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+
+--------------------------------------------------------------------------------
+
+-- | Compile a program as R1CS and write it to out.jsonl.
+generate :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+generate fieldType prog = case elaborate prog of
+  Left err -> return $ Left (ElabError err)
+  Right elab ->
+    case fieldType of
+      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
+      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
+      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
 --------------------------------------------------------------------------------
 
@@ -120,7 +133,7 @@ wrapper args' payload = do
       case version' of
         Nothing -> return $ Left CannotReadVersionError
         Just (major, minor, patch) -> do
-          if major == 0 && minor >= 5 && minor < 6
+          if major == 0 && minor >= 5 && minor < 6 && patch >= 1
             then do
               blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
               let result = decode (BSC.pack blob)
@@ -182,7 +195,7 @@ readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 5, 0)
+keelungVersion_ = (0, 5, 1)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
