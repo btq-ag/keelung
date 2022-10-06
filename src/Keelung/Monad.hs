@@ -366,7 +366,7 @@ allocArray elemType vals = do
   addresses <- map fst <$> mapM alloc vals
   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
   modifyHeap (IntMap.insert addr (elemType, bindings))
-  return (addr, ArrayRef elemType (length addresses) addr)
+  return (addr, ArrayRef elemType (length vals) addr)
 
 -- | Internal helper function for updating an array entry on the heap
 writeHeap :: Addr -> ElemType -> (Int, Var) -> Comp ()
@@ -417,7 +417,23 @@ assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 --------------------------------------------------------------------------------
 
 -- | Allow an expression to be referenced and reused in the future
-reuse :: Mutable t => t -> Comp t
-reuse val = do
-  xs <- toArrayM [val]
-  accessM xs 0
+class Reusable t where
+  reuse :: t -> Comp t
+
+instance Reusable Boolean where
+  reuse val = do
+    xs <- toArrayM [val]
+    accessM xs 0
+
+instance Reusable Number where
+  reuse val = do
+    xs <- toArrayM [val]
+    accessM xs 0
+
+instance Mutable t => Reusable (ArrM t) where
+  reuse val = do
+    xs <- toArrayM [val]
+    accessM xs 0
+
+instance Mutable t => Reusable (Arr t) where
+  reuse arr = thaw arr >>= reuse >>= freeze
