@@ -42,6 +42,7 @@ module Keelung.Monad
     -- * Statements
     cond,
     assert,
+    mapI,
     reduce,
     reuse,
   )
@@ -58,6 +59,7 @@ import Keelung.Error
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
+import Data.Traversable (mapAccumL)
 
 --------------------------------------------------------------------------------
 
@@ -403,6 +405,10 @@ readHeapArray addr = do
 -- | An alternative to 'foldM'
 reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
 reduce a xs f = foldM f a xs
+
+-- | Map with index, basically 'mapi' in OCaml.
+mapI :: Traversable f => (Int -> a -> b) -> f a -> f b
+mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 
 -- | Length of a mutable array
 lengthOf :: ArrM t -> Int
