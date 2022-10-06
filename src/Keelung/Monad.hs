@@ -70,8 +70,8 @@ data Assignment
   deriving (Eq)
 
 instance Show Assignment where
-  show (BoolAssignment var expr) = show var <> " := " <> show expr
-  show (NumAssignment var expr) = show var <> " := " <> show expr
+  show (BoolAssignment var expr) = "$" <> show var <> " := " <> show expr
+  show (NumAssignment var expr) = "$" <> show var <> " := " <> show expr
 
 --------------------------------------------------------------------------------
 
