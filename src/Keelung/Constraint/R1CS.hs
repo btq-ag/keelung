@@ -38,8 +38,8 @@ data R1CS n = R1CS
     r1csVarSize :: Int,
     -- Number of input variables
     r1csInputVarSize :: Int,
-    -- Set of Boolean input variables
-    r1csBoolInputVars :: IntSet,
+    -- Set of Boolean variables
+    r1csBoolVars :: IntSet,
     -- Number of output variables
     r1csOutputVarSize :: Int,
     -- List of pairs for restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
@@ -50,10 +50,10 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
-  show r1cs@(R1CS cs n is bis os _) =
+  show r1cs@(R1CS cs n is bs os _) =
     "R1CS {\n\
     \  R1C constraints ("
-      <> show (length cs + IntSet.size bis)
+      <> show (length cs + IntSet.size bs) -- as each Bool vars would introduce 1 extra constraints
       <> "): "
       <> showConstraints
       ++ "\n  Number of variables: "
@@ -89,12 +89,12 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
       showBooleanInputVarNumber =
         if null constraints
           then ""
-          else "\n  Number of Boolean input variables: " <> show (IntSet.size bis)
+          else "\n  Number of Boolean variables: " <> show (IntSet.size bs)
 
 -- | Return R1Cs from a R1CS
---   (includes constraints of boolean input variables)
+--   (includes constraints of boolean variables)
 toR1Cs :: Num n => R1CS n -> [R1C n]
-toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
+toR1Cs (R1CS cs _ _ bs _ _) = cs <> booleanInputVarConstraints
   where
     booleanInputVarConstraints =
       map
@@ -104,4 +104,4 @@ toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
               (Right (Poly.singleVar var))
               (Right (Poly.singleVar var))
         )
-        (IntSet.toList bis)
+        (IntSet.toList bs)
