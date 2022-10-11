@@ -42,8 +42,8 @@ data R1CS n = R1CS
     r1csBoolVars :: IntSet,
     -- Number of output variables
     r1csOutputVarSize :: Int,
-    -- List of pairs for restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
-    r1csCNQZPairs :: [(Var, Var)]
+    -- List of tuples for restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
+    r1csCNQZ :: [(Var, Var, Var)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
