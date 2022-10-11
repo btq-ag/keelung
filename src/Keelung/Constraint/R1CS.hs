@@ -18,7 +18,7 @@ import Keelung.Types (Var)
 -- | Rank-1 Constraint System
 --
 --    Layout of variables:
---  
+--
 --      ┌─────────────────┐
 --      │     Input Vars  │
 --      ├─────────────────┤
@@ -30,7 +30,6 @@ import Keelung.Types (Var)
 --      │                 │
 --      │                 │
 --      └─────────────────┘
---
 data R1CS n = R1CS
   { -- List of constraints
     r1csConstraints :: [R1C n],
@@ -42,8 +41,8 @@ data R1CS n = R1CS
     r1csBoolVars :: IntSet,
     -- Number of output variables
     r1csOutputVarSize :: Int,
-    -- List of tuples for restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
-    r1csCNQZ :: [(Var, Var, Var)]
+    -- For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
+    r1csCNEQs :: [CNEQ n]
   }
   deriving (Generic, Eq, NFData, Functor)
 
@@ -105,3 +104,26 @@ toR1Cs (R1CS cs _ _ bs _ _) = cs <> booleanInputVarConstraints
               (Right (Poly.singleVar var))
         )
         (IntSet.toList bs)
+
+--------------------------------------------------------------------------------
+
+-- For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
+
+-- Constraint 'x != y = out'
+-- The encoding is, for some 'm':
+--  1. (x - y) * m = out
+--  2. (x - y) * (1 - out) = 0
+data CNEQ n
+  = CNEQ
+      (Either Var n) -- 'x' could be a variable or a constant 
+      (Either Var n) -- 'y' could be a variable or a constant
+      Var -- m
+  deriving (Generic, Eq, NFData, Functor)
+
+instance Serialize n => Serialize (CNEQ n)
+
+instance Show n => Show (CNEQ n) where
+  show (CNEQ (Left x) (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
+  show (CNEQ (Left x) (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
+  show (CNEQ (Right x) (Left y) m) = "Q " <> show x <> " $" <> show y <> " $" <> show m
+  show (CNEQ (Right x) (Right y) m) = "Q " <> show x <> " " <> show y <> " $" <> show m
