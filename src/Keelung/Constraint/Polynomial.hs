@@ -47,9 +47,8 @@ instance Serialize n => Serialize (Poly n)
 -- or one is the negation of the other
 instance (Eq n, Num n) => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
-    if c1 == c2
-      then v1 == v2 || v1 == IntMap.map Prelude.negate v2
-      else (c1 == (-c2)) && (v1 == IntMap.map Prelude.negate v2)
+    (c1 == c2 && v1 == v2)
+      || (c1 == -c2 && v1 == IntMap.map Prelude.negate v2)
 
 instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
@@ -71,7 +70,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = [" + ", "$" ++ show x]
-        | c == - 1 = [" - ", "$" ++ show x]
+        | c == -1 = [" - ", "$" ++ show x]
         | c < 0 = [" - ", show (Prelude.negate c) ++ "$" ++ show x]
         | otherwise = [" + ", show c ++ "$" ++ show x]
 
