@@ -1,5 +1,5 @@
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (Elaborable(..), convert, convertComputation) where
+module Keelung.Syntax.Simplify (Elaborable (..), convert, convertComputation) where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
@@ -39,12 +39,11 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
 --------------------------------------------------------------------------------
 
 convertComputation :: Kinded.Computation -> Computation
-convertComputation (Kinded.Computation nextVar nextInputVar nextAddr heap asgns bsgns asgns') =
+convertComputation (Kinded.Computation varCounters addrSize heap asgns bsgns asgns') =
   runHeapM heap $ do
     Computation
-      nextVar
-      nextInputVar
-      nextAddr
+      varCounters
+      addrSize
       heap
       <$> mapM convertAssignment asgns
       <*> mapM convertAssignment bsgns

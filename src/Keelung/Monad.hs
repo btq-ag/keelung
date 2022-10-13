@@ -55,11 +55,11 @@ import Data.Array.Unboxed (Array)
 import qualified Data.Array.Unboxed as IArray
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Traversable (mapAccumL)
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
-import Data.Traversable (mapAccumL)
 
 --------------------------------------------------------------------------------
 
@@ -77,12 +77,10 @@ instance Show Assignment where
 
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
-  { -- Counter for generating fresh variables
-    compNextVar :: Int,
-    -- Counter for generating fresh input variables
-    compNextInputVar :: Int,
-    -- Counter for allocating fresh heap addresses
-    compNextAddr :: Int,
+  { -- Variable bookkeeping
+    compVarCounters :: VarCounters,
+    -- Size of allocated heap addresses
+    compAddrSize :: Int,
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
@@ -94,17 +92,13 @@ data Computation = Computation
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation 0 0 0 mempty mempty mempty mempty
+emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation nextVar nextInputVar nextAddr _ numAsgns boolAsgns assertions) =
-    "{\n  variable counter: " ++ show nextVar
-      ++ "\n  input variable counter: "
-      ++ show nextInputVar
-      ++ "\n  address counter: "
-      ++ show nextAddr
-      ++ "\n  input variables: "
-      ++ showInputVars
+  show (Computation varCounters addrSize _ numAsgns boolAsgns assertions) =
+    "{\n" <> indent (show varCounters)
+      <> "  address size: "
+      <> show addrSize
       ++ "\n  num assignments: "
       ++ show numAsgns
       ++ "\n  bool assignments: "
@@ -113,11 +107,6 @@ instance Show Computation where
       ++ show assertions
       ++ "\n\
          \}"
-    where
-      showInputVars = case nextInputVar of
-        0 -> "none"
-        1 -> "$0"
-        _ -> "[ $0 .. $" ++ show (nextInputVar - 1) ++ " ]"
 
 --------------------------------------------------------------------------------
 
@@ -136,7 +125,7 @@ instance Show t => Show (Elaborated t) where
     "{\n expression: "
       ++ show expr
       ++ "\n  compuation state: \n"
-      ++ show comp
+      ++ indent (indent (show comp))
       ++ "\n}"
 
 --------------------------------------------------------------------------------
@@ -155,15 +144,15 @@ runComp comp f = runExcept (runStateT f comp)
 -- | Allocate a fresh variable.
 freshVar :: Comp Var
 freshVar = do
-  index <- gets compNextVar
-  modify (\st -> st {compNextVar = succ index})
+  index <- gets (varOrdinary . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpOrdinaryVar (compVarCounters st)})
   return index
 
 -- | Allocate a fresh input variable.
 freshInputVar :: Comp Var
 freshInputVar = do
-  index <- gets compNextInputVar
-  modify (\st -> st {compNextInputVar = succ index})
+  index <- gets (varInput . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpInputVar (compVarCounters st)})
   return index
 
 --------------------------------------------------------------------------------
@@ -362,8 +351,8 @@ access3 addr (i, j, k) = access (access (access addr i) j) k
 allocArray :: Mutable t => ElemType -> [t] -> Comp (Addr, ArrM u)
 allocArray elemType vals = do
   -- allocate a new array for holding the variables of these elements
-  addr <- gets compNextAddr
-  modify (\st -> st {compNextAddr = succ addr})
+  addr <- gets compAddrSize
+  modify (\st -> st {compAddrSize = succ addr})
   -- allocate new variables for each element
   addresses <- map fst <$> mapM alloc vals
   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses

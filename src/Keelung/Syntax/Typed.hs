@@ -15,7 +15,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
-import Keelung.Types (Heap, Var)
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -133,13 +133,12 @@ instance Show Elaborated where
     "{\n  expression: "
       ++ showExpr
       ++ "\n  compuation state: \n"
-      ++ indent (lines (show comp))
+      ++ indent (indent (show comp))
       ++ "\n}"
     where
       showExpr = case expr of
         Array xs -> prettyList2 4 (toList xs)
         _ -> show expr
-      indent = unlines . map ("    " <>)
 
 instance Serialize Elaborated
 
@@ -150,12 +149,12 @@ prettyList [x] = ["[" <> show x <> "]"]
 prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
 
 prettyList2 :: Show a => Int -> [a] -> String
-prettyList2 indent list = case list of
+prettyList2 n list = case list of
   [] -> "[]"
   [x] -> "[" <> show x <> "]"
   (x : xs) ->
     unlines $
-      map (replicate indent ' ' <>) $
+      map (replicate n ' ' <>) $
         "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
 
 --------------------------------------------------------------------------------
@@ -173,12 +172,10 @@ instance Serialize Assignment
 
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
-  { -- Counter for generating fresh variables
-    compNextVar :: Int,
-    -- Counter for generating fresh input variables
-    compNextInputVar :: Int,
-    -- Counter for allocating fresh heap addresses
-    compNextAddr :: Int,
+  { -- Variable bookkeeping
+    compVarCounters :: VarCounters,
+    -- Size of allocated heap addresses
+    compAddrSize :: Int,
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
@@ -190,14 +187,10 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation nextVar nextInputVar nextAddr _ numAsgns boolAsgns assertions) =
-    "{\n  variable counter: " ++ show nextVar
-      ++ "\n  input variable counter: "
-      ++ show nextInputVar
-      ++ "\n  address counter: "
-      ++ show nextAddr
-      ++ "\n  input variables: "
-      ++ showInputVars
+  show (Computation varCounters addrSize _ numAsgns boolAsgns assertions) =
+    "{\n" <> indent (show varCounters)
+      <> "  address size: "
+      <> show addrSize
       ++ "\n  num assignments: "
       ++ prettyList2 8 numAsgns
       ++ "\n  bool assignments: "
@@ -206,11 +199,6 @@ instance Show Computation where
       ++ prettyList2 8 assertions
       ++ "\n\
          \}"
-    where
-      showInputVars = case nextInputVar of
-        0 -> "none"
-        1 -> "$I0"
-        _ -> "[ $I0 .. $I" ++ show (nextInputVar - 1) ++ " ]"
 
 instance Serialize Computation
 
@@ -227,14 +215,14 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation 0 0 0 mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty 0 mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
 allocVar :: Comp Int
 allocVar = do
-  index <- gets compNextVar
-  modify (\st -> st {compNextVar = succ index})
+  index <- gets (varOrdinary . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpOrdinaryVar (compVarCounters st)})
   return index
 
 assignNum :: Ref -> Expr -> Comp ()
