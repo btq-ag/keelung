@@ -12,13 +12,13 @@ module Keelung.Syntax.Kinded
     nbeq,
     neq,
     neg,
-  )
+  (!))
 where
 
 import Data.Array.Unboxed (Array)
+import Data.Foldable (toList)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -82,8 +82,9 @@ data Boolean
   = Boolean Bool
   | BoolVar Var -- Boolean Variables
   | BoolInputVar Var -- Input Boolean Variables
-  -- Operators on Booleans
-  | And Boolean Boolean
+  | NumBit Number Int
+  | -- Operators on Booleans
+    And Boolean Boolean
   | Or Boolean Boolean
   | Xor Boolean Boolean
   | -- Equalities
@@ -100,6 +101,7 @@ instance Show Boolean where
     Boolean b -> showsPrec prec b
     BoolVar ref -> showString "$" . shows ref
     BoolInputVar ref -> showString "$" . shows ref
+    NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
@@ -148,3 +150,8 @@ nbeq x y = IfBool (x `BEq` y) false true
 -- | Helper function for negating a boolean expression
 neg :: Boolean -> Boolean
 neg x = true `Xor` x
+
+--------------------------------------------------------------------------------
+
+(!) :: Number -> Int -> Boolean 
+x ! i = NumBit x i

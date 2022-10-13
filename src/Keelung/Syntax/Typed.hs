@@ -69,6 +69,7 @@ data Expr
   | If Expr Expr Expr
   | ToBool Expr
   | ToNum Expr
+  | Bit Expr Int
   deriving (Generic, Eq, NFData)
 
 sizeOfExpr :: Expr -> Int
@@ -88,6 +89,7 @@ sizeOfExpr expr = case expr of
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
   ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
+  Bit x _ -> 1 + sizeOfExpr x
 
 isOfUnit :: Expr -> Bool
 isOfUnit (Val Unit) = True
@@ -110,6 +112,7 @@ instance Show Expr where
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
+    Bit x i -> shows x . showString "[" . shows i . showString "]"
 
 instance Serialize Expr
 
@@ -261,3 +264,4 @@ freeVars expr = case expr of
   If x y z -> freeVars x <> freeVars y <> freeVars z
   ToBool x -> freeVars x
   ToNum x -> freeVars x
+  Bit x _ -> freeVars x

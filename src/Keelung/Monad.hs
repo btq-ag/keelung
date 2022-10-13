@@ -345,7 +345,7 @@ accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
 access :: Arr t -> Int -> t
 access (Arr xs) i =
   if i < length xs
-    then xs ! i
+    then xs Data.Array.! i
     else error $ show $ IndexOutOfBoundsError2 (length xs) i
 
 -- | Access an element from a 2-D array
