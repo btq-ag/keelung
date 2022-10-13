@@ -19,27 +19,31 @@ import Keelung.Types (Var)
 --
 --    Layout of variables:
 --
---      ┌─────────────────┐
---      │     Input Vars  │
---      ├─────────────────┤
---      │    Output Vars  │
---      ├─────────────────┤
---      │                 │
---      │                 │
---      │  Ordinary Vars  │
---      │                 │
---      │                 │
---      └─────────────────┘
+--      ┌─────────────────────────┐
+--      │   Input Vars            │
+--      ├─────────────────────────┤
+--      │   Binary Representation |
+--      │   of Number Input Vars  |
+--      ├─────────────────────────┤
+--      │   Output Vars           │
+--      ├─────────────────────────┤
+--      │                         │
+--      │   Ordinary Vars         │
+--      │                         │
+--      └─────────────────────────┘
+
 data R1CS n = R1CS
   { -- List of constraints
     r1csConstraints :: [R1C n],
-    -- Number of all variables in the constraint system
+    -- Size of all variables in the constraint system
     r1csVarSize :: Int,
-    -- Number of input variables
+    -- Size of input variables
     r1csInputVarSize :: Int,
+    -- Size of binary representation of Number input variables
+    r1csNumInputVarBinRepSize :: Int,
     -- Set of Boolean variables
     r1csBoolVars :: IntSet,
-    -- Number of output variables
+    -- Size of output variables
     r1csOutputVarSize :: Int,
     -- For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n]
@@ -49,7 +53,7 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
-  show r1cs@(R1CS cs n is bs os _) =
+  show r1cs@(R1CS cs n is brs bs os _) =
     "R1CS {\n\
     \  R1C constraints ("
       <> show (length cs + IntSet.size bs) -- as each Bool vars would introduce 1 extra constraints
@@ -62,6 +66,10 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
       <> show is
       <> "): "
       ++ inputVars
+      ++ "\n  Binary representation of Number input variables ("
+      <> show brs
+      <> "): "
+      ++ numInputVarsBinRep
       ++ "\n  Output variables ("
       <> show os
       <> "): "
@@ -73,11 +81,16 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
         0 -> "none"
         1 -> "$0"
         _ -> "$0 .. $" <> show (is - 1)
+      -- prettify binary representation of Number input variables
+      numInputVarsBinRep = case is of
+        0 -> "none"
+        1 -> "$" <> show brs
+        _ -> "$" <> show brs <> " .. $" <> show (is + brs - 1)
       -- prettify output variables
       outputVars = case os of
         0 -> "none"
         1 -> "$" <> show is
-        _ -> "$" <> show is <> " .. $" <> show (is + os - 1)
+        _ -> "$" <> show is <> " .. $" <> show (is + brs + os - 1)
 
       constraints = toR1Cs r1cs
       showConstraints =
@@ -93,7 +106,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1CS n) where
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
 toR1Cs :: Num n => R1CS n -> [R1C n]
-toR1Cs (R1CS cs _ _ bs _ _) = cs <> booleanInputVarConstraints
+toR1Cs (R1CS cs _ _ _ bs _ _) = cs <> booleanInputVarConstraints
   where
     booleanInputVarConstraints =
       map
