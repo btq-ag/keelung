@@ -81,16 +81,27 @@ instance Semigroup VarCounters where
       }
 
 instance Monoid VarCounters where
-  mempty = VarCounters 0 0 0 
+  mempty = VarCounters 0 0 0
 
+--------------------------------------------------------------------------------
+
+-- | Bump the input variable counter
 bumpInputVar :: VarCounters -> VarCounters
 bumpInputVar counters = counters {varInput = varInput counters + 1}
 
+-- | Bump the output variable counter
 bumpOrdinaryVar :: VarCounters -> VarCounters
 bumpOrdinaryVar counters = counters {varOrdinary = varOrdinary counters + 1}
 
+-- | Handy function for prettifying VarCounters
 indent :: String -> String
 indent = unlines . map ("  " <>) . lines
 
+-- | Total size of all variables
 totalVarSize :: VarCounters -> Int
 totalVarSize counter = varInput counter + varOutput counter + varOrdinary counter
+
+-- | Calculate the size of variables that are considered "pinned"
+--   i.e. they should not be modified by optimizers
+pinnedVarSize :: VarCounters -> Int
+pinnedVarSize counter = varInput counter + varOutput counter
