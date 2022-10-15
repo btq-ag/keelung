@@ -78,7 +78,7 @@ instance Show Assignment where
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
   { -- Variable bookkeeping
-    compVarCounters :: VarCounters,
+    compVarCounters :: !VarCounters,
     -- Size of allocated heap addresses
     compAddrSize :: Int,
     -- Heap for arrays

@@ -46,11 +46,11 @@ instance Semigroup ElemType where
 -- | Variable bookkeeping
 data VarCounters = VarCounters
   { -- Size of input variables
-    varInput :: Int,
+    varInput :: !Int,
     -- Size of output variables
-    varOutput :: Int,
+    varOutput :: !Int,
     -- Size of other ordinary variables
-    varOrdinary :: Int
+    varOrdinary :: !Int
   }
   deriving (Generic, NFData, Eq)
 

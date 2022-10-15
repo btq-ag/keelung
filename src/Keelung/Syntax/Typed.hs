@@ -173,7 +173,7 @@ instance Serialize Assignment
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
   { -- Variable bookkeeping
-    compVarCounters :: VarCounters,
+    compVarCounters :: !VarCounters,
     -- Assignments
     compNumAsgns :: [Assignment],
     compBoolAsgns :: [Assignment],
