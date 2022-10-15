@@ -1,5 +1,5 @@
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (Elaborable (..), convert, convertComputation) where
+module Keelung.Syntax.Simplify (Elaborable (..), convert) where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
@@ -12,53 +12,21 @@ import qualified Keelung.Types as Kinded
 
 --------------------------------------------------------------------------------
 
--- | Monad for storing the Heap
-type HeapM = Reader Heap
-
-runHeapM :: Heap -> HeapM a -> a
-runHeapM h m = runReader m h
-
-readArray :: Addr -> Int -> HeapM Expr
-readArray addr len = Array <$> mapM (readHeap addr) indices
-  where
-    indices :: Array.Array Int Int
-    indices = Array.listArray (0, pred len) [0 .. pred len]
-
-    readHeap :: Addr -> Int -> HeapM Expr
-    readHeap addr' i = do
-      heap <- ask
-      case IntMap.lookup addr' heap of
-        Nothing -> error "HeapM: address not found"
-        Just (elemType, array) -> case IntMap.lookup i array of
-          Nothing -> error "HeapM: index ouf of bounds"
-          Just addr'' -> case elemType of
-            Kinded.NumElem -> return $ Var $ NumVar addr''
-            Kinded.BoolElem -> return $ Var $ BoolVar addr''
-            Kinded.ArrElem _ len' -> readArray addr'' len'
-
---------------------------------------------------------------------------------
-
-convertComputation :: Kinded.Computation -> Computation
-convertComputation (Kinded.Computation varCounters addrSize heap asgns bsgns asgns') =
-  runHeapM heap $ do
-    Computation
-      varCounters
-      addrSize
-      heap
-      <$> mapM convertAssignment asgns
-      <*> mapM convertAssignment bsgns
-      <*> mapM convertM asgns'
+convert :: Elaborable t => Kinded.Elaborated t -> Elaborated
+convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
+  let Kinded.Computation varCounters _addrSize _heap asgns bsgns asgns' = comp
+  Elaborated
+    <$> convertM expr
+    <*> ( Computation
+            varCounters
+            <$> mapM convertAssignment asgns
+            <*> mapM convertAssignment bsgns
+            <*> mapM convertM asgns'
+        )
 
 convertAssignment :: Kinded.Assignment -> HeapM Assignment
 convertAssignment (Kinded.BoolAssignment var e) = Assignment (NumVar var) <$> convertM e
 convertAssignment (Kinded.NumAssignment var e) = Assignment (BoolVar var) <$> convertM e
-
-convert :: Elaborable t => Kinded.Elaborated t -> Elaborated
-convert (Kinded.Elaborated expr comp) =
-  let comp' = convertComputation comp
-   in Elaborated
-        (runHeapM (compHeap comp') (convertM expr))
-        comp'
 
 --------------------------------------------------------------------------------
 
@@ -104,3 +72,29 @@ instance Elaborable t => Elaborable (Kinded.Arr t) where
 instance Elaborable t => Elaborable (Kinded.ArrM t) where
   convertM expr = case expr of
     Kinded.ArrayRef _ len addr -> readArray addr len
+
+--------------------------------------------------------------------------------
+
+-- | Reader Monad for Heap lookups
+type HeapM = Reader Heap
+
+runHeapM :: Heap -> HeapM a -> a
+runHeapM h m = runReader m h
+
+readArray :: Addr -> Int -> HeapM Expr
+readArray addr len = Array <$> mapM (readHeap addr) indices
+  where
+    indices :: Array.Array Int Int
+    indices = Array.listArray (0, pred len) [0 .. pred len]
+
+    readHeap :: Addr -> Int -> HeapM Expr
+    readHeap addr' i = do
+      heap <- ask
+      case IntMap.lookup addr' heap of
+        Nothing -> error "HeapM: address not found"
+        Just (elemType, array) -> case IntMap.lookup i array of
+          Nothing -> error "HeapM: index ouf of bounds"
+          Just addr'' -> case elemType of
+            Kinded.NumElem -> return $ Var $ NumVar addr''
+            Kinded.BoolElem -> return $ Var $ BoolVar addr''
+            Kinded.ArrElem _ len' -> readArray addr'' len'

@@ -16,7 +16,7 @@ module Keelung
     elaborate,
     Elaborable,
     GaloisField,
-    keelungVersion
+    keelungVersion,
   )
 where
 
@@ -88,7 +88,7 @@ printErrorInstead (Left err) = do
   return []
 printErrorInstead (Right values) = return values
 
--- | Interpret a program with private and public inputs 
+-- | Interpret a program with private and public inputs
 run :: Elaborable t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
 run prog private public = interpret_ GF181 prog (private ++ public) >>= printErrorInstead
 
