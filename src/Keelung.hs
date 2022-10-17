@@ -8,6 +8,7 @@ module Keelung
     compileO2,
     generate,
     genCircuit,
+    genWitness,
     interpret,
     interpret_,
     gf181,
@@ -76,9 +77,18 @@ generate fieldType prog = case elaborate prog of
       BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
       B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
 
--- | Compile a program as R1CS and write it to out.jsonl.
+-- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 genCircuit = generate 
+
+-- | Generate witnesses for a program with inputs and write them to witness.jsonl.
+genWitness_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
+genWitness_ fieldType prog xs = case elaborate prog of
+  Left err -> return $ Left (ElabError err)
+  Right elab -> wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
+
+genWitness :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO [Integer]
+genWitness fieldType prog xs = genWitness_ fieldType prog xs >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
