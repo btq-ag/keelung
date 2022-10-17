@@ -7,6 +7,7 @@ module Keelung
     compileO0,
     compileO2,
     generate,
+    genCircuit,
     interpret,
     interpret_,
     gf181,
@@ -65,7 +66,7 @@ compileO2 fieldType prog = case elaborate prog of
 
 --------------------------------------------------------------------------------
 
--- | Compile a program as R1CS and write it to out.jsonl.
+-- | Alias of 'genCircuit'. To be deprecated.
 generate :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 generate fieldType prog = case elaborate prog of
   Left err -> return $ Left (ElabError err)
@@ -74,6 +75,10 @@ generate fieldType prog = case elaborate prog of
       GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
       BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
       B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+
+-- | Compile a program as R1CS and write it to out.jsonl.
+genCircuit :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+genCircuit = generate 
 
 --------------------------------------------------------------------------------
 
