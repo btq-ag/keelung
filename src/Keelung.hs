@@ -148,7 +148,7 @@ wrapper args' payload = do
       case version' of
         Nothing -> return $ Left CannotReadVersionError
         Just (major, minor, patch) -> do
-          if major == 0 && minor >= 5 && minor < 6 && patch >= 1
+          if major == 0 && minor >= 5 && minor < 6 && patch >= 4
             then do
               blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
               let result = decode (BSC.pack blob)
@@ -210,7 +210,7 @@ readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 5, 3)
+keelungVersion_ = (0, 5, 4)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
