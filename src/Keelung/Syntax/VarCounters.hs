@@ -24,8 +24,10 @@ where
 import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 
---------------------------------------------------------------------------------
+
 
 -- | Variable bookkeeping
 data VarCounters = VarCounters
@@ -103,6 +105,19 @@ numInputVarSize = varNumInput
 
 --------------------------------------------------------------------------------
 
+-- | Return the variable index of the bit of a Number input variable
+-- getBitVar :: VarCounters -> Int -> Int -> Maybe Int
+-- getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex counters inputVarIndex
+
+-- getNumInputIndex :: VarCounters -> Int -> Maybe Int
+-- getNumInputIndex 
+
+--   guard (inputVarIndex < varNumInput counters)
+--   guard (bitIndex < varNumWidth counters)
+--   return $ varInput counters + inputVarIndex * varNumWidth counters + bitIndex
+
+--------------------------------------------------------------------------------
+
 -- | Bump the input variable & number input variable counter
 bumpNumInputVar :: VarCounters -> VarCounters
 bumpNumInputVar counters =
@@ -135,3 +150,38 @@ indent :: String -> String
 indent = unlines . map ("  " <>) . lines
 
 --------------------------------------------------------------------------------
+
+-- | Data structure for storing intervals of Boolean variables
+--   For fast lookup (O(log n)) of whether a variable is Boolean or Number
+--      and how many Boolean or Number variables are before it
+--
+--   The index is for marking the beginning of an interval
+--   The value indicates:
+--          1. the number of Boolean variables before this interval
+--          2. the size of this interval
+--
+--   For example: 
+--      nnnnnnnnnnn     => []
+--      bbbnnn          => [(0, (0, 3))]
+--      nbbbnnn         => [(1, (0, 3)]
+--      nbbbnnnbb       => [(1, (0, 3)), (7, (3, 2))]
+--      nbbbnnbbnnnnbb  => [(1, (0, 3)), (7, (3, 2)), (12, (5, 2))]
+--
+
+type IntervalLength = Int
+type BoolVarIntervals = IntMap (Int, IntervalLength) 
+
+-- | Given a variable index, 
+--      returns Left along with the number of Boolean variables before it if it's a Boolean variable
+--      returns Right along with the number of Number variables before it if it's a Number variable
+distinguishInputVar :: BoolVarIntervals -> Int -> Either Int Int
+distinguishInputVar intervals varIndex = case IntMap.lookupLE varIndex intervals of
+  Nothing -> -- there are no Boolean variables before this variable: Number
+    Right varIndex
+  Just (start, (before, size)) -> if varIndex < start + size
+    then Left (before + varIndex - start) -- within an interval: Boolean
+    else Right (varIndex - before - size) -- after an interval: Number
+
+-- | Returns the number of Boolean variables
+totalBoolVarSize :: BoolVarIntervals -> Int
+totalBoolVarSize = sum . map snd . IntMap.elems
