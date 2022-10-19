@@ -15,6 +15,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
+import Keelung.Syntax.VarCounters
 import Keelung.Types
 
 --------------------------------------------------------------------------------

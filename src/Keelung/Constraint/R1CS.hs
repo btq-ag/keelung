@@ -12,6 +12,7 @@ import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 

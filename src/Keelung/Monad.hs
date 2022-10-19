@@ -60,6 +60,7 @@ import Keelung.Error
 import Keelung.Syntax
 import Keelung.Types
 import Prelude hiding (product, sum)
+import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
