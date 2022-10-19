@@ -144,15 +144,21 @@ runComp comp f = runExcept (runStateT f comp)
 -- | Allocate a fresh variable.
 freshVar :: Comp Var
 freshVar = do
-  index <- gets (varOrdinary . compVarCounters)
+  index <- gets (ordinaryVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpOrdinaryVar (compVarCounters st)})
   return index
 
 -- | Allocate a fresh input variable.
-freshInputVar :: Comp Var
-freshInputVar = do
-  index <- gets (varInput . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpInputVar (compVarCounters st)})
+freshNumInputVar :: Comp Var
+freshNumInputVar = do
+  index <- gets (inputVarSize . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpNumInputVar (compVarCounters st)})
+  return index
+
+freshBoolInputVar :: Comp Var
+freshBoolInputVar = do
+  index <- gets (inputVarSize . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpBoolInputVar (compVarCounters st)})
   return index
 
 --------------------------------------------------------------------------------
@@ -175,11 +181,11 @@ instance Proper Boolean where
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number
-inputNum = NumInputVar <$> freshInputVar
+inputNum = NumInputVar <$> freshNumInputVar
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
-inputBool = BoolInputVar <$> freshInputVar
+inputBool = BoolInputVar <$> freshBoolInputVar
 
 --------------------------------------------------------------------------------
 -- Array & Input Array
