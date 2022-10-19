@@ -4,11 +4,12 @@
 module Keelung.Syntax.VarCounters
   ( VarCounters (VarCounters),
     totalVarSize,
+    boolInputVarSize,
+    numInputVarSize,
+    pinnedVarSize,
     inputVarSize,
     outputVarSize,
     ordinaryVarSize,
-    pinnedVarSize,
-    numInputVarSize,
     ----
     bumpNumInputVar,
     bumpBoolInputVar,
@@ -22,20 +23,19 @@ module Keelung.Syntax.VarCounters
 where
 
 import Control.DeepSeq (NFData)
-import Data.Serialize (Serialize)
-import GHC.Generics (Generic)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-
-
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 
 -- | Variable bookkeeping
 data VarCounters = VarCounters
-  { -- Size of input variables
-    varInput :: !Int,
+  { -- Size of Boolean input variables
+    varBoolInput :: !Int,
     -- Size of Number input variables
-    -- (so that we can allocate variables for binary representation of these variables)
     varNumInput :: !Int,
+    -- Intervals of Boolean input variables
+    varBoolIntervals :: !BoolIntervals,
     -- Width of binary representation of Numbers
     varNumWidth :: !Int,
     -- Size of output variables
@@ -48,40 +48,41 @@ data VarCounters = VarCounters
 instance Serialize VarCounters
 
 instance Show VarCounters where
-  show counters@(VarCounters input _ _ output _) =
+  show counters =
     "total variable size: " <> show (totalVarSize counters)
       <> show (totalVarSize counters)
       <> showInputVars
       <> showOutputVars
     where
-      showInputVars = case input of
+      showInputVars = case inputVarSize counters of
         0 -> ""
         1 -> "\ninput variables: $0"
-        _ -> "\ninput variables: $0 .. $" <> show (input - 1)
+        n -> "\ninput variables: $0 .. $" <> show (n - 1)
 
-      showOutputVars = case output of
+      showOutputVars = case outputVarSize counters of
         0 -> ""
-        1 -> "\noutput variables: $" <> show input
-        _ -> "\noutput variables: $" <> show input <> " .. $" <> show (input + output - 1)
+        1 -> "\noutput variables: $" <> show (inputVarSize counters)
+        n -> "\noutput variables: $" <> show (inputVarSize counters) <> " .. $" <> show (inputVarSize counters + n - 1)
 
 instance Semigroup VarCounters where
   a <> b =
     VarCounters
-      { varInput = varInput a + varInput b,
+      { varBoolInput = varBoolInput a + varBoolInput b,
         varNumInput = varNumInput a + varNumInput b,
+        varBoolIntervals = varBoolIntervals a <> varBoolIntervals b,
         varNumWidth = max (varNumWidth a) (varNumWidth b),
         varOutput = varOutput a + varOutput b,
         varOrdinary = varOrdinary a + varOrdinary b
       }
 
 instance Monoid VarCounters where
-  mempty = VarCounters 0 0 0 0 0
+  mempty = VarCounters 0 0 mempty 0 0 0
 
 --------------------------------------------------------------------------------
 
 -- | Total size of all variables
 totalVarSize :: VarCounters -> Int
-totalVarSize counters = varInput counters + varOutput counters + varOrdinary counters
+totalVarSize counters = inputVarSize counters + varOutput counters + varOrdinary counters
 
 -- | Calculate the size of variables that are considered "pinned"
 --   i.e. they should not be modified by optimizers
@@ -89,16 +90,20 @@ pinnedVarSize :: VarCounters -> Int
 pinnedVarSize counters = inputVarSize counters + outputVarSize counters
 
 -- | Size of input variables
---      = size of input variables
+--      = size of Boolean input variables
+--      + size of Number input variables
 --      + size of binary representation of Number input variables
 inputVarSize :: VarCounters -> Int
-inputVarSize counters = varInput counters + varNumWidth counters * varNumInput counters
+inputVarSize counters = varBoolInput counters + (1 + varNumWidth counters) * varNumInput counters
 
 outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
 ordinaryVarSize :: VarCounters -> Int
 ordinaryVarSize = varOrdinary
+
+boolInputVarSize :: VarCounters -> Int
+boolInputVarSize = varBoolInput
 
 numInputVarSize :: VarCounters -> Int
 numInputVarSize = varNumInput
@@ -110,7 +115,7 @@ numInputVarSize = varNumInput
 -- getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex counters inputVarIndex
 
 -- getNumInputIndex :: VarCounters -> Int -> Maybe Int
--- getNumInputIndex 
+-- getNumInputIndex
 
 --   guard (inputVarIndex < varNumInput counters)
 --   guard (bitIndex < varNumWidth counters)
@@ -118,17 +123,13 @@ numInputVarSize = varNumInput
 
 --------------------------------------------------------------------------------
 
--- | Bump the input variable & number input variable counter
+-- | Bump the Number input variable counter
 bumpNumInputVar :: VarCounters -> VarCounters
-bumpNumInputVar counters =
-  counters
-    { varInput = varInput counters + 1,
-      varNumInput = varNumInput counters + 1
-    }
+bumpNumInputVar counters = counters {varNumInput = varNumInput counters + 1}
 
--- | Bump the input variable counter
+-- | Bump the Boolean input variable counter
 bumpBoolInputVar :: VarCounters -> VarCounters
-bumpBoolInputVar counters = counters {varInput = varInput counters + 1}
+bumpBoolInputVar counters = counters {varBoolInput = varBoolInput counters + 1}
 
 -- | Bump the output variable counter
 bumpOrdinaryVar :: VarCounters -> VarCounters
@@ -160,28 +161,29 @@ indent = unlines . map ("  " <>) . lines
 --          1. the number of Boolean variables before this interval
 --          2. the size of this interval
 --
---   For example: 
+--   For example:
 --      nnnnnnnnnnn     => []
 --      bbbnnn          => [(0, (0, 3))]
 --      nbbbnnn         => [(1, (0, 3)]
 --      nbbbnnnbb       => [(1, (0, 3)), (7, (3, 2))]
 --      nbbbnnbbnnnnbb  => [(1, (0, 3)), (7, (3, 2)), (12, (5, 2))]
---
-
 type IntervalLength = Int
-type BoolVarIntervals = IntMap (Int, IntervalLength) 
 
--- | Given a variable index, 
+type BoolIntervals = IntMap (Int, IntervalLength)
+
+-- | Given a variable index,
 --      returns Left along with the number of Boolean variables before it if it's a Boolean variable
 --      returns Right along with the number of Number variables before it if it's a Number variable
-distinguishInputVar :: BoolVarIntervals -> Int -> Either Int Int
+distinguishInputVar :: BoolIntervals -> Int -> Either Int Int
 distinguishInputVar intervals varIndex = case IntMap.lookupLE varIndex intervals of
-  Nothing -> -- there are no Boolean variables before this variable: Number
+  Nothing ->
+    -- there are no Boolean variables before this variable: Number
     Right varIndex
-  Just (start, (before, size)) -> if varIndex < start + size
-    then Left (before + varIndex - start) -- within an interval: Boolean
-    else Right (varIndex - before - size) -- after an interval: Number
+  Just (start, (before, size)) ->
+    if varIndex < start + size
+      then Left (before + varIndex - start) -- within an interval: Boolean
+      else Right (varIndex - before - size) -- after an interval: Number
 
 -- | Returns the number of Boolean variables
-totalBoolVarSize :: BoolVarIntervals -> Int
+totalBoolVarSize :: BoolIntervals -> Int
 totalBoolVarSize = sum . map snd . IntMap.elems
