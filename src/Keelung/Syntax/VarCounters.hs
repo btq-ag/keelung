@@ -110,6 +110,8 @@ numInputVarSize = varNumInput
 
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+
 -- | Return the variable index of the bit of a Number input variable
 -- getBitVar :: VarCounters -> Int -> Int -> Maybe Int
 -- getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex counters inputVarIndex
@@ -125,11 +127,31 @@ numInputVarSize = varNumInput
 
 -- | Bump the Number input variable counter
 bumpNumInputVar :: VarCounters -> VarCounters
-bumpNumInputVar counters = counters {varNumInput = varNumInput counters + 1}
+bumpNumInputVar counters =
+  counters
+    { varNumInput = varNumInput counters + 1
+    }
 
 -- | Bump the Boolean input variable counter
 bumpBoolInputVar :: VarCounters -> VarCounters
-bumpBoolInputVar counters = counters {varBoolInput = varBoolInput counters + 1}
+bumpBoolInputVar counters =
+  counters
+    { varBoolInput = varBoolInput counters + 1,
+      varBoolIntervals = intervals'
+    }
+  where
+    inputVarIndex = varBoolInput counters + varNumInput counters
+    intervals = varBoolIntervals counters
+    intervals' = case IntMap.lookupMax intervals of
+      -- no existing Boolean intervals, create a new one
+      Nothing -> IntMap.singleton inputVarIndex (0, 1)
+      -- found an existing Boolean interval, see if we can extend it
+      Just (lastIntervalIndex, (boolVarsBefore, lastIntervalSize)) ->
+        if inputVarIndex < lastIntervalIndex + lastIntervalSize
+          then -- within the last interval, extend it
+            IntMap.insert lastIntervalIndex (boolVarsBefore, lastIntervalSize + 1) intervals
+          else -- create a new interval
+            IntMap.insert inputVarIndex (boolVarsBefore + lastIntervalSize, 1) intervals
 
 -- | Bump the output variable counter
 bumpOrdinaryVar :: VarCounters -> VarCounters
@@ -184,6 +206,17 @@ distinguishInputVar intervals varIndex = case IntMap.lookupLE varIndex intervals
       then Left (before + varIndex - start) -- within an interval: Boolean
       else Right (varIndex - before - size) -- after an interval: Number
 
--- | Returns the number of Boolean variables
-totalBoolVarSize :: BoolIntervals -> Int
-totalBoolVarSize = sum . map snd . IntMap.elems
+-- | Inverse of 'distinguishInputVar'
+mixInputVar :: BoolIntervals -> Either Int Int -> Int
+mixInputVar intervals (Left boolVarIndex) = case IntMap.lookupLE boolVarIndex intervals of
+  Nothing -> error "mixInputVar: invalid Boolean variable index"
+  Just (start, (before, size)) ->
+    if boolVarIndex < start + size
+      then before + boolVarIndex - start
+      else error "mixInputVar: invalid Boolean variable index"
+mixInputVar intervals (Right numVarIndex) = case IntMap.lookupLE numVarIndex intervals of
+  Nothing -> numVarIndex
+  Just (start, (before, size)) ->
+    if numVarIndex < start + size
+      then error "mixInputVar: invalid Number variable index"
+      else before + numVarIndex + size
