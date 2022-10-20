@@ -17,6 +17,7 @@ module Keelung.Syntax.VarCounters
     setOutputVarSize,
     setOrdinaryVarSize,
     setNumWidth,
+    getNumWidth,
     ----
     indent,
     ----
@@ -162,8 +163,13 @@ setOutputVarSize size counters = counters {varOutput = size}
 setOrdinaryVarSize :: Int -> VarCounters -> VarCounters
 setOrdinaryVarSize size counters = counters {varOrdinary = size}
 
+-- | Updates the width of binary representation of a Number when it's known
 setNumWidth :: Int -> VarCounters -> VarCounters
 setNumWidth width counters = counters {varNumWidth = width}
+
+-- | Get the width of binary representation of a Number
+getNumWidth :: VarCounters -> Int
+getNumWidth = varNumWidth
 
 --------------------------------------------------------------------------------
 
