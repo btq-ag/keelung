@@ -19,6 +19,9 @@ module Keelung.Syntax.VarCounters
     setNumWidth,
     ----
     indent,
+    ----
+    getBitVar,
+    distinguishInputVar,
   )
 where
 
@@ -49,7 +52,7 @@ instance Serialize VarCounters
 
 instance Show VarCounters where
   show counters =
-    "total variable size: " <> show (totalVarSize counters)
+    "total variable size: "
       <> show (totalVarSize counters)
       <> showInputVars
       <> showOutputVars
@@ -110,18 +113,14 @@ numInputVarSize = varNumInput
 
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
-
 -- | Return the variable index of the bit of a Number input variable
--- getBitVar :: VarCounters -> Int -> Int -> Maybe Int
--- getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex counters inputVarIndex
-
--- getNumInputIndex :: VarCounters -> Int -> Maybe Int
--- getNumInputIndex
-
---   guard (inputVarIndex < varNumInput counters)
---   guard (bitIndex < varNumWidth counters)
---   return $ varInput counters + inputVarIndex * varNumWidth counters + bitIndex
+getBitVar :: VarCounters -> Int -> Int -> Maybe Int
+getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
+  where
+    getNumInputIndex :: Maybe Int
+    getNumInputIndex = case distinguishInputVar counters inputVarIndex of
+      Left _ -> Nothing
+      Right n -> Just $ varBoolInput counters + varNumInput counters + n
 
 --------------------------------------------------------------------------------
 
@@ -196,8 +195,8 @@ type BoolIntervals = IntMap (Int, IntervalLength)
 -- | Given a variable index,
 --      returns Left along with the number of Boolean variables before it if it's a Boolean variable
 --      returns Right along with the number of Number variables before it if it's a Number variable
-distinguishInputVar :: BoolIntervals -> Int -> Either Int Int
-distinguishInputVar intervals varIndex = case IntMap.lookupLE varIndex intervals of
+distinguishInputVar :: VarCounters -> Int -> Either Int Int
+distinguishInputVar counters varIndex = case IntMap.lookupLE varIndex (varBoolIntervals counters) of
   Nothing ->
     -- there are no Boolean variables before this variable: Number
     Right varIndex
@@ -207,16 +206,16 @@ distinguishInputVar intervals varIndex = case IntMap.lookupLE varIndex intervals
       else Right (varIndex - before - size) -- after an interval: Number
 
 -- | Inverse of 'distinguishInputVar'
-mixInputVar :: BoolIntervals -> Either Int Int -> Int
-mixInputVar intervals (Left boolVarIndex) = case IntMap.lookupLE boolVarIndex intervals of
-  Nothing -> error "mixInputVar: invalid Boolean variable index"
-  Just (start, (before, size)) ->
-    if boolVarIndex < start + size
-      then before + boolVarIndex - start
-      else error "mixInputVar: invalid Boolean variable index"
-mixInputVar intervals (Right numVarIndex) = case IntMap.lookupLE numVarIndex intervals of
-  Nothing -> numVarIndex
-  Just (start, (before, size)) ->
-    if numVarIndex < start + size
-      then error "mixInputVar: invalid Number variable index"
-      else before + numVarIndex + size
+-- mixInputVar :: BoolIntervals -> Either Int Int -> Int
+-- mixInputVar intervals (Left boolVarIndex) = case IntMap.lookupLE boolVarIndex intervals of
+--   Nothing -> error "mixInputVar: invalid Boolean variable index"
+--   Just (start, (before, size)) ->
+--     if boolVarIndex < start + size
+--       then before + boolVarIndex - start
+--       else error "mixInputVar: invalid Boolean variable index"
+-- mixInputVar intervals (Right numVarIndex) = case IntMap.lookupLE numVarIndex intervals of
+--   Nothing -> numVarIndex
+--   Just (start, (before, size)) ->
+--     if numVarIndex < start + size
+--       then error "mixInputVar: invalid Number variable index"
+--       else before + numVarIndex + size

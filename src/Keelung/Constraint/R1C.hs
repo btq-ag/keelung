@@ -7,6 +7,7 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
@@ -61,3 +62,9 @@ satisfy constraint assignment
     evaluate :: GaloisField a => Either a (Poly a) -> IntMap a -> a
     evaluate (Left x) _ = x
     evaluate (Right p) w = Poly.evaluate p w
+
+freeVars :: R1C n -> IntSet
+freeVars (R1C a b c) = freeVarsE a <> freeVarsE b <> freeVarsE c
+  where
+    freeVarsE (Left _) = mempty
+    freeVarsE (Right p) = Poly.vars p
