@@ -12,7 +12,8 @@ module Keelung.Syntax.Kinded
     nbeq,
     neq,
     neg,
-  (!))
+    (!!!),
+  )
 where
 
 import Data.Array.Unboxed (Array)
@@ -153,5 +154,9 @@ neg x = true `Xor` x
 
 --------------------------------------------------------------------------------
 
-(!) :: Number -> Int -> Boolean 
-x ! i = NumBit x i
+-- | Retrieve the i-th bit of a Number and return it as Boolean
+--   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
+--      where n is the number of bits of the Number
+--   You can access the MSB with (-1) because the index is modulo n
+(!!!) :: Number -> Int -> Boolean
+x !!! i = NumBit x i
