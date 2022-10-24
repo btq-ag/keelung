@@ -210,7 +210,7 @@ readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 6, 0)
+keelungVersion_ = (0, 6, 1)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
