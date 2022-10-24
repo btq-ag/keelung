@@ -21,6 +21,8 @@ import Data.Foldable (toList)
 import Data.Semiring (Ring (..), Semiring (..))
 import Keelung.Types
 
+infixl 9 !!!
+
 --------------------------------------------------------------------------------
 
 -- | Numbers
