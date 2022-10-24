@@ -3,6 +3,7 @@
 
 module Keelung.Syntax.VarCounters
   ( VarCounters (VarCounters),
+    -- Sizes of different variable groups
     totalVarSize,
     boolInputVarSize,
     numInputVarSize,
@@ -10,7 +11,7 @@ module Keelung.Syntax.VarCounters
     inputVarSize,
     outputVarSize,
     ordinaryVarSize,
-    ----
+    -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
     bumpOrdinaryVar,
@@ -18,7 +19,7 @@ module Keelung.Syntax.VarCounters
     setOrdinaryVarSize,
     setNumWidth,
     getNumWidth,
-    ----
+    -- Helper function for pretty printing
     indent,
     ----
     getBitVar,
@@ -121,7 +122,7 @@ getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
     getNumInputIndex :: Maybe Int
     getNumInputIndex = case distinguishInputVar counters inputVarIndex of
       Left _ -> Nothing
-      Right n -> Just $ varBoolInput counters + varNumInput counters + n
+      Right n -> Just $ varBoolInput counters + varNumInput counters + varNumWidth counters * n
 
 --------------------------------------------------------------------------------
 
