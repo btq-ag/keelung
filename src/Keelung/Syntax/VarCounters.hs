@@ -11,6 +11,9 @@ module Keelung.Syntax.VarCounters
     inputVarSize,
     outputVarSize,
     ordinaryVarSize,
+    -- Group of variables
+    numInputVars,
+    outputVars,
     -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
@@ -32,6 +35,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Types (Var)
 
 -- | Variable bookkeeping
 data VarCounters = VarCounters
@@ -123,6 +127,19 @@ getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
     getNumInputIndex = case distinguishInputVar counters inputVarIndex of
       Left _ -> Nothing
       Right n -> Just $ varBoolInput counters + varNumInput counters + varNumWidth counters * n
+
+-- | Return the (mixed) indices of Number input variables
+numInputVars :: VarCounters -> [Var]
+numInputVars counters = [var | var <- [0 .. boolInputVarSize counters + numInputVarSize counters - 1], not (inBoolIntervals var)]
+  where
+    -- [varBoolInput counters + i | i <- [0 .. varNumInput counters - 1]]
+
+    inBoolIntervals :: Var -> Bool
+    inBoolIntervals var = any (\(start, (_, size)) -> start <= var && var < start + size) $ IntMap.toList (varBoolIntervals counters)
+
+-- | Return the indices pf all output variables
+outputVars :: VarCounters -> [Var]
+outputVars counters = [inputVarSize counters .. inputVarSize counters + outputVarSize counters - 1]
 
 --------------------------------------------------------------------------------
 
