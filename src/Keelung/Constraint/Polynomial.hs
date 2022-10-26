@@ -23,11 +23,9 @@ module Keelung.Constraint.Polynomial
 where
 
 import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField (..))
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
-import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Types (Var)
@@ -76,7 +74,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
-buildEither :: GaloisField n => n -> [(Var, n)] -> Either n (Poly n)
+buildEither :: (Num n, Eq n) => n -> [(Var, n)] -> Either n (Poly n)
 buildEither c xs =
   let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
    in if IntMap.null xs'
@@ -85,7 +83,7 @@ buildEither c xs =
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
-buildMaybe :: GaloisField n => n -> IntMap n -> Maybe (Poly n)
+buildMaybe :: (Num n, Eq n) => n -> IntMap n -> Maybe (Poly n)
 buildMaybe c xs =
   let xs' = IntMap.filter (0 /=) xs
    in if IntMap.null xs'
@@ -105,7 +103,7 @@ coeffs :: Poly n -> IntMap n
 coeffs (Poly _ xs) = xs
 
 -- | Merge coefficients of the same variable by adding them up
-mergeCoeffs :: GaloisField n => IntMap n -> IntMap n -> IntMap n
+mergeCoeffs :: (Num n, Eq n) => IntMap n -> IntMap n -> IntMap n
 mergeCoeffs xs ys = IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys
 
 -- | Return the constant.
@@ -121,27 +119,27 @@ mapVars :: (Var -> Var) -> Poly n -> Poly n
 mapVars f (Poly c xs) = Poly c (IntMap.mapKeys f xs)
 
 -- | Given an assignment of variables, return the value of the polynomial.
-evaluate :: GaloisField n => Poly n -> IntMap n -> n
+evaluate :: (Num n, Eq n) => Poly n -> IntMap n -> n
 evaluate (Poly c xs) assignment =
   IntMap.foldlWithKey
-    (\acc k v -> (v `times` IntMap.findWithDefault zero k assignment) `plus` acc)
+    (\acc k v -> (v * IntMap.findWithDefault 0 k assignment) + acc)
     c
     xs
 
 -- | Delete a variable from the polynomial.
-delete :: GaloisField n => Var -> Poly n -> Maybe (Poly n)
+delete :: (Num n, Eq n) => Var -> Poly n -> Maybe (Poly n)
 delete x (Poly c xs) = buildMaybe c (IntMap.delete x xs)
 
 -- | Merge two polynomials.
-merge :: GaloisField n => Poly n -> Poly n -> Maybe (Poly n)
+merge :: (Num n, Eq n) => Poly n -> Poly n -> Maybe (Poly n)
 merge (Poly c xs) (Poly d ys) = buildMaybe (c + d) (mergeCoeffs xs ys)
 
 -- | Negate a polynomial.
-negate :: GaloisField n => Poly n -> Poly n
+negate :: (Num n, Eq n) => Poly n -> Poly n
 negate (Poly c xs) = Poly (-c) (fmap Prelude.negate xs)
 
 -- | Substitute a variable in a polynomial with another polynomial.
-substitute :: GaloisField n => Poly n -> Var -> Poly n -> Maybe (Poly n)
+substitute :: (Num n, Eq n) => Poly n -> Var -> Poly n -> Maybe (Poly n)
 substitute (Poly c xs) var (Poly d ys) =
   if IntMap.member var xs
     then do
