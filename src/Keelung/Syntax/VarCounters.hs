@@ -58,20 +58,20 @@ instance Serialize VarCounters
 
 instance Show VarCounters where
   show counters =
-    "total variable size: "
+    "Total variable size: "
       <> show (totalVarSize counters)
       <> showInputVars
       <> showOutputVars
     where
       showInputVars = case inputVarSize counters of
         0 -> ""
-        1 -> "\ninput variables: $0"
-        n -> "\ninput variables: $0 .. $" <> show (n - 1)
+        1 -> "\nInput variables: $0"
+        n -> "\nInput variables: $0 .. $" <> show (n - 1)
 
       showOutputVars = case outputVarSize counters of
         0 -> ""
-        1 -> "\noutput variables: $" <> show (inputVarSize counters)
-        n -> "\noutput variables: $" <> show (inputVarSize counters) <> " .. $" <> show (inputVarSize counters + n - 1)
+        1 -> "\nOutput variables: $" <> show (inputVarSize counters)
+        n -> "\nOutput variables: $" <> show (inputVarSize counters) <> " .. $" <> show (inputVarSize counters + n - 1)
 
 instance Semigroup VarCounters where
   a <> b =

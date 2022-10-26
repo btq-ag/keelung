@@ -52,32 +52,48 @@ instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
   show r1cs@(R1CS cs counters bs _ binReps) =
-    "R1CS {\n\
-    \  R1C constraints ("
-      <> show constraintSize -- as each Bool vars would introduce 1 extra constraints
-      <> "): "
-      <> showConstraints
+    "R1CS {\n"
+      <> showTotalConstraintSize
+      <> showOrdinaryConstraints
+      <> showBooleanConstraints
+      <> showBinRepConstraints
       <> indent (show counters)
-      <> showBooleanInputVarNumber
-      <> showBinReps
       <> "}"
     where
-      constraintSize = length cs + IntSet.size bs + IntMap.size binReps
-      constraints = toR1Cs r1cs
-      showConstraints =
-        if null constraints
-          then "none"
-          else "\n\n" <> unlines (map (\s -> "    " <> show s) constraints)
+      showTotalConstraintSize =
+        "  Total constriant size: "
+          <> show (length cs + IntSet.size bs + IntMap.size binReps)
+          <> "\n"
+      -- constraints excluding Boolean constraints & Binary Representation constraints
+      ordinaryConstraints = r1csConstraints r1cs
+      showOrdinaryConstraints =
+        if null ordinaryConstraints
+          then "  Ordinary constraints: None"
+          else
+            "  Ordinary constraints: \n"
+              <> unlines (map (\s -> "    " <> show s) ordinaryConstraints)
 
-      showBooleanInputVarNumber =
-        if null constraints
+      showBooleanConstraints =
+        if IntSet.null bs
           then ""
-          else "  Number of Boolean variables: " <> show (IntSet.size bs) <> "\n"
+          else
+            "  Boolean constriants (" <> show (IntSet.size bs) <> "):\n"
+              <> unlines
+                ( map
+                    (\var -> "    $" <> show var <> " = $" <> show var <> " * $" <> show var)
+                    (IntSet.toList bs)
+                )
 
-      showBinReps =
-        if null constraints
+      showBinRepConstraints =
+        if IntSet.null bs
           then ""
-          else "  Number of Binary Representations: " <> show (IntMap.size binReps) <> "\n"
+          else
+            "  Binary representation constriants (" <> show (IntMap.size binReps) <> "):\n"
+              <> unlines
+                ( map
+                    (\(v, (b, n)) -> "    $" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1))
+                    (IntMap.toList binReps)
+                )
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
@@ -100,7 +116,7 @@ toR1Cs (R1CS cs _ bs _ binReps) = cs <> booleanInputVarConstraints <> binRepCons
             R1C
               (Left 1)
               (Poly.buildEither 0 [(var, 1)])
-              (Poly.buildEither 0 [(b + i, fromInteger (toInteger i ^ (2 :: Integer))) | i <- [0 .. n - 1]])
+              (Poly.buildEither 0 [(b + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. n - 1]])
         )
         (IntMap.toList binReps)
 
