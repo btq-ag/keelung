@@ -95,8 +95,6 @@ data Boolean
   | Eq Number Number
   | -- Conditionals
     IfBool Boolean Boolean Boolean
-  | -- Conversion between Booleans and Numbers
-    ToBool Number
   deriving (Eq)
 
 instance Show Boolean where
@@ -111,7 +109,6 @@ instance Show Boolean where
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfBool p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    ToBool x -> showString "ToBool " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -130,9 +127,9 @@ data ArrM t = ArrayRef ElemType Int Addr
 fromBool :: Boolean -> Number
 fromBool = ToNum
 
--- | An synonym of 'ToBool' for converting numbers to booleans
+-- | For converting numbers to booleans
 toBool :: Number -> Boolean
-toBool = ToBool
+toBool x = IfBool (x `Eq` 0) false true
 
 -- | Smart constructor for 'True'
 true :: Boolean

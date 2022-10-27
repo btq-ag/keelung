@@ -59,7 +59,6 @@ instance Elaborable Kinded.Boolean where
     Kinded.Xor x y -> Xor <$> convertM x <*> convertM y
     Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.IfBool p x y -> If <$> convertM p <*> convertM x <*> convertM y
-    Kinded.ToBool x -> ToBool <$> convertM x
 
 instance Elaborable () where
   convertM expr = case expr of

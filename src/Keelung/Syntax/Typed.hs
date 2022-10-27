@@ -68,7 +68,6 @@ data Expr
   | Xor Expr Expr
   | BEq Expr Expr
   | If Expr Expr Expr
-  | ToBool Expr
   | ToNum Expr
   | Bit Expr Int
   deriving (Generic, Eq, NFData)
@@ -88,7 +87,6 @@ sizeOfExpr expr = case expr of
   Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
   BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
-  ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
   Bit x _ -> 1 + sizeOfExpr x
 
@@ -111,7 +109,6 @@ instance Show Expr where
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
     Bit x i -> shows x . showString "[" . shows i . showString "]"
 
@@ -245,6 +242,5 @@ freeVars expr = case expr of
   Xor x y -> freeVars x <> freeVars y
   BEq x y -> freeVars x <> freeVars y
   If x y z -> freeVars x <> freeVars y <> freeVars z
-  ToBool x -> freeVars x
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
