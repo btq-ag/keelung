@@ -2,7 +2,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Syntax.VarCounters
-  ( VarCounters (VarCounters),
+  ( VarCounters,
+    InputVar (..),
+    makeVarCounters,
+    getInputSequence,
     -- Sizes of different variable groups
     totalVarSize,
     boolInputVarSize,
@@ -17,40 +20,58 @@ module Keelung.Syntax.VarCounters
     -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
-    bumpOrdinaryVar,
+    bumpIntermediateVar,
     setOutputVarSize,
-    setOrdinaryVarSize,
+    setIntermediateVarSize,
     setNumWidth,
     getNumWidth,
     -- Helper function for pretty printing
     indent,
     ----
     getBitVar,
-    distinguishInputVar,
   )
 where
 
 import Control.DeepSeq (NFData)
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.Foldable (toList)
+import Data.Maybe (mapMaybe)
+import Data.Sequence (Seq ((:|>)))
+import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Types (Var)
 
+-- Current layout of variables
+--
+-- ┏━━━━━━━━━━━━━━━━━┓
+-- ┃         Output  ┃
+-- ┣─────────────────┫
+-- ┃   Number Input  ┃
+-- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
+-- ┃  Boolean Input  ┃               │
+-- ┣─────────────────┫   Contiguous chunk of bits
+-- ┃  Binary Rep of  ┃
+-- ┃   Number Input  ┃               │
+-- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
+-- ┃   Intermediate  ┃
+-- ┗━━━━━━━━━━━━━━━━━┛
+--
+--------------------------------------------------------------------------------
+
 -- | Variable bookkeeping
 data VarCounters = VarCounters
-  { -- Size of Boolean input variables
-    varBoolInput :: !Int,
+  { -- Size of output variables
+    varOutput :: !Int,
     -- Size of Number input variables
     varNumInput :: !Int,
-    -- Intervals of Boolean input variables
-    varBoolIntervals :: !BoolIntervals,
+    -- Size of Boolean input variables
+    varBoolInput :: !Int,
+    -- Sequence of input variables
+    varInputSequence :: !(Seq InputVar),
     -- Width of binary representation of Numbers
     varNumWidth :: !Int,
-    -- Size of output variables
-    varOutput :: !Int,
-    -- Size of other ordinary variables
-    varOrdinary :: !Int
+    -- Size of intermediate variables
+    varIntermediate :: !Int
   }
   deriving (Generic, NFData, Eq)
 
@@ -78,20 +99,41 @@ instance Semigroup VarCounters where
     VarCounters
       { varBoolInput = varBoolInput a + varBoolInput b,
         varNumInput = varNumInput a + varNumInput b,
-        varBoolIntervals = varBoolIntervals a <> varBoolIntervals b,
+        varInputSequence = varInputSequence a <> varInputSequence b,
         varNumWidth = max (varNumWidth a) (varNumWidth b),
         varOutput = varOutput a + varOutput b,
-        varOrdinary = varOrdinary a + varOrdinary b
+        varIntermediate = varIntermediate a + varIntermediate b
       }
 
 instance Monoid VarCounters where
-  mempty = VarCounters 0 0 mempty 0 0 0
+  mempty = makeVarCounters 0 0 0 0 0 mempty
+
+makeVarCounters :: Int -> Int -> Int -> Int -> Int -> [InputVar] -> VarCounters
+makeVarCounters numWidth output numInput boolInput intermediate inputSeq =
+  VarCounters
+    { varOutput = output,
+      varNumInput = numInput,
+      varBoolInput = boolInput,
+      varInputSequence = Seq.fromList inputSeq,
+      varNumWidth = numWidth,
+      varIntermediate = intermediate
+    }
+
+getInputSequence :: VarCounters -> Seq InputVar
+getInputSequence = varInputSequence
+
+--------------------------------------------------------------------------------
+
+data InputVar = NumInput Var | BoolInput Var
+  deriving (Generic, NFData, Eq, Show)
+
+instance Serialize InputVar
 
 --------------------------------------------------------------------------------
 
 -- | Total size of all variables
 totalVarSize :: VarCounters -> Int
-totalVarSize counters = inputVarSize counters + varOutput counters + varOrdinary counters
+totalVarSize counters = inputVarSize counters + varOutput counters + varIntermediate counters
 
 -- | Calculate the size of variables that are considered "pinned"
 --   i.e. they should not be modified by optimizers
@@ -109,7 +151,7 @@ outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
 ordinaryVarSize :: VarCounters -> Int
-ordinaryVarSize = varOrdinary
+ordinaryVarSize = varIntermediate
 
 boolInputVarSize :: VarCounters -> Int
 boolInputVarSize = varBoolInput
@@ -124,18 +166,18 @@ getBitVar :: VarCounters -> Int -> Int -> Maybe Int
 getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
   where
     getNumInputIndex :: Maybe Int
-    getNumInputIndex = case distinguishInputVar counters inputVarIndex of
-      Left _ -> Nothing
-      Right n -> Just $ varBoolInput counters + varNumInput counters + varNumWidth counters * n
+    getNumInputIndex =
+      case getInputSequence counters Seq.!? inputVarIndex of
+        Just (NumInput n) -> Just $ varBoolInput counters + varNumInput counters + varNumWidth counters * n
+        _ -> Nothing
 
 -- | Return the (mixed) indices of Number input variables
 numInputVars :: VarCounters -> [Var]
-numInputVars counters = [var | var <- [0 .. boolInputVarSize counters + numInputVarSize counters - 1], not (inBoolIntervals var)]
+numInputVars counters = mapMaybe extractNumInput (toList (varInputSequence counters))
   where
-    -- [varBoolInput counters + i | i <- [0 .. varNumInput counters - 1]]
-
-    inBoolIntervals :: Var -> Bool
-    inBoolIntervals var = any (\(start, (_, size)) -> start <= var && var < start + size) $ IntMap.toList (varBoolIntervals counters)
+    extractNumInput :: InputVar -> Maybe Var
+    extractNumInput (NumInput n) = Just n
+    extractNumInput _ = Nothing
 
 -- | Return the indices pf all output variables
 outputVars :: VarCounters -> [Var]
@@ -146,40 +188,30 @@ outputVars counters = [inputVarSize counters .. inputVarSize counters + outputVa
 -- | Bump the Number input variable counter
 bumpNumInputVar :: VarCounters -> VarCounters
 bumpNumInputVar counters =
-  counters
-    { varNumInput = varNumInput counters + 1
-    }
+  let var = varNumInput counters
+   in counters
+        { varNumInput = var + 1,
+          varInputSequence = varInputSequence counters :|> NumInput var
+        }
 
 -- | Bump the Boolean input variable counter
 bumpBoolInputVar :: VarCounters -> VarCounters
 bumpBoolInputVar counters =
-  counters
-    { varBoolInput = varBoolInput counters + 1,
-      varBoolIntervals = intervals'
-    }
-  where
-    inputVarIndex = varBoolInput counters + varNumInput counters
-    intervals = varBoolIntervals counters
-    intervals' = case IntMap.lookupMax intervals of
-      -- no existing Boolean intervals, create a new one
-      Nothing -> IntMap.singleton inputVarIndex (0, 1)
-      -- found an existing Boolean interval, see if we can extend it
-      Just (lastIntervalIndex, (boolVarsBefore, lastIntervalSize)) ->
-        if inputVarIndex < lastIntervalIndex + lastIntervalSize
-          then -- within the last interval, extend it
-            IntMap.insert lastIntervalIndex (boolVarsBefore, lastIntervalSize + 1) intervals
-          else -- create a new interval
-            IntMap.insert inputVarIndex (boolVarsBefore + lastIntervalSize, 1) intervals
+  let var = varBoolInput counters
+   in counters
+        { varBoolInput = var + 1,
+          varInputSequence = varInputSequence counters :|> BoolInput var
+        }
 
 -- | Bump the output variable counter
-bumpOrdinaryVar :: VarCounters -> VarCounters
-bumpOrdinaryVar counters = counters {varOrdinary = varOrdinary counters + 1}
+bumpIntermediateVar :: VarCounters -> VarCounters
+bumpIntermediateVar counters = counters {varIntermediate = varIntermediate counters + 1}
 
 setOutputVarSize :: Int -> VarCounters -> VarCounters
 setOutputVarSize size counters = counters {varOutput = size}
 
-setOrdinaryVarSize :: Int -> VarCounters -> VarCounters
-setOrdinaryVarSize size counters = counters {varOrdinary = size}
+setIntermediateVarSize :: Int -> VarCounters -> VarCounters
+setIntermediateVarSize size counters = counters {varIntermediate = size}
 
 -- | Updates the width of binary representation of a Number when it's known
 setNumWidth :: Int -> VarCounters -> VarCounters
@@ -194,52 +226,3 @@ getNumWidth = varNumWidth
 -- | Handy function for prettifying VarCounters
 indent :: String -> String
 indent = unlines . map ("  " <>) . lines
-
---------------------------------------------------------------------------------
-
--- | Data structure for storing intervals of Boolean variables
---   For fast lookup (O(log n)) of whether a variable is Boolean or Number
---      and how many Boolean or Number variables are before it
---
---   The index is for marking the beginning of an interval
---   The value indicates:
---          1. the number of Boolean variables before this interval
---          2. the size of this interval
---
---   For example:
---      nnnnnnnnnnn     => []
---      bbbnnn          => [(0, (0, 3))]
---      nbbbnnn         => [(1, (0, 3)]
---      nbbbnnnbb       => [(1, (0, 3)), (7, (3, 2))]
---      nbbbnnbbnnnnbb  => [(1, (0, 3)), (7, (3, 2)), (12, (5, 2))]
-type IntervalLength = Int
-
-type BoolIntervals = IntMap (Int, IntervalLength)
-
--- | Given a variable index,
---      returns Left along with the number of Boolean variables before it if it's a Boolean variable
---      returns Right along with the number of Number variables before it if it's a Number variable
-distinguishInputVar :: VarCounters -> Int -> Either Int Int
-distinguishInputVar counters varIndex = case IntMap.lookupLE varIndex (varBoolIntervals counters) of
-  Nothing ->
-    -- there are no Boolean variables before this variable: Number
-    Right varIndex
-  Just (start, (before, size)) ->
-    if varIndex < start + size
-      then Left (before + varIndex - start) -- within an interval: Boolean
-      else Right (varIndex - before - size) -- after an interval: Number
-
--- | Inverse of 'distinguishInputVar'
--- mixInputVar :: BoolIntervals -> Either Int Int -> Int
--- mixInputVar intervals (Left boolVarIndex) = case IntMap.lookupLE boolVarIndex intervals of
---   Nothing -> error "mixInputVar: invalid Boolean variable index"
---   Just (start, (before, size)) ->
---     if boolVarIndex < start + size
---       then before + boolVarIndex - start
---       else error "mixInputVar: invalid Boolean variable index"
--- mixInputVar intervals (Right numVarIndex) = case IntMap.lookupLE numVarIndex intervals of
---   Nothing -> numVarIndex
---   Just (start, (before, size)) ->
---     if numVarIndex < start + size
---       then error "mixInputVar: invalid Number variable index"
---       else before + numVarIndex + size

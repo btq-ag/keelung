@@ -21,7 +21,7 @@ module Keelung.Constraint.Polynomial
     merge,
     negate,
     substWithPoly,
-    substWithBindings
+    substWithBindings,
   )
 where
 

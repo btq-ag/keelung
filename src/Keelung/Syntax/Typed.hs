@@ -217,7 +217,7 @@ elaborate prog = do
 allocVar :: Comp Int
 allocVar = do
   index <- gets (ordinaryVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpOrdinaryVar (compVarCounters st)})
+  modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
 
 assignNum :: Ref -> Expr -> Comp ()

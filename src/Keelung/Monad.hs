@@ -146,7 +146,7 @@ runComp comp f = runExcept (runStateT f comp)
 freshVar :: Comp Var
 freshVar = do
   index <- gets (ordinaryVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpOrdinaryVar (compVarCounters st)})
+  modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
 
 -- | Allocate a fresh input variable.
