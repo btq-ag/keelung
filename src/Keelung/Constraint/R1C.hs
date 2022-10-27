@@ -88,7 +88,7 @@ freeVars (R1C a b c) = freeVarsE a <> freeVarsE b <> freeVarsE c
 
 -- | An R1C is of rank 1 if either side of the multiplication is a constant
 isRank1 :: R1C n -> Bool
-isRank1 (R1C (Left _) _ _) = True
-isRank1 (R1C _ (Left _) _) = True
-isRank1 (R1C (Right _) (Right _) (Left _)) = True
-isRank1 _ = False
+isRank1 (R1C a b _) = isConstant a || isConstant b
+  where
+    isConstant (Left _) = True
+    isConstant (Right xs) = Poly.isConstant xs
