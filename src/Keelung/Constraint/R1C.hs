@@ -18,7 +18,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
 data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
-  deriving (Eq, Ord, Generic, NFData)
+  deriving (Eq, Generic, NFData)
 
 instance Functor R1C where
   fmap f (R1C a b c) = R1C (fmapE a) (fmapE b) (fmapE c)
@@ -27,6 +27,22 @@ instance Functor R1C where
       fmapE (Right xs) = Right (fmap f xs)
 
 instance Serialize n => Serialize (R1C n)
+
+instance (Num n, Eq n, Ord n) => Ord (R1C n) where
+  compare x@(R1C a b c) y@(R1C e f g) = case (isRank1 x, isRank1 y) of
+    (True, False) -> LT
+    (False, True) -> GT
+    (True, True) ->
+      -- both are of rank 1
+      -- the one with a constant term on the RHS is considered smaller
+      case (c, g) of
+        (Left _, Right _) -> LT
+        (Right _, Left _) -> GT
+        (Left c0, Left c1) -> compare c0 c1 -- compare the constant terms
+        (Right v0, Right v1) -> compare v0 v1 -- compare the polynomials
+    (False, False) ->
+      -- both are of rank 2
+      compare (a, b, c) (e, f, g)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (R1C n) where
   show (R1C aX bX cX) = case (aX, bX, cX) of
@@ -63,8 +79,16 @@ satisfy constraint assignment
     evaluate (Left x) _ = x
     evaluate (Right p) w = Poly.evaluate p w
 
+-- | Free variables in a R1C
 freeVars :: R1C n -> IntSet
 freeVars (R1C a b c) = freeVarsE a <> freeVarsE b <> freeVarsE c
   where
     freeVarsE (Left _) = mempty
     freeVarsE (Right p) = Poly.vars p
+
+-- | An R1C is of rank 1 if either side of the multiplication is a constant
+isRank1 :: R1C n -> Bool
+isRank1 (R1C (Left _) _ _) = True
+isRank1 (R1C _ (Left _) _) = True
+isRank1 (R1C (Right _) (Right _) (Left _)) = True
+isRank1 _ = False
