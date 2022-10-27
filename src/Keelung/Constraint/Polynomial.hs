@@ -8,9 +8,11 @@ module Keelung.Constraint.Polynomial
     buildMaybe,
     singleVar,
     vars,
+    varSize,
     coeffs,
     mergeCoeffs,
     constant,
+    isConstant,
     view,
     mapVars,
     evaluate,
@@ -18,7 +20,8 @@ module Keelung.Constraint.Polynomial
     delete,
     merge,
     negate,
-    substitute,
+    substWithPoly,
+    substWithBindings
   )
 where
 
@@ -98,6 +101,10 @@ singleVar x = Poly 0 (IntMap.singleton x 1)
 vars :: Poly n -> IntSet
 vars = IntMap.keysSet . coeffs
 
+-- | Number of variables.
+varSize :: Poly n -> Int
+varSize = IntMap.size . coeffs
+
 -- | Return the mapping of variables to coefficients.
 coeffs :: Poly n -> IntMap n
 coeffs (Poly _ xs) = xs
@@ -109,6 +116,10 @@ mergeCoeffs xs ys = IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys
 -- | Return the constant.
 constant :: Poly n -> n
 constant (Poly c _) = c
+
+-- | See of a polynomial is a constant.
+isConstant :: Poly n -> Bool
+isConstant (Poly _ xs) = IntMap.null xs
 
 -- | View pattern for Poly
 view :: Poly n -> (n, IntMap n)
@@ -139,10 +150,18 @@ negate :: (Num n, Eq n) => Poly n -> Poly n
 negate (Poly c xs) = Poly (-c) (fmap Prelude.negate xs)
 
 -- | Substitute a variable in a polynomial with another polynomial.
-substitute :: (Num n, Eq n) => Poly n -> Var -> Poly n -> Maybe (Poly n)
-substitute (Poly c xs) var (Poly d ys) =
+substWithPoly :: (Num n, Eq n) => Poly n -> Var -> Poly n -> Maybe (Poly n)
+substWithPoly (Poly c xs) var (Poly d ys) =
   if IntMap.member var xs
     then do
       let xs' = ys <> IntMap.delete var xs
       buildMaybe (c + d) xs'
     else return $ Poly c xs
+
+-- | Substitute variables with some values.
+substWithBindings :: (Num n, Eq n) => Poly n -> IntMap n -> Poly n
+substWithBindings (Poly c xs) bindings =
+  let intersected = IntMap.intersectionWith (*) xs bindings
+      unaffected = IntMap.difference xs bindings
+      c' = c + IntMap.foldl' (+) 0 intersected
+   in Poly c' unaffected
