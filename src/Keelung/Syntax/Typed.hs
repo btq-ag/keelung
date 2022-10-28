@@ -48,9 +48,9 @@ instance Serialize Ref
 
 instance Show Ref where
   show (NumVar n) = "$" ++ show n
-  show (NumInputVar n) = "$I" ++ show n
+  show (NumInputVar n) = "$N" ++ show n
   show (BoolVar n) = "$" ++ show n
-  show (BoolInputVar n) = "$I" ++ show n
+  show (BoolInputVar n) = "$B" ++ show n
 
 --------------------------------------------------------------------------------
 
@@ -213,7 +213,7 @@ elaborate prog = do
 -- | Allocate a fresh variable.
 allocVar :: Comp Int
 allocVar = do
-  index <- gets (ordinaryVarSize . compVarCounters)
+  index <- gets (intermediateVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
 

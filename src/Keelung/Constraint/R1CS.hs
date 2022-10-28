@@ -7,8 +7,6 @@ module Keelung.Constraint.R1CS where
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -19,28 +17,11 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Rank-1 Constraint System
---
---    Layout of variables:
---
---      ┌─────────────────────────┐
---      │   Input Vars            │
---      ├─────────────────────────┤
---      │   Binary Representation |
---      │   of Number Input Vars  |
---      ├─────────────────────────┤
---      │   Output Vars           │
---      ├─────────────────────────┤
---      │                         │
---      │   Ordinary Vars         │
---      │                         │
---      └─────────────────────────┘
 data R1CS n = R1CS
   { -- | List of constraints
     r1csConstraints :: [R1C n],
     -- | Variable bookkeeping
     r1csVarCounters :: VarCounters,
-    -- | Set of Boolean variables
-    r1csBoolVars :: IntSet,
     -- | For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n],
     -- | For restoring binary representation of input variables
@@ -51,7 +32,7 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show r1cs@(R1CS cs counters bs _ binReps) =
+  show r1cs@(R1CS cs counters _ binReps) =
     "R1CS {\n"
       <> showTotalConstraintSize
       <> showOrdinaryConstraints
@@ -62,7 +43,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
     where
       showTotalConstraintSize =
         "  Total constriant size: "
-          <> show (length cs + IntSet.size bs + IntMap.size binReps)
+          <> show (length cs + snd (boolVarsRange counters) - fst (boolVarsRange counters) + IntMap.size binReps)
           <> "\n"
       -- constraints excluding Boolean constraints & Binary Representation constraints
       ordinaryConstraints = r1csConstraints r1cs
@@ -74,18 +55,54 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
               <> unlines (map (\s -> "    " <> show s) ordinaryConstraints)
 
       showBooleanConstraints =
-        if IntSet.null bs
-          then ""
-          else
-            "  Boolean constriants (" <> show (IntSet.size bs) <> "):\n"
-              <> unlines
-                ( map
-                    (\var -> "    $" <> show var <> " = $" <> show var <> " * $" <> show var)
-                    (IntSet.toList bs)
-                )
+        let (start, end) = boolVarsRange counters
+         in case end - start of
+              0 -> ""
+              1 ->
+                "  Boolean constriants (1):\n"
+                  <> "    $"
+                  <> show start
+                  <> " = $"
+                  <> show start
+                  <> " * $"
+                  <> show start
+                  <> "\n"
+              2 ->
+                "  Boolean constriants (2):\n"
+                  <> "    $"
+                  <> show start
+                  <> " = $"
+                  <> show start
+                  <> " * $"
+                  <> show start
+                  <> "\n"
+                  <> "    $"
+                  <> show (start + 1)
+                  <> " = $"
+                  <> show (start + 1)
+                  <> " * $"
+                  <> show (start + 1)
+                  <> "\n"
+              n ->
+                "  Boolean constriants (" <> show n <> "):\n"
+                  <> "    $"
+                  <> show start
+                  <> " = $"
+                  <> show start
+                  <> " * $"
+                  <> show start
+                  <> "\n"
+                  <> "      ..\n"
+                  <> "    $"
+                  <> show (end - 1)
+                  <> " = $"
+                  <> show (end - 1)
+                  <> " * $"
+                  <> show (end - 1)
+                  <> "\n"
 
       showBinRepConstraints =
-        if IntSet.null bs
+        if IntMap.null binReps
           then ""
           else
             "  Binary representation constriants (" <> show (IntMap.size binReps) <> "):\n"
@@ -98,17 +115,18 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS cs _ bs _ binReps) = cs <> booleanInputVarConstraints <> binRepConstraints
+toR1Cs (R1CS cs counters _ binReps) = cs <> booleanInputVarConstraints <> binRepConstraints
   where
     booleanInputVarConstraints =
-      map
-        ( \var ->
-            R1C
-              (Right (Poly.singleVar var))
-              (Right (Poly.singleVar var))
-              (Right (Poly.singleVar var))
-        )
-        (IntSet.toList bs)
+      let (start, end) = boolVarsRange counters
+       in map
+            ( \var ->
+                R1C
+                  (Right (Poly.singleVar var))
+                  (Right (Poly.singleVar var))
+                  (Right (Poly.singleVar var))
+            )
+            [start .. end - 1]
 
     binRepConstraints =
       map

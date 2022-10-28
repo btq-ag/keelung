@@ -13,10 +13,14 @@ module Keelung.Syntax.VarCounters
     pinnedVarSize,
     inputVarSize,
     outputVarSize,
-    ordinaryVarSize,
+    intermediateVarSize,
+    boolVarSize,
     -- Group of variables
     numInputVars,
+    inputVars,
     outputVars,
+    inputVarsRange,
+    boolVarsRange,
     -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
@@ -133,16 +137,16 @@ instance Serialize InputVar
 
 -- | Total size of all variables
 totalVarSize :: VarCounters -> Int
-totalVarSize counters = inputVarSize counters + varOutput counters + varIntermediate counters
+totalVarSize counters = pinnedVarSize counters + varIntermediate counters
 
 -- | Calculate the size of variables that are considered "pinned"
 --   i.e. they should not be modified by optimizers
 pinnedVarSize :: VarCounters -> Int
-pinnedVarSize counters = inputVarSize counters + outputVarSize counters
+pinnedVarSize counters = outputVarSize counters + inputVarSize counters
 
 -- | Size of input variables
---      = size of Boolean input variables
---      + size of Number input variables
+--      = size of Number input variables
+--      + size of Boolean input variables
 --      + size of binary representation of Number input variables
 inputVarSize :: VarCounters -> Int
 inputVarSize counters = varBoolInput counters + (1 + varNumWidth counters) * varNumInput counters
@@ -150,14 +154,17 @@ inputVarSize counters = varBoolInput counters + (1 + varNumWidth counters) * var
 outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
-ordinaryVarSize :: VarCounters -> Int
-ordinaryVarSize = varIntermediate
+intermediateVarSize :: VarCounters -> Int
+intermediateVarSize = varIntermediate
 
 boolInputVarSize :: VarCounters -> Int
 boolInputVarSize = varBoolInput
 
 numInputVarSize :: VarCounters -> Int
 numInputVarSize = varNumInput
+
+boolVarSize :: VarCounters -> Int
+boolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters
 
 --------------------------------------------------------------------------------
 
@@ -167,8 +174,8 @@ getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
   where
     getNumInputIndex :: Maybe Int
     getNumInputIndex =
-      case getInputSequence counters Seq.!? inputVarIndex of
-        Just (NumInput n) -> Just $ varBoolInput counters + varNumInput counters + varNumWidth counters * n
+      case getInputSequence counters Seq.!? (inputVarIndex - varOutput counters) of
+        Just (NumInput n) -> Just $ varOutput counters + varNumInput counters + varBoolInput counters + varNumWidth counters * n
         _ -> Nothing
 
 -- | Return the (mixed) indices of Number input variables
@@ -176,12 +183,23 @@ numInputVars :: VarCounters -> [Var]
 numInputVars counters = mapMaybe extractNumInput (toList (varInputSequence counters))
   where
     extractNumInput :: InputVar -> Maybe Var
-    extractNumInput (NumInput n) = Just n
+    extractNumInput (NumInput n) = Just (varOutput counters + n)
     extractNumInput _ = Nothing
 
--- | Return the indices pf all output variables
+-- | Return the indices of all input variables
+inputVars :: VarCounters -> [Var]
+inputVars counters = [outputVarSize counters .. pinnedVarSize counters - 1]
+
+-- | Return the indices of all output variables
 outputVars :: VarCounters -> [Var]
-outputVars counters = [inputVarSize counters .. inputVarSize counters + outputVarSize counters - 1]
+outputVars counters = [0 .. outputVarSize counters - 1]
+
+
+inputVarsRange :: VarCounters -> (Int, Int)
+inputVarsRange counters = (varOutput counters, pinnedVarSize counters - 1)
+
+boolVarsRange :: VarCounters -> (Int, Int)
+boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters - 1)
 
 --------------------------------------------------------------------------------
 

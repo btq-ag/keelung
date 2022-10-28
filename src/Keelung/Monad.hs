@@ -58,9 +58,9 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Traversable (mapAccumL)
 import Keelung.Error
 import Keelung.Syntax
+import Keelung.Syntax.VarCounters
 import Keelung.Types
 import Prelude hiding (product, sum)
-import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
@@ -145,20 +145,20 @@ runComp comp f = runExcept (runStateT f comp)
 -- | Allocate a fresh variable.
 freshVar :: Comp Var
 freshVar = do
-  index <- gets (ordinaryVarSize . compVarCounters)
+  index <- gets (intermediateVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
 
 -- | Allocate a fresh input variable.
 freshNumInputVar :: Comp Var
 freshNumInputVar = do
-  index <- gets (inputVarSize . compVarCounters)
+  index <- gets (numInputVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpNumInputVar (compVarCounters st)})
   return index
 
 freshBoolInputVar :: Comp Var
 freshBoolInputVar = do
-  index <- gets (inputVarSize . compVarCounters)
+  index <- gets (boolInputVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpBoolInputVar (compVarCounters st)})
   return index
 

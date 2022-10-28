@@ -47,7 +47,7 @@ instance Show Number where
     Integer n -> showsPrec prec n
     Rational n -> showsPrec prec n
     NumVar ref -> showString "$" . shows ref
-    NumInputVar ref -> showString "$" . shows ref
+    NumInputVar ref -> showString "$N" . shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -101,7 +101,7 @@ instance Show Boolean where
   showsPrec prec expr = case expr of
     Boolean b -> showsPrec prec b
     BoolVar ref -> showString "$" . shows ref
-    BoolInputVar ref -> showString "$" . shows ref
+    BoolInputVar ref -> showString "$B" . shows ref
     NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
