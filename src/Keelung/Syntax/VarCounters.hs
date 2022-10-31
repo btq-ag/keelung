@@ -10,10 +10,14 @@ module Keelung.Syntax.VarCounters
     totalVarSize,
     boolInputVarSize,
     numInputVarSize,
+    customInputSizeOf,
+    totalCustomInputSize,
     pinnedVarSize,
     inputVarSize,
     outputVarSize,
     intermediateVarSize,
+    numBinRepVarSize,
+    customBinRepVarSize,
     boolVarSize,
     -- Group of variables
     numInputVars,
@@ -24,6 +28,7 @@ module Keelung.Syntax.VarCounters
     -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
+    bumpCustomInputVar,
     bumpIntermediateVar,
     setOutputVarSize,
     setIntermediateVarSize,
@@ -38,7 +43,9 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
-import Data.Maybe (mapMaybe)
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Sequence (Seq ((:|>)))
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
@@ -46,20 +53,24 @@ import GHC.Generics (Generic)
 import Keelung.Types (Var)
 
 -- Current layout of variables
---
+
 -- ┏━━━━━━━━━━━━━━━━━┓
 -- ┃         Output  ┃
 -- ┣─────────────────┫
 -- ┃   Number Input  ┃
+-- ┣─────────────────┫
+-- ┃   Custom Input  ┃
 -- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
 -- ┃  Boolean Input  ┃               │
--- ┣─────────────────┫   Contiguous chunk of bits
+-- ┣─────────────────┫
 -- ┃  Binary Rep of  ┃
--- ┃   Number Input  ┃               │
+-- ┃   Number Input  ┃   Contiguous chunk of bits
+-- ┣─────────────────┫
+-- ┃  Binary Rep of  ┃
+-- ┃   Custom Input  ┃               │
 -- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
 -- ┃   Intermediate  ┃
 -- ┗━━━━━━━━━━━━━━━━━┛
---
 --------------------------------------------------------------------------------
 
 -- | Variable bookkeeping
@@ -70,6 +81,8 @@ data VarCounters = VarCounters
     varNumInput :: !Int,
     -- Size of Boolean input variables
     varBoolInput :: !Int,
+    -- Size of custom input variables of different bit width
+    varCustomInputs :: !(IntMap Int),
     -- Sequence of input variables
     varInputSequence :: !(Seq InputVar),
     -- Width of binary representation of Numbers
@@ -101,23 +114,25 @@ instance Show VarCounters where
 instance Semigroup VarCounters where
   a <> b =
     VarCounters
-      { varBoolInput = varBoolInput a + varBoolInput b,
+      { varOutput = varOutput a + varOutput b,
         varNumInput = varNumInput a + varNumInput b,
+        varBoolInput = varBoolInput a + varBoolInput b,
+        varCustomInputs = varCustomInputs a <> varCustomInputs b,
         varInputSequence = varInputSequence a <> varInputSequence b,
         varNumWidth = max (varNumWidth a) (varNumWidth b),
-        varOutput = varOutput a + varOutput b,
         varIntermediate = varIntermediate a + varIntermediate b
       }
 
 instance Monoid VarCounters where
-  mempty = makeVarCounters 0 0 0 0 0 mempty
+  mempty = makeVarCounters 0 0 0 0 0 mempty mempty
 
-makeVarCounters :: Int -> Int -> Int -> Int -> Int -> [InputVar] -> VarCounters
-makeVarCounters numWidth output numInput boolInput intermediate inputSeq =
+makeVarCounters :: Int -> Int -> Int -> Int -> Int -> [InputVar] -> [(Int, Int)] -> VarCounters
+makeVarCounters numWidth output numInput boolInput intermediate inputSeq customInputs =
   VarCounters
     { varOutput = output,
       varNumInput = numInput,
       varBoolInput = boolInput,
+      varCustomInputs = IntMap.fromList customInputs,
       varInputSequence = Seq.fromList inputSeq,
       varNumWidth = numWidth,
       varIntermediate = intermediate
@@ -128,7 +143,7 @@ getInputSequence = varInputSequence
 
 --------------------------------------------------------------------------------
 
-data InputVar = NumInput Var | BoolInput Var
+data InputVar = NumInput Var | BoolInput Var | CustomInput Int Var
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize InputVar
@@ -154,6 +169,12 @@ inputVarSize counters = varBoolInput counters + (1 + varNumWidth counters) * var
 outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
+customInputSizeOf :: VarCounters -> Int -> Int
+customInputSizeOf counters width = fromMaybe 0 (IntMap.lookup width (varCustomInputs counters))
+
+totalCustomInputSize :: VarCounters -> Int
+totalCustomInputSize counters = IntMap.size (varCustomInputs counters)
+
 intermediateVarSize :: VarCounters -> Int
 intermediateVarSize = varIntermediate
 
@@ -163,6 +184,16 @@ boolInputVarSize = varBoolInput
 numInputVarSize :: VarCounters -> Int
 numInputVarSize = varNumInput
 
+numBinRepVarSize :: VarCounters -> Int
+numBinRepVarSize counters = varNumWidth counters * varNumInput counters
+
+customBinRepVarSize :: VarCounters -> Int
+customBinRepVarSize counters =
+  IntMap.foldlWithKey'
+    (\acc width size -> acc + width * size)
+    0
+    (varCustomInputs counters)
+
 boolVarSize :: VarCounters -> Int
 boolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters
 
@@ -170,12 +201,31 @@ boolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInpu
 
 -- | Return the variable index of the bit of a Number input variable
 getBitVar :: VarCounters -> Int -> Int -> Maybe Int
-getBitVar counters inputVarIndex bitIndex = (+) bitIndex <$> getNumInputIndex
+getBitVar counters mixedIndex bitIndex = (+) bitIndex <$> getIndex
   where
-    getNumInputIndex :: Maybe Int
-    getNumInputIndex =
-      case getInputSequence counters Seq.!? (inputVarIndex - varOutput counters) of
-        Just (NumInput n) -> Just $ varOutput counters + varNumInput counters + varBoolInput counters + varNumWidth counters * n
+    getIndex :: Maybe Int
+    getIndex =
+      case getInputSequence counters Seq.!? (mixedIndex - varOutput counters) of
+        Just (NumInput n) ->
+          Just $
+            outputVarSize counters
+              + numInputVarSize counters
+              + totalCustomInputSize counters
+              + boolInputVarSize counters
+              + varNumWidth counters * n
+        Just (CustomInput width n) ->
+          Just $
+            outputVarSize counters
+              + numInputVarSize counters
+              + totalCustomInputSize counters
+              + boolInputVarSize counters
+              + numBinRepVarSize counters
+              -- size of all custom inputs of width smaller than this one
+              + IntMap.foldlWithKey'
+                (\acc w size -> acc + w * size)
+                0
+                (IntMap.filterWithKey (\w _ -> w < width) (varCustomInputs counters))
+              + width * n
         _ -> Nothing
 
 -- | Return the (mixed) indices of Number input variables
@@ -193,7 +243,6 @@ inputVars counters = [outputVarSize counters .. pinnedVarSize counters - 1]
 -- | Return the indices of all output variables
 outputVars :: VarCounters -> [Var]
 outputVars counters = [0 .. outputVarSize counters - 1]
-
 
 inputVarsRange :: VarCounters -> (Int, Int)
 inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
@@ -220,6 +269,18 @@ bumpBoolInputVar counters =
         { varBoolInput = var + 1,
           varInputSequence = varInputSequence counters :|> BoolInput var
         }
+
+-- | Bump a custom input variable counter of some bit width
+bumpCustomInputVar :: VarCounters -> Int -> VarCounters
+bumpCustomInputVar counters width =
+  let (result, after) = IntMap.insertLookupWithKey f width 0 (varCustomInputs counters)
+   in counters
+        { varCustomInputs = after,
+          varInputSequence = varInputSequence counters :|> CustomInput width (fromMaybe 0 result)
+        }
+  where
+    -- bump the counter if and only if it exists
+    f _key _new old = old + 1
 
 -- | Bump the output variable counter
 bumpIntermediateVar :: VarCounters -> VarCounters
