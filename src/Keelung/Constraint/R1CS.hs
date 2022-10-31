@@ -56,50 +56,33 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 
       showBooleanConstraints =
         let (start, end) = boolVarsRange counters
+            showBooleanConstraint n =
+              "    $"
+                <> show n
+                <> " = $"
+                <> show n
+                <> " * $"
+                <> show n
+                <> "\n"
          in case end - start of
               0 -> ""
               1 ->
                 "  Boolean constriants (1):\n"
-                  <> "    $"
-                  <> show start
-                  <> " = $"
-                  <> show start
-                  <> " * $"
-                  <> show start
-                  <> "\n"
+                  <> showBooleanConstraint start
               2 ->
                 "  Boolean constriants (2):\n"
-                  <> "    $"
-                  <> show start
-                  <> " = $"
-                  <> show start
-                  <> " * $"
-                  <> show start
-                  <> "\n"
-                  <> "    $"
-                  <> show (start + 1)
-                  <> " = $"
-                  <> show (start + 1)
-                  <> " * $"
-                  <> show (start + 1)
-                  <> "\n"
+                  <> showBooleanConstraint start
+                  <> showBooleanConstraint (start + 1)
+              3 ->
+                "  Boolean constriants (3):\n"
+                  <> showBooleanConstraint start
+                  <> showBooleanConstraint (start + 1)
+                  <> showBooleanConstraint (start + 2)
               n ->
                 "  Boolean constriants (" <> show n <> "):\n"
-                  <> "    $"
-                  <> show start
-                  <> " = $"
-                  <> show start
-                  <> " * $"
-                  <> show start
-                  <> "\n"
+                  <> showBooleanConstraint start
                   <> "      ..\n"
-                  <> "    $"
-                  <> show (end - 1)
-                  <> " = $"
-                  <> show (end - 1)
-                  <> " * $"
-                  <> show (end - 1)
-                  <> "\n"
+                  <> showBooleanConstraint (end - 1)
 
       showBinRepConstraints =
         if IntMap.null binReps

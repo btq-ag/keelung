@@ -85,18 +85,18 @@ instance Show VarCounters where
   show counters =
     "Total variable size: "
       <> show (totalVarSize counters)
-      <> showInputVars
       <> showOutputVars
+      <> showInputVars
     where
-      showInputVars = case inputVarSize counters of
-        0 -> ""
-        1 -> "\nInput variables: $0"
-        n -> "\nInput variables: $0 .. $" <> show (n - 1)
-
       showOutputVars = case outputVarSize counters of
         0 -> ""
-        1 -> "\nOutput variables: $" <> show (inputVarSize counters)
-        n -> "\nOutput variables: $" <> show (inputVarSize counters) <> " .. $" <> show (inputVarSize counters + n - 1)
+        1 -> "\nOutput variable : $0"
+        n -> "\nOutput variables: $0 .. $" <> show (n - 1)
+
+      showInputVars = case inputVarSize counters of
+        0 -> ""
+        1 -> "\nInput  variable : $" <> show (fst (inputVarsRange counters))
+        _ -> "\nInput  variables: $" <> show (fst (inputVarsRange counters)) <> " .. $" <> show (snd (inputVarsRange counters) - 1)
 
 instance Semigroup VarCounters where
   a <> b =
@@ -196,10 +196,10 @@ outputVars counters = [0 .. outputVarSize counters - 1]
 
 
 inputVarsRange :: VarCounters -> (Int, Int)
-inputVarsRange counters = (varOutput counters, pinnedVarSize counters - 1)
+inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
 
 boolVarsRange :: VarCounters -> (Int, Int)
-boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters - 1)
+boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters)
 
 --------------------------------------------------------------------------------
 
