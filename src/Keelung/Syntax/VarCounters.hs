@@ -230,10 +230,10 @@ getBitVar counters mixedIndex bitIndex = (+) bitIndex <$> getIndex
 
 -- | Return the (mixed) indices of Number input variables
 numInputVars :: VarCounters -> [Var]
-numInputVars counters = mapMaybe extractNumInput (toList (varInputSequence counters))
+numInputVars counters = mapMaybe extractNumInput (zip [varOutput counters ..] (toList (varInputSequence counters)))
   where
-    extractNumInput :: InputVar -> Maybe Var
-    extractNumInput (NumInput n) = Just (varOutput counters + n)
+    extractNumInput :: (Int, InputVar) -> Maybe Var
+    extractNumInput (index, NumInput _) = Just index
     extractNumInput _ = Nothing
 
 -- | Return the indices of all input variables
