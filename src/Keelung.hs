@@ -6,7 +6,7 @@ module Keelung
     compile,
     compileO0,
     compileO2,
-    generate,
+    -- generate,
     genCircuit,
     genWitness,
     interpret,
@@ -22,6 +22,8 @@ module Keelung
   )
 where
 
+import Control.Arrow (left)
+import Control.Monad.Except
 import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
 import Data.Serialize
@@ -32,60 +34,69 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Simplify (Elaborable, convert)
 import qualified Keelung.Syntax.Typed as C
-import System.IO.Error
+import qualified System.IO.Error as IO
 import qualified System.Info
 import qualified System.Process as Process
 import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compile fieldType prog = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab ->
-    case fieldType of
-      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O1"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+compile fieldType prog = runM $ do
+  elab <- liftEither (elaborate prog)
+  case fieldType of
+    GF181 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS B64))
 
 compileO0 :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 fieldType prog = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab ->
-    case fieldType of
-      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O0"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+compileO0 fieldType prog = runM $ do
+  elab <- liftEither (elaborate prog)
+  case fieldType of
+    GF181 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS B64))
 
 compileO2 :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO2 fieldType prog = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab ->
-    case fieldType of
-      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "O2"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+compileO2 fieldType prog = runM $ do
+  elab <- liftEither (elaborate prog)
+  case fieldType of
+    GF181 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    B64 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
 
 --------------------------------------------------------------------------------
 
--- | Alias of 'genCircuit'. To be deprecated.
-generate :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-generate fieldType prog = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab ->
-    case fieldType of
-      GF181 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS GF181)))
-      BN128 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS BN128)))
-      B64 -> fmap (fmap (toInteger . N)) <$> (wrapper ["protocol", "toJSON"] (fieldType, elab) :: IO (Either Error (R1CS B64)))
+-- | Generate a proof
+-- generate :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+-- generate fieldType prog = case elaborate prog of
+--   Left err -> return $ Left (ElabError err)
+--   Right elab -> do
+--     exists <- checkCmd "instrument_aurora_snark_proof"
+--     genCircuit fieldType elab
+--     if exists
+--       then return $ Left InstallError
+--       else do
+--         blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
+--         let result = decode (BSC.pack blob)
+--         case result of
+--           Left err -> return $ Left $ DecodeError err
+--           Right (Left err) -> return $ Left $ CompileError err
+--           Right (Right x) -> return $ Right x
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-genCircuit = generate 
+genCircuit fieldType prog = runM $ do
+  elab <- liftEither (elaborate prog)
+  case fieldType of
+    GF181 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
-genWitness_ fieldType prog xs = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab -> wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
+genWitness_ fieldType prog xs = runM $ do
+  elab <- liftEither (elaborate prog)
+  wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
 
 genWitness :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO [Integer]
 genWitness fieldType prog xs = genWitness_ fieldType prog xs >>= printErrorInstead
@@ -93,9 +104,9 @@ genWitness fieldType prog xs = genWitness_ fieldType prog xs >>= printErrorInste
 --------------------------------------------------------------------------------
 
 interpret_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
-interpret_ fieldType prog xs = case elaborate prog of
-  Left err -> return $ Left (ElabError err)
-  Right elab -> wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
+interpret_ fieldType prog xs = runM $ do
+  elab <- liftEither (elaborate prog)
+  wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
 
 printErrorInstead :: Show e => Either e [a] -> IO [a]
 printErrorInstead (Left err) = do
@@ -126,76 +137,64 @@ bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 --------------------------------------------------------------------------------
 
 -- | Elaborate a program to the Kinded Syntax
-elaborate' :: Comp t -> Either ElabError (Elaborated t)
+elaborate' :: Comp t -> Either Error (Elaborated t)
 elaborate' prog = do
-  (expr, comp') <- runComp emptyComputation prog
+  (expr, comp') <- left ElabError $ runComp emptyComputation prog
   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
-elaborate :: Elaborable t => Comp t -> Either ElabError C.Elaborated
+elaborate :: Elaborable t => Comp t -> Either Error C.Elaborated
 elaborate prog = convert <$> elaborate' prog
 
 --------------------------------------------------------------------------------
 
 -- | Internal function for handling data serialization
-wrapper :: (Serialize a, Serialize b) => [String] -> a -> IO (Either Error b)
+wrapper :: (Serialize a, Serialize b) => [String] -> a -> M b
 wrapper args' payload = do
-  path <- findKeelungc
-  case path of
-    Nothing -> return $ Left InstallError
-    Just (cmd, args) -> do
-      version' <- readKeelungVersion cmd args
-      case version' of
-        Nothing -> return $ Left CannotReadVersionError
-        Just (major, minor, patch) -> do
-          if major == 0 && minor >= 6 && minor < 7 && patch >= 0
-            then do
-              blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
-              let result = decode (BSC.pack blob)
-              case result of
-                Left err -> return $ Left $ DecodeError err
-                Right (Left err) -> return $ Left $ CompileError err
-                Right (Right x) -> return $ Right x
-            else return $ Left (VersionMismatchError major minor patch)
+  (cmd, args) <- findKeelungc
+  version <- readKeelungVersion cmd args
+  checkKeelungVersion version
+  blob <- lift $ Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
+  let result = decode (BSC.pack blob)
+  case result of
+    Left err -> throwError (DecodeError err)
+    Right (Left err) -> throwError (CompileError err)
+    Right (Right x) -> return x
 
 -- | Locate the Keelung compiler
 --      1. see if "keelungc" is in PATH
 --      2. if not, try to run "docker run banacorn/keelung"
 --   Returns the command and arguments to run when found
-findKeelungc :: IO (Maybe (String, [String]))
+findKeelungc :: M (String, [String])
 findKeelungc = do
   keelungcExists <- checkCmd "keelungc"
   if keelungcExists
-    then return $ Just ("keelungc", [])
+    then return ("keelungc", [])
     else do
       dockerExists <- checkCmd "docker"
       if dockerExists
         then -- insert "--platform=linux/amd64" when we are not on a x86 machine
         case System.Info.arch of
-          "x86_64" -> return $ Just ("docker", ["run", "-i", "banacorn/keelung"])
-          _ -> return $ Just ("docker", ["run", "-i", "--platform=linux/amd64", "banacorn/keelung"])
-        else return Nothing
-  where
-    -- decide the command for locating executables
-    whichCmd :: String
-    whichCmd = case System.Info.os of
-      "mingw32" -> "where" -- Windows uses "where"
-      _ -> "which" -- Unix uses "which"
-
-    -- check if a command exists
-    checkCmd :: String -> IO Bool
-    checkCmd cmd =
-      catchIOError
-        (Process.readProcess whichCmd [cmd] mempty >> return True)
-        (\_ -> return False)
+          "x86_64" -> return ("docker", ["run", "-i", "banacorn/keelung"])
+          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "banacorn/keelung"])
+        else throwError InstallError
 
 -- | Check the version of the Keelung compiler
-readKeelungVersion :: FilePath -> [String] -> IO (Maybe (Int, Int, Int))
-readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
-  rawString <- Process.readProcess cmd (args ++ ["--version"]) mempty
-  case splitAt 9 rawString of
-    ("Keelung v", versionString) -> return $ parseVersion versionString
-    _ -> return Nothing
+readKeelungVersion :: FilePath -> [String] -> M (Int, Int, Int)
+readKeelungVersion cmd args = do
+  -- trying to read version with `keelungc --version`
+  rawString <-
+    catchIOError
+      CannotReadVersionError
+      (Process.readProcess cmd (args ++ ["--version"]) mempty)
+  -- parse see if the version number is well-formed
+  let parseResult = case splitAt 9 rawString of
+        ("Keelung v", versionString) -> parseVersion versionString
+        _ -> Nothing
+  -- throws CannotReadVersionError if it's not well-formed
+  case parseResult of
+    Nothing -> throwError CannotReadVersionError
+    Just x -> return x
   where
     parseVersion :: String -> Maybe (Int, Int, Int)
     parseVersion versionString = do
@@ -206,6 +205,28 @@ readKeelungVersion cmd args = flip catchIOError (const $ return Nothing) $ do
         _ -> Nothing
       (,,) <$> readMaybe major <*> readMaybe minor <*> readMaybe patch
 
+checkKeelungVersion :: (Int, Int, Int) -> M ()
+checkKeelungVersion (major, minor, patch) = do
+  if major == 0 && minor >= 6 && minor < 7 && patch >= 0
+    then return ()
+    else throwError (VersionMismatchError major minor patch)
+
+--------------------------------------------------------------------------------
+
+-- | Check if a command exists
+checkCmd :: String -> M Bool
+checkCmd cmd =
+  lift $
+    IO.catchIOError
+      (Process.readProcess whichCmd [cmd] mempty >> return True)
+      (\_ -> return False)
+  where
+    -- decide the command for locating executables
+    whichCmd :: String
+    whichCmd = case System.Info.os of
+      "mingw32" -> "where" -- Windows uses "where"
+      _ -> "which" -- Unix uses "which"
+
 --------------------------------------------------------------------------------
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
@@ -215,3 +236,18 @@ keelungVersion_ = (0, 6, 1)
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
 keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
+
+--------------------------------------------------------------------------------
+
+type M = ExceptT Error IO
+
+runM :: M a -> IO (Either Error a)
+runM = runExceptT
+
+-- | Handle 'IO' Exceptions in the 'M' Monad
+catchIOError :: Error -> IO a -> M a
+catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left err)))) >>= liftEither
+
+-- | Prettify and convert all field numbers to 'Integer' in a 'R1CS'
+convertFieldNumber :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
+convertFieldNumber = fmap (fmap (toInteger . N))
