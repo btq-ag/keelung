@@ -18,13 +18,19 @@ module Keelung.Syntax.VarCounters
     intermediateVarSize,
     numBinRepVarSize,
     customBinRepVarSize,
-    boolVarSize,
+    totalBoolVarSize,
     -- Group of variables
-    numInputVars,
     inputVars,
     outputVars,
     inputVarsRange,
     boolVarsRange,
+    -- Blended index of variables
+    blendedNumInputVars,
+    blendedCustomInputVars,
+    blendNumInputVar,
+    blendCustomInputVar,
+    blendBoolInputVar,
+    blendIntermediateVar,
     -- For modifying the counters
     bumpNumInputVar,
     bumpBoolInputVar,
@@ -45,6 +51,8 @@ import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Sequence (Seq ((:|>)))
 import qualified Data.Sequence as Seq
@@ -53,7 +61,6 @@ import GHC.Generics (Generic)
 import Keelung.Types (Var)
 
 -- Current layout of variables
-
 -- ┏━━━━━━━━━━━━━━━━━┓
 -- ┃         Output  ┃
 -- ┣─────────────────┫
@@ -161,17 +168,25 @@ pinnedVarSize counters = outputVarSize counters + inputVarSize counters
 
 -- | Size of input variables
 --      = size of Number input variables
+--      + size of Custom input variables
 --      + size of Boolean input variables
 --      + size of binary representation of Number input variables
+--      + size of binary representation of Custom input variables
 inputVarSize :: VarCounters -> Int
-inputVarSize counters = varBoolInput counters + (1 + varNumWidth counters) * varNumInput counters
+inputVarSize counters =
+  varBoolInput counters
+    + (1 + varNumWidth counters) * varNumInput counters
+    + totalCustomInputSize counters
+    + customBinRepVarSize counters
 
 outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
+-- | Size of custom input variables of certain bit width
 customInputSizeOf :: VarCounters -> Int -> Int
 customInputSizeOf counters width = fromMaybe 0 (IntMap.lookup width (varCustomInputs counters))
 
+-- | Size of custom input variables of all bit width combined
 totalCustomInputSize :: VarCounters -> Int
 totalCustomInputSize counters = IntMap.size (varCustomInputs counters)
 
@@ -194,18 +209,35 @@ customBinRepVarSize counters =
     0
     (varCustomInputs counters)
 
-boolVarSize :: VarCounters -> Int
-boolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters
+-- | Size of all Boolean variables (for imposing the Boolean constraint)
+totalBoolVarSize :: VarCounters -> Int
+totalBoolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters
+
+--------------------------------------------------------------------------------
+
+-- | Return the indices of all input variables
+inputVars :: VarCounters -> [Var]
+inputVars counters = [outputVarSize counters .. pinnedVarSize counters - 1]
+
+-- | Return the indices of all output variables
+outputVars :: VarCounters -> [Var]
+outputVars counters = [0 .. outputVarSize counters - 1]
+
+inputVarsRange :: VarCounters -> (Int, Int)
+inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
+
+boolVarsRange :: VarCounters -> (Int, Int)
+boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters)
 
 --------------------------------------------------------------------------------
 
 -- | Return the variable index of the bit of a Number input variable
 getBitVar :: VarCounters -> Int -> Int -> Maybe Int
-getBitVar counters mixedIndex bitIndex = (+) bitIndex <$> getIndex
+getBitVar counters blendedIndex bitIndex = (+) bitIndex <$> getIndex
   where
     getIndex :: Maybe Int
     getIndex =
-      case getInputSequence counters Seq.!? (mixedIndex - varOutput counters) of
+      case getInputSequence counters Seq.!? (blendedIndex - varOutput counters) of
         Just (NumInput n) ->
           Just $
             outputVarSize counters
@@ -228,27 +260,40 @@ getBitVar counters mixedIndex bitIndex = (+) bitIndex <$> getIndex
               + width * n
         _ -> Nothing
 
--- | Return the (mixed) indices of Number input variables
-numInputVars :: VarCounters -> [Var]
-numInputVars counters = mapMaybe extractNumInput (zip [varOutput counters ..] (toList (varInputSequence counters)))
+-- | Return the blended indices of all Number input variables
+blendedNumInputVars :: VarCounters -> [Var]
+blendedNumInputVars counters = mapMaybe extractNumInput (zip [varOutput counters ..] (toList (varInputSequence counters)))
   where
     extractNumInput :: (Int, InputVar) -> Maybe Var
     extractNumInput (index, NumInput _) = Just index
     extractNumInput _ = Nothing
 
--- | Return the indices of all input variables
-inputVars :: VarCounters -> [Var]
-inputVars counters = [outputVarSize counters .. pinnedVarSize counters - 1]
+-- | Return the blended indices of all Custom input variables along with their bit width
+blendedCustomInputVars :: VarCounters -> IntMap IntSet
+blendedCustomInputVars counters =
+  IntMap.foldlWithKey'
+    ( \acc index inputVar -> case inputVar of
+        CustomInput width _ -> IntMap.insertWith (<>) width (IntSet.singleton index) acc
+        _ -> acc
+    )
+    mempty
+    (IntMap.fromList (zip [varOutput counters ..] (toList (varInputSequence counters))))
 
--- | Return the indices of all output variables
-outputVars :: VarCounters -> [Var]
-outputVars counters = [0 .. outputVarSize counters - 1]
+-- | Return the blended index of a Number input variable
+blendNumInputVar :: VarCounters -> Int -> Int
+blendNumInputVar counters index = index + varOutput counters
 
-inputVarsRange :: VarCounters -> (Int, Int)
-inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
+-- | Return the blended index of a Custom input variable
+blendCustomInputVar :: VarCounters -> Int -> Int
+blendCustomInputVar counters index = index + varOutput counters + varNumInput counters
 
-boolVarsRange :: VarCounters -> (Int, Int)
-boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters)
+-- | Return the blended index of a Boolean input variable
+blendBoolInputVar :: VarCounters -> Int -> Int
+blendBoolInputVar counters index = index + varOutput counters + varNumInput counters + totalCustomInputSize counters
+
+-- | Return the blended index of an intermediate variable
+blendIntermediateVar :: VarCounters -> Int -> Int
+blendIntermediateVar counters index = index + pinnedVarSize counters
 
 --------------------------------------------------------------------------------
 
