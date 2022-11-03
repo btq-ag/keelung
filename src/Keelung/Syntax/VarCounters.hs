@@ -183,8 +183,8 @@ outputVarSize :: VarCounters -> Int
 outputVarSize = varOutput
 
 -- | Size of custom input variables of certain bit width
-customInputSizeOf :: VarCounters -> Int -> Int
-customInputSizeOf counters width = fromMaybe 0 (IntMap.lookup width (varCustomInputs counters))
+customInputSizeOf :: Int -> VarCounters -> Int
+customInputSizeOf width counters = fromMaybe 0 (IntMap.lookup width (varCustomInputs counters))
 
 -- | Size of custom input variables of all bit width combined
 totalCustomInputSize :: VarCounters -> Int
@@ -317,8 +317,8 @@ bumpBoolInputVar counters =
         }
 
 -- | Bump a custom input variable counter of some bit width
-bumpCustomInputVar :: VarCounters -> Int -> VarCounters
-bumpCustomInputVar counters width =
+bumpCustomInputVar :: Int -> VarCounters -> VarCounters
+bumpCustomInputVar width counters =
   let (result, after) = IntMap.insertLookupWithKey f width 0 (varCustomInputs counters)
    in counters
         { varCustomInputs = after,

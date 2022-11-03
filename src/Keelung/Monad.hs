@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Keelung.Monad
   ( Comp,
@@ -35,6 +36,7 @@ module Keelung.Monad
     input,
     inputNum,
     inputBool,
+    inputUInt,
     inputs,
     inputs2,
     inputs3,
@@ -53,9 +55,11 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Array ((!))
 import Data.Array.Unboxed (Array)
 import qualified Data.Array.Unboxed as IArray
+import Data.Data (Proxy (..))
 import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Traversable (mapAccumL)
+import GHC.TypeNats
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.VarCounters
@@ -162,6 +166,12 @@ freshBoolInputVar = do
   modify (\st -> st {compVarCounters = bumpBoolInputVar (compVarCounters st)})
   return index
 
+freshUIntInputVar :: Int -> Comp Var
+freshUIntInputVar width = do
+  index <- gets (customInputSizeOf width . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpCustomInputVar width (compVarCounters st)})
+  return index
+
 --------------------------------------------------------------------------------
 
 -- | Typeclass for operations on base types
@@ -180,6 +190,14 @@ instance Proper Boolean where
   input = inputBool
   cond = IfBool
 
+instance KnownNat w => Proper (UInt w) where
+  input = go
+    where
+      width = natVal (Proxy :: Proxy w)
+      go :: forall width. KnownNat width => Comp (UInt width)
+      go = inputUInt (fromIntegral width)
+  cond = IfUInt
+
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number
 inputNum = NumInputVar <$> freshNumInputVar
@@ -187,6 +205,10 @@ inputNum = NumInputVar <$> freshNumInputVar
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
 inputBool = BoolInputVar <$> freshBoolInputVar
+
+-- | Requests a fresh Unsigned integer input variable of some bit width
+inputUInt :: Int -> Comp (UInt w)
+inputUInt width = UIntInputVar width <$> freshUIntInputVar width
 
 --------------------------------------------------------------------------------
 -- Array & Input Array

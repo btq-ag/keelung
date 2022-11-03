@@ -255,7 +255,6 @@ neg :: Boolean -> Boolean
 neg x = true `Xor` x
 
 --------------------------------------------------------------------------------
-
 -- | Retrieve the i-th bit of a Number and return it as Boolean
 --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
 --      where n is the number of bits of the Number
