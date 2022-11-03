@@ -1,4 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Keelung.Syntax.Kinded
   ( Number (..),
@@ -18,7 +21,9 @@ where
 
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
+import Data.Proxy (Proxy (Proxy))
 import Data.Semiring (Ring (..), Semiring (..))
+import GHC.TypeNats
 import Keelung.Types
 
 infixl 9 !!!
@@ -80,52 +85,59 @@ instance Fractional Number where
 
 --------------------------------------------------------------------------------
 
--- -- | Unsigned Integers
--- data Unsigned
---   = Unsigned Int Integer -- Integers
---   | UVar Int Var -- Unsigned Integer Variables
---   | UInputVar Int Var -- Input Unsigned Integer Variables
---   -- Operators on numbers
---   | UAdd Unsigned Unsigned
---   | USub Unsigned Unsigned
---   | UMul Unsigned Unsigned
---   | UDiv Unsigned Unsigned
---   | -- Conditionals
---     IfU Boolean Unsigned Unsigned
---   | -- Conversion between Booleans and Numbers
---     ToU Boolean
---   deriving (Eq)
+-- | Unsigned Integers
+data UInt (w :: Nat)
+  = UInt Int Integer -- Integers
+  | UIntVar Int Var -- Unsigned Integer Variables
+  | UIntInputVar Int Var -- Input Unsigned Integer Variables
+  -- Operators on numbers
+  | UIntAdd (UInt w) (UInt w)
+  | UIntSub (UInt w) (UInt w)
+  | UIntMul (UInt w) (UInt w)
+  | UIntDiv (UInt w) (UInt w)
+  | -- Conditionals
+    IfUInt Boolean (UInt w) (UInt w)
+  | -- Conversion between Booleans and Numbers
+    ToUInt Boolean
+  deriving (Eq)
 
--- instance Show Unsigned where
---   showsPrec prec expr = case expr of
---     Unsigned _ n -> showsPrec prec n
---     UVar _ ref -> showString "$" . shows ref
---     UInputVar width ref -> showString "$U[" . shows width . "]" . shows ref
---     UAdd x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
---     USub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
---     UMul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
---     UDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
---     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
---     ToU x -> showString "ToU " . showsPrec prec x
+instance Show (UInt w) where
+  showsPrec prec expr = case expr of
+    UInt _ n -> showsPrec prec n
+    UIntVar _ ref -> showString "$" . shows ref
+    UIntInputVar width ref -> showString "$U[" . shows width . showString "]" . shows ref
+    UIntAdd x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    UIntSub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    UIntMul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    UIntDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    IfUInt p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    ToUInt x -> showString "ToU " . showsPrec prec x
 
--- instance Num Unsigned where
---   (+) = Add
---   (-) = Sub
---   (*) = Mul
---   abs = id
+instance KnownNat w => Num (UInt w) where
+  (+) = UIntAdd
+  (-) = UIntSub
+  (*) = UIntMul
+  abs = id
 
---   -- law of `signum`: abs x * signum x == x
---   signum = const (Integer 1)
---   fromInteger = Integer
+  -- law of `signum`: abs x * signum x == x
+  signum x =
+    let width = natVal x
+     in UInt (fromIntegral width) 1
 
--- instance Semiring Unsigned where
---   plus = Add
---   times = Mul
---   zero = Integer 0
---   one = Integer 1
+  fromInteger = go
+    where
+      width = natVal (Proxy :: Proxy w)
+      go :: forall width. KnownNat width => Integer -> UInt width
+      go n = UInt (fromIntegral width) (fromIntegral n)
 
--- instance Ring Unsigned where
---   negate = id
+instance KnownNat w => Semiring (UInt w) where
+  plus = UIntAdd
+  times = UIntMul
+  zero = 0
+  one = 1
+
+instance KnownNat w => Ring (UInt w) where
+  negate = id
 
 -- instance Fractional Number where
 --   fromRational = Rational
