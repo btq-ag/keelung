@@ -269,6 +269,7 @@ blendedNumInputVars counters = mapMaybe extractNumInput (zip [varOutput counters
     extractNumInput _ = Nothing
 
 -- | Return the blended indices of all Custom input variables along with their bit width
+--    [(bitWidth, blendedIndices)]
 blendedCustomInputVars :: VarCounters -> IntMap IntSet
 blendedCustomInputVars counters =
   IntMap.foldlWithKey'

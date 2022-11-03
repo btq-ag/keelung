@@ -21,6 +21,7 @@ convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
             varCounters
             <$> mapM convertAssignment asgns
             <*> mapM convertAssignment bsgns
+            <*> pure mempty 
             <*> mapM convertM asgns'
         )
 

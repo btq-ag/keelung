@@ -9,8 +9,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
@@ -22,13 +22,15 @@ import Keelung.Types
 
 data Val
   = Integer Integer
-  | Rational Rational
+  | -- | Unsigned Int Integer
+    Rational Rational
   | Boolean Bool
   | Unit
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
   show (Integer n) = show n
+  -- show (Unsigned _ n) = show n
   show (Rational n) = show n
   show (Boolean b) = show b
   show Unit = "()"
@@ -42,15 +44,24 @@ data Ref
   | NumInputVar Var
   | BoolVar Var
   | BoolInputVar Var
-  deriving (Generic, Eq, NFData)
+  deriving
+    ( -- | UIntVar Int Var
+      -- | UIntInputVar Int Var
+      Generic,
+      Eq,
+      NFData
+    )
 
 instance Serialize Ref
 
 instance Show Ref where
-  show (NumVar n) = "$" ++ show n
-  show (NumInputVar n) = "$N" ++ show n
-  show (BoolVar n) = "$" ++ show n
-  show (BoolInputVar n) = "$B" ++ show n
+  show (NumVar n) = "$" <> show n
+  show (NumInputVar n) = "$N" <> show n
+  show (BoolVar n) = "$" <> show n
+  show (BoolInputVar n) = "$B" <> show n
+
+-- show (UIntVar _ n) = "$" <> show n
+-- show (UIntInputVar w n) = "$U[" <> show w <> "]" <> show n
 
 --------------------------------------------------------------------------------
 
@@ -129,10 +140,10 @@ data Elaborated = Elaborated
 instance Show Elaborated where
   show (Elaborated expr comp) =
     "{\n  expression: "
-      ++ showExpr
-      ++ "\n  compuation state: \n"
-      ++ indent (indent (show comp))
-      ++ "\n}"
+      <> showExpr
+      <> "\n  compuation state: \n"
+      <> indent (indent (show comp))
+      <> "\n}"
     where
       showExpr = case expr of
         Array xs -> prettyList2 4 (toList xs)
@@ -144,7 +155,7 @@ instance Serialize Elaborated
 prettyList :: Show a => [a] -> [String]
 prettyList [] = ["[]"]
 prettyList [x] = ["[" <> show x <> "]"]
-prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
+prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
 
 prettyList2 :: Show a => Int -> [a] -> String
 prettyList2 n list = case list of
@@ -153,7 +164,7 @@ prettyList2 n list = case list of
   (x : xs) ->
     unlines $
       map (replicate n ' ' <>) $
-        "" : "[ " <> show x : map (\y -> ", " <> show y) xs ++ ["]"]
+        "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
 
 --------------------------------------------------------------------------------
 
@@ -175,21 +186,24 @@ data Computation = Computation
     -- Assignments
     compNumAsgns :: [Assignment],
     compBoolAsgns :: [Assignment],
+    compUIntAsgns :: IntMap [Assignment],
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr]
   }
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation varCounters numAsgns boolAsgns assertions) =
+  show (Computation varCounters numAsgns boolAsgns uintAsgns assertions) =
     "{\n" <> indent (show varCounters)
-      ++ "\n  Number assignments: "
-      ++ prettyList2 8 numAsgns
-      ++ "\n  Boolean assignments: "
-      ++ prettyList2 8 boolAsgns
-      ++ "\n  assertions: "
-      ++ prettyList2 8 assertions
-      ++ "\n\
+      <> "\n  Number assignments: "
+      <> prettyList2 8 numAsgns
+      <> "\n  Boolean assignments: "
+      <> prettyList2 8 boolAsgns
+      <> "\n  Unsigned Int assignments: "
+      <> prettyList2 8 (IntMap.elems uintAsgns)
+      <> "\n  assertions: "
+      <> prettyList2 8 assertions
+      <> "\n\
          \}"
 
 instance Serialize Computation
@@ -207,7 +221,7 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
@@ -222,25 +236,3 @@ assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNum
 
 assignBool :: Ref -> Expr -> Comp ()
 assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
-
--- collect free variables of an expression (input variables are not free variables!)
-freeVars :: Expr -> IntSet
-freeVars expr = case expr of
-  Val _ -> mempty
-  Var (NumVar n) -> IntSet.singleton n
-  Var (NumInputVar _) -> mempty
-  Var (BoolVar n) -> IntSet.singleton n
-  Var (BoolInputVar _) -> mempty
-  Array xs -> IntSet.unions (fmap freeVars xs)
-  Add x y -> freeVars x <> freeVars y
-  Sub x y -> freeVars x <> freeVars y
-  Mul x y -> freeVars x <> freeVars y
-  Div x y -> freeVars x <> freeVars y
-  Eq x y -> freeVars x <> freeVars y
-  And x y -> freeVars x <> freeVars y
-  Or x y -> freeVars x <> freeVars y
-  Xor x y -> freeVars x <> freeVars y
-  BEq x y -> freeVars x <> freeVars y
-  If x y z -> freeVars x <> freeVars y <> freeVars z
-  ToNum x -> freeVars x
-  Bit x _ -> freeVars x

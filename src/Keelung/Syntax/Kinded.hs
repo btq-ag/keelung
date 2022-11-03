@@ -80,6 +80,59 @@ instance Fractional Number where
 
 --------------------------------------------------------------------------------
 
+-- -- | Unsigned Integers
+-- data Unsigned
+--   = Unsigned Int Integer -- Integers
+--   | UVar Int Var -- Unsigned Integer Variables
+--   | UInputVar Int Var -- Input Unsigned Integer Variables
+--   -- Operators on numbers
+--   | UAdd Unsigned Unsigned
+--   | USub Unsigned Unsigned
+--   | UMul Unsigned Unsigned
+--   | UDiv Unsigned Unsigned
+--   | -- Conditionals
+--     IfU Boolean Unsigned Unsigned
+--   | -- Conversion between Booleans and Numbers
+--     ToU Boolean
+--   deriving (Eq)
+
+-- instance Show Unsigned where
+--   showsPrec prec expr = case expr of
+--     Unsigned _ n -> showsPrec prec n
+--     UVar _ ref -> showString "$" . shows ref
+--     UInputVar width ref -> showString "$U[" . shows width . "]" . shows ref
+--     UAdd x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+--     USub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+--     UMul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+--     UDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+--     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+--     ToU x -> showString "ToU " . showsPrec prec x
+
+-- instance Num Unsigned where
+--   (+) = Add
+--   (-) = Sub
+--   (*) = Mul
+--   abs = id
+
+--   -- law of `signum`: abs x * signum x == x
+--   signum = const (Integer 1)
+--   fromInteger = Integer
+
+-- instance Semiring Unsigned where
+--   plus = Add
+--   times = Mul
+--   zero = Integer 0
+--   one = Integer 1
+
+-- instance Ring Unsigned where
+--   negate = id
+
+-- instance Fractional Number where
+--   fromRational = Rational
+--   (/) = Div
+
+--------------------------------------------------------------------------------
+
 -- | Booleans
 data Boolean
   = Boolean Bool
