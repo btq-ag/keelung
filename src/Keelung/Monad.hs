@@ -41,6 +41,7 @@ module Keelung.Monad
     inputs2,
     inputs3,
     (!!!),
+
     -- * Statements
     cond,
     assert,
@@ -198,14 +199,10 @@ instance Proper Number where
 instance Proper Boolean where
   input = inputBool
   cond = IfBool
-  x !!! _ = x 
+  x !!! _ = x
 
 instance KnownNat w => Proper (UInt w) where
-  input = go
-    where
-      width = natVal (Proxy :: Proxy w)
-      go :: forall width. KnownNat width => Comp (UInt width)
-      go = inputUInt (fromIntegral width)
+  input = inputUInt
   cond = IfUInt
   x !!! i = UIntBit x i
 
@@ -218,8 +215,10 @@ inputBool :: Comp Boolean
 inputBool = BoolInputVar <$> freshBoolInputVar
 
 -- | Requests a fresh Unsigned integer input variable of some bit width
-inputUInt :: Int -> Comp (UInt w)
-inputUInt width = UIntInputVar width <$> freshUIntInputVar width
+inputUInt :: forall w. KnownNat w => Comp (UInt w)
+inputUInt = UIntInputVar width <$> freshUIntInputVar width
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))
 
 --------------------------------------------------------------------------------
 -- Array & Input Array

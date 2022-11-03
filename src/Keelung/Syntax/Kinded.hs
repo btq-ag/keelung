@@ -225,7 +225,7 @@ data ArrM t = ArrayRef ElemType Int Addr
 
 --------------------------------------------------------------------------------
 
--- | An synonym of 'ToNum' for converting booleans to numbers
+-- | An synonym of 'FromBool' for converting booleans to numbers
 fromBool :: Boolean -> Number
 fromBool = FromBool
 
