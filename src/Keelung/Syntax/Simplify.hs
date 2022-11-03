@@ -21,7 +21,7 @@ convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
             varCounters
             <$> mapM convertAssignment asgns
             <*> mapM convertAssignment bsgns
-            <*> pure mempty 
+            <*> pure mempty
             <*> mapM convertM asgns'
         )
 
@@ -46,7 +46,20 @@ instance Elaborable Kinded.Number where
     Kinded.Mul x y -> Mul <$> convertM x <*> convertM y
     Kinded.Div x y -> Div <$> convertM x <*> convertM y
     Kinded.IfNum p x y -> If <$> convertM p <*> convertM x <*> convertM y
-    Kinded.ToNum x -> ToNum <$> convertM x
+    Kinded.FromBool x -> ToNum <$> convertM x
+    Kinded.FromUInt x -> ToNum <$> convertM x
+
+instance Elaborable (Kinded.UInt w) where
+  convertM expr = case expr of
+    Kinded.UInt w n -> return $ Val (Unsigned w n)
+    Kinded.UIntVar w n -> return $ Var (UIntVar w n)
+    Kinded.UIntInputVar w n -> return $ Var (UIntInputVar w n)
+    Kinded.UIntAdd x y -> Add <$> convertM x <*> convertM y
+    Kinded.UIntSub x y -> Sub <$> convertM x <*> convertM y
+    Kinded.UIntMul x y -> Mul <$> convertM x <*> convertM y
+    Kinded.UIntDiv x y -> Div <$> convertM x <*> convertM y
+    Kinded.IfUInt p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.ToUInt x -> ToNum <$> convertM x
 
 instance Elaborable Kinded.Boolean where
   convertM expr = case expr of
@@ -59,6 +72,7 @@ instance Elaborable Kinded.Boolean where
     Kinded.Or x y -> Or <$> convertM x <*> convertM y
     Kinded.Xor x y -> Xor <$> convertM x <*> convertM y
     Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
+    Kinded.UEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.IfBool p x y -> If <$> convertM p <*> convertM x <*> convertM y
 
 instance Elaborable () where

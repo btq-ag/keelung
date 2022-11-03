@@ -22,15 +22,15 @@ import Keelung.Types
 
 data Val
   = Integer Integer
-  | -- | Unsigned Int Integer
-    Rational Rational
+  | Rational Rational
+  | Unsigned Int Integer
   | Boolean Bool
   | Unit
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
   show (Integer n) = show n
-  -- show (Unsigned _ n) = show n
+  show (Unsigned _ n) = show n
   show (Rational n) = show n
   show (Boolean b) = show b
   show Unit = "()"
@@ -44,10 +44,10 @@ data Ref
   | NumInputVar Var
   | BoolVar Var
   | BoolInputVar Var
+  | UIntVar Int Var
+  | UIntInputVar Int Var
   deriving
-    ( -- | UIntVar Int Var
-      -- | UIntInputVar Int Var
-      Generic,
+    ( Generic,
       Eq,
       NFData
     )
@@ -59,9 +59,8 @@ instance Show Ref where
   show (NumInputVar n) = "$N" <> show n
   show (BoolVar n) = "$" <> show n
   show (BoolInputVar n) = "$B" <> show n
-
--- show (UIntVar _ n) = "$" <> show n
--- show (UIntInputVar w n) = "$U[" <> show w <> "]" <> show n
+  show (UIntVar _ n) = "$" <> show n
+  show (UIntInputVar w n) = "$U[" <> show w <> "]" <> show n
 
 --------------------------------------------------------------------------------
 

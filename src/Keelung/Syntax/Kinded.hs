@@ -1,11 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Keelung.Syntax.Kinded
   ( Number (..),
     Boolean (..),
+    UInt (..),
     Arr (..),
     ArrM (..),
     fromBool,
@@ -20,8 +22,8 @@ module Keelung.Syntax.Kinded
 where
 
 import Data.Array.Unboxed (Array)
+import Data.Data
 import Data.Foldable (toList)
-import Data.Proxy (Proxy (Proxy))
 import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
@@ -44,8 +46,24 @@ data Number
   | -- Conditionals
     IfNum Boolean Number Number
   | -- Conversion between Booleans and Numbers
-    ToNum Boolean
-  deriving (Eq)
+    FromBool Boolean
+  | forall w. KnownNat w => FromUInt (UInt w)
+
+instance Eq Number where
+  Integer x == Integer y = x == y
+  Rational x == Rational y = x == y
+  NumVar x == NumVar y = x == y
+  NumInputVar x == NumInputVar y = x == y
+  Add x1 x2 == Add y1 y2 = x1 == y1 && x2 == y2
+  Sub x1 x2 == Sub y1 y2 = x1 == y1 && x2 == y2
+  Mul x1 x2 == Mul y1 y2 = x1 == y1 && x2 == y2
+  Div x1 x2 == Div y1 y2 = x1 == y1 && x2 == y2
+  IfNum x1 x2 x3 == IfNum y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  FromBool x == FromBool y = x == y
+  FromUInt x == FromUInt y = case sameNat x y of
+    Just Refl -> x == y
+    Nothing -> False
+  _ == _ = False
 
 instance Show Number where
   showsPrec prec expr = case expr of
@@ -58,7 +76,8 @@ instance Show Number where
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    ToNum x -> showString "ToNum " . showsPrec prec x
+    FromBool x -> showString "FromBool " . showsPrec prec x
+    FromUInt x -> showString "FromUInt " . showsPrec prec x
 
 instance Num Number where
   (+) = Add
@@ -158,9 +177,27 @@ data Boolean
   | -- Equalities
     BEq Boolean Boolean
   | Eq Number Number
+  | forall w. KnownNat w => UEq (UInt w) (UInt w)
   | -- Conditionals
     IfBool Boolean Boolean Boolean
-  deriving (Eq)
+
+instance Eq Boolean where
+  Boolean x == Boolean y = x == y
+  BoolVar x == BoolVar y = x == y
+  BoolInputVar x == BoolInputVar y = x == y
+  NumBit x1 x2 == NumBit y1 y2 = x1 == y1 && x2 == y2
+  And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
+  Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
+  Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
+  BEq x1 x2 == BEq y1 y2 = x1 == y1 && x2 == y2
+  Eq x1 x2 == Eq y1 y2 = x1 == y1 && x2 == y2
+  UEq x1 x2 == UEq y1 y2 = case sameNat x1 x2 of
+    Just Refl -> case sameNat y1 y2 of
+      Just Refl -> (x1 == x2) == (y1 == y2)
+      Nothing -> False
+    Nothing -> False
+  IfBool x1 x2 x3 == IfBool y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  _ == _ = False
 
 instance Show Boolean where
   showsPrec prec expr = case expr of
@@ -173,6 +210,7 @@ instance Show Boolean where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    UEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfBool p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
@@ -190,7 +228,7 @@ data ArrM t = ArrayRef ElemType Int Addr
 
 -- | An synonym of 'ToNum' for converting booleans to numbers
 fromBool :: Boolean -> Number
-fromBool = ToNum
+fromBool = FromBool
 
 -- | For converting numbers to booleans
 toBool :: Number -> Boolean
