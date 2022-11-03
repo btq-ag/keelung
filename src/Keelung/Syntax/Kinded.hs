@@ -17,7 +17,6 @@ module Keelung.Syntax.Kinded
     nbeq,
     neq,
     neg,
-    (!!!),
   )
 where
 
@@ -27,8 +26,6 @@ import Data.Foldable (toList)
 import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
-
-infixl 9 !!!
 
 --------------------------------------------------------------------------------
 
@@ -170,6 +167,7 @@ data Boolean
   | BoolVar Var -- Boolean Variables
   | BoolInputVar Var -- Input Boolean Variables
   | NumBit Number Int
+  | forall w. KnownNat w => UIntBit (UInt w) Int
   | -- Operators on Booleans
     And Boolean Boolean
   | Or Boolean Boolean
@@ -205,6 +203,7 @@ instance Show Boolean where
     BoolVar ref -> showString "$" . shows ref
     BoolInputVar ref -> showString "$B" . shows ref
     NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
+    UIntBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
@@ -253,11 +252,3 @@ nbeq x y = IfBool (x `BEq` y) false true
 -- | Helper function for negating a boolean expression
 neg :: Boolean -> Boolean
 neg x = true `Xor` x
-
---------------------------------------------------------------------------------
--- | Retrieve the i-th bit of a Number and return it as Boolean
---   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
---      where n is the number of bits of the Number
---   You can access the MSB with (-1) because the index is modulo n
-(!!!) :: Number -> Int -> Boolean
-x !!! i = NumBit x i

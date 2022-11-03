@@ -67,6 +67,7 @@ instance Elaborable Kinded.Boolean where
     Kinded.BoolVar var -> return $ Var (BoolVar var)
     Kinded.BoolInputVar var -> return $ Var (BoolInputVar var)
     Kinded.NumBit n i -> Bit <$> convertM n <*> return i
+    Kinded.UIntBit n i -> Bit <$> convertM n <*> return i
     Kinded.Eq x y -> Eq <$> convertM x <*> convertM y
     Kinded.And x y -> And <$> convertM x <*> convertM y
     Kinded.Or x y -> Or <$> convertM x <*> convertM y
