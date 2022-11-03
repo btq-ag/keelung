@@ -24,15 +24,19 @@ data R1CS n = R1CS
     r1csVarCounters :: VarCounters,
     -- | For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n],
-    -- | For restoring binary representation of input variables
-    r1csBinReps :: IntMap (Var, Int)
+    -- | For restoring binary representation of Number input variables
+    --   [(inputIndex, binRepIndex)]
+    r1csNumBinReps :: IntMap Var,
+    -- | For restoring binary representation of custom output variables
+    --   [(bitWidth, [(inputIndex, binRepIndex)])]
+    r1csCustomBinReps :: IntMap (IntMap Var)
   }
   deriving (Generic, Eq, NFData, Functor)
 
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show r1cs@(R1CS cs counters _ binReps) =
+  show r1cs@(R1CS cs counters _ numBinReps customBinReps) =
     "R1CS {\n"
       <> showTotalConstraintSize
       <> showOrdinaryConstraints
@@ -41,9 +45,12 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
       <> indent (show counters)
       <> "}"
     where
+      numBitWidth = getNumBitWidth counters
+
+      totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
       showTotalConstraintSize =
         "  Total constriant size: "
-          <> show (length cs + snd (boolVarsRange counters) - fst (boolVarsRange counters) + IntMap.size binReps)
+          <> show (length cs + snd (boolVarsRange counters) - fst (boolVarsRange counters) + totalBinRepConstraintSize)
           <> "\n"
       -- constraints excluding Boolean constraints & Binary Representation constraints
       ordinaryConstraints = r1csConstraints r1cs
@@ -85,21 +92,62 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
                   <> showBooleanConstraint (end - 1)
 
       showBinRepConstraints =
-        if IntMap.null binReps
+        if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation constriants (" <> show (IntMap.size binReps) <> "):\n"
+            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
               <> unlines
                 ( map
-                    (\(v, (b, n)) -> "    $" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1))
-                    (IntMap.toList binReps)
+                    (uncurry (showBinRepConstraint numBitWidth))
+                    (IntMap.toList numBinReps)
+                    ++ concatMap
+                      ( \(bitWidth, pairs) ->
+                          map
+                            (uncurry (showBinRepConstraint bitWidth))
+                            (IntMap.toList pairs)
+                      )
+                      (IntMap.toList customBinReps)
                 )
+        where
+          showBinRepConstraint 2 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+          showBinRepConstraint 3 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + 4$"
+              <> show (binRep + 2)
+          showBinRepConstraint width var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + ... + 2^"
+              <> show (width - 1)
+              <> "$"
+              <> show (binRep + width - 1)
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS cs counters _ binReps) = cs <> booleanInputVarConstraints <> binRepConstraints
+toR1Cs (R1CS cs counters _ numBinReps customBinReps) =
+  cs
+    <> booleanInputVarConstraints
+    <> numBinRepConstraints
+    <> customBinRepConstraints
   where
+    numBitWidth = getNumBitWidth counters
+
     booleanInputVarConstraints =
       let (start, end) = boolVarsRange counters
        in map
@@ -111,15 +159,29 @@ toR1Cs (R1CS cs counters _ binReps) = cs <> booleanInputVarConstraints <> binRep
             )
             [start .. end - 1]
 
-    binRepConstraints =
+    numBinRepConstraints =
       map
-        ( \(var, (b, n)) ->
+        ( \(input, binRep) ->
             R1C
               (Left 1)
-              (Poly.buildEither 0 [(var, 1)])
-              (Poly.buildEither 0 [(b + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. n - 1]])
+              (Poly.buildEither 0 [(input, 1)])
+              (Poly.buildEither 0 [(binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. numBitWidth - 1]])
         )
-        (IntMap.toList binReps)
+        (IntMap.toList numBinReps)
+
+    customBinRepConstraints =
+      concatMap
+        ( \(width, pairs) ->
+            map
+              ( \(input, binRep) ->
+                  R1C
+                    (Left 1)
+                    (Poly.buildEither 0 [(input, 1)])
+                    (Poly.buildEither 0 [(binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. width - 1]])
+              )
+              (IntMap.toList pairs)
+        )
+        (IntMap.toList customBinReps)
 
 --------------------------------------------------------------------------------
 

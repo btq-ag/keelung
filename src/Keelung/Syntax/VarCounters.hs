@@ -38,8 +38,8 @@ module Keelung.Syntax.VarCounters
     bumpIntermediateVar,
     setOutputVarSize,
     setIntermediateVarSize,
-    setNumWidth,
-    getNumWidth,
+    setNumBitWidth,
+    getNumBitWidth,
     -- Helper function for pretty printing
     indent,
     ----
@@ -338,12 +338,12 @@ setIntermediateVarSize :: Int -> VarCounters -> VarCounters
 setIntermediateVarSize size counters = counters {varIntermediate = size}
 
 -- | Updates the width of binary representation of a Number when it's known
-setNumWidth :: Int -> VarCounters -> VarCounters
-setNumWidth width counters = counters {varNumWidth = width}
+setNumBitWidth :: Int -> VarCounters -> VarCounters
+setNumBitWidth width counters = counters {varNumWidth = width}
 
 -- | Get the width of binary representation of a Number
-getNumWidth :: VarCounters -> Int
-getNumWidth = varNumWidth
+getNumBitWidth :: VarCounters -> Int
+getNumBitWidth = varNumWidth
 
 --------------------------------------------------------------------------------
 
