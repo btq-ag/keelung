@@ -211,7 +211,7 @@ customBinRepVarSize counters =
 
 -- | Size of all Boolean variables (for imposing the Boolean constraint)
 totalBoolVarSize :: VarCounters -> Int
-totalBoolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters
+totalBoolVarSize counters = varBoolInput counters + varNumWidth counters * varNumInput counters + customBinRepVarSize counters
 
 --------------------------------------------------------------------------------
 
@@ -227,7 +227,7 @@ inputVarsRange :: VarCounters -> (Int, Int)
 inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
 
 boolVarsRange :: VarCounters -> (Int, Int)
-boolVarsRange counters = (varOutput counters + varNumInput counters, pinnedVarSize counters)
+boolVarsRange counters = (varOutput counters + varNumInput counters + totalCustomInputSize counters, pinnedVarSize counters)
 
 --------------------------------------------------------------------------------
 
@@ -319,7 +319,7 @@ bumpBoolInputVar counters =
 -- | Bump a custom input variable counter of some bit width
 bumpCustomInputVar :: Int -> VarCounters -> VarCounters
 bumpCustomInputVar width counters =
-  let (result, after) = IntMap.insertLookupWithKey f width 0 (varCustomInputs counters)
+  let (result, after) = IntMap.insertLookupWithKey f width 1 (varCustomInputs counters)
    in counters
         { varCustomInputs = after,
           varInputSequence = varInputSequence counters :|> CustomInput width (fromMaybe 0 result)

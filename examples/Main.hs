@@ -4,6 +4,7 @@
 
 {-# HLINT ignore "Use <$>" #-}
 {-# HLINT ignore "Redundant return" #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -102,3 +103,8 @@ loop3 n m = do
       let x = access2 xs (i, j)
       let x' = access2 squares (i, j)
       assert (x' `Eq` (x * x))
+
+bits2 :: Comp (Arr Boolean)
+bits2 = do
+  x <- inputUInt @4
+  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]

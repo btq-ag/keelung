@@ -95,7 +95,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
         if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
+            "  Binary representation constriants (" <> show (totalCustomInputSize counters) <> "):\n"
               <> unlines
                 ( map
                     (uncurry (showBinRepConstraint numBitWidth))
