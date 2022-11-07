@@ -9,6 +9,7 @@ module Keelung
     compileO0,
     compileO2,
     generate,
+    verify,
     genCircuit,
     genWitness,
     interpret,
@@ -37,6 +38,7 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Simplify (Elaborable, convert)
 import qualified Keelung.Syntax.Typed as C
+import qualified System.Directory as Path
 import qualified System.IO.Error as IO
 import qualified System.Info
 import qualified System.Process as Process
@@ -70,14 +72,15 @@ compileO2 fieldType prog = runM $ do
 --------------------------------------------------------------------------------
 
 -- | Generate a proof
-generate_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
+generate_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error (FilePath, String))
 generate_ fieldType prog inputs' = runM $ do
   exists <- checkCmd "instrument_aurora_snark_proof"
   _ <- genCircuit fieldType prog
   _ <- genWitness_ fieldType prog inputs'
-  genParameters 
+  proofPath <- lift $ Path.makeAbsolute "proof"
+  genParameters
   if exists
-    then do
+    then lift $ do
       let arguments =
             [ "--r1cs_filepath",
               "circuit.jsonl",
@@ -86,18 +89,55 @@ generate_ fieldType prog inputs' = runM $ do
               "--parameter_filepath",
               "parameter.json",
               "--output_filepath",
-              "proof"
+              proofPath
             ]
-      lift $ Process.readProcess "instrument_aurora_snark_proof" arguments mempty
+      msg <- Process.readProcess "instrument_aurora_snark_proof" arguments mempty
+      Path.removeFile "circuit.jsonl"
+      Path.removeFile "witness.jsonl"
+      Path.removeFile "parameter.json"
+      return (proofPath, msg)
     else throwError CannotLocateProver
 
-generate :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO ()
+generate :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO ()
 generate fieldType prog inputs' = do
   result <- generate_ fieldType prog inputs'
   case result of
     Left err -> print err
-    Right msg -> putStr msg
+    Right (_, msg) -> putStr msg
 
+-- | Generate and verify a proof
+verify_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
+verify_ fieldType prog inputs' = runM $ do
+  (proofPath, _) <- liftEitherT $ generate_ fieldType prog inputs'
+  exists <- checkCmd "instrument_aurora_snark_verify"
+  _ <- genCircuit fieldType prog
+  _ <- genWitness_ fieldType prog inputs'
+  genParameters
+  if exists
+    then lift $ do
+      let arguments =
+            [ "--r1cs_filepath",
+              "circuit.jsonl",
+              "--input_filepath",
+              "witness.jsonl",
+              "--parameter_filepath",
+              "parameter.json",
+              "--proof_filepath",
+              proofPath
+            ]
+      msg <- Process.readProcess "instrument_aurora_snark_verify" arguments mempty
+      Path.removeFile "circuit.jsonl"
+      Path.removeFile "witness.jsonl"
+      Path.removeFile "parameter.json"
+      return msg
+    else throwError CannotLocateVerifier
+
+verify :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO ()
+verify fieldType prog inputs' = do
+  result <- verify_ fieldType prog inputs'
+  case result of
+    Left err -> print err
+    Right msg -> putStr msg
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Elaborable t => FieldType -> Comp t -> M (R1CS Integer)
@@ -262,6 +302,13 @@ type M = ExceptT Error IO
 
 runM :: M a -> IO (Either Error a)
 runM = runExceptT
+
+liftEitherT :: IO (Either Error a) -> M a
+liftEitherT f = do
+  result <- lift f
+  case result of
+    Left err -> throwError err
+    Right x -> return x
 
 -- | Handle 'IO' Exceptions in the 'M' Monad
 catchIOError :: Error -> IO a -> M a

@@ -52,6 +52,7 @@ library
     , cereal
     , containers
     , deepseq
+    , directory
     , galois-field
     , groups
     , mtl
@@ -76,6 +77,7 @@ executable tutorial
     , cereal
     , containers
     , deepseq
+    , directory
     , galois-field
     , groups
     , keelung
@@ -102,6 +104,7 @@ test-suite keelung-test
     , cereal
     , containers
     , deepseq
+    , directory
     , galois-field
     , groups
     , keelung
@@ -128,6 +131,7 @@ benchmark profile
     , cereal
     , containers
     , deepseq
+    , directory
     , galois-field
     , groups
     , keelung
