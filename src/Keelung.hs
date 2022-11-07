@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
@@ -6,7 +8,7 @@ module Keelung
     compile,
     compileO0,
     compileO2,
-    -- generate,
+    generate,
     genCircuit,
     genWitness,
     interpret,
@@ -24,6 +26,7 @@ where
 
 import Control.Arrow (left)
 import Control.Monad.Except
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
 import Data.Serialize
@@ -67,25 +70,38 @@ compileO2 fieldType prog = runM $ do
 --------------------------------------------------------------------------------
 
 -- | Generate a proof
--- generate :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
--- generate fieldType prog = case elaborate prog of
---   Left err -> return $ Left (ElabError err)
---   Right elab -> do
---     exists <- checkCmd "instrument_aurora_snark_proof"
---     genCircuit fieldType elab
---     if exists
---       then return $ Left InstallError
---       else do
---         blob <- Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
---         let result = decode (BSC.pack blob)
---         case result of
---           Left err -> return $ Left $ DecodeError err
---           Right (Left err) -> return $ Left $ CompileError err
---           Right (Right x) -> return $ Right x
+generate_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
+generate_ fieldType prog inputs' = runM $ do
+  exists <- checkCmd "instrument_aurora_snark_proof"
+  _ <- genCircuit fieldType prog
+  _ <- genWitness_ fieldType prog inputs'
+  genParameters 
+  if exists
+    then do
+      let arguments =
+            [ "--r1cs_filepath",
+              "circuit.jsonl",
+              "--input_filepath",
+              "witness.jsonl",
+              "--parameter_filepath",
+              "parameter.json",
+              "--output_filepath",
+              "proof"
+            ]
+      lift $ Process.readProcess "instrument_aurora_snark_proof" arguments mempty
+    else throwError CannotLocateProver
+
+generate :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO ()
+generate fieldType prog inputs' = do
+  result <- generate_ fieldType prog inputs'
+  case result of
+    Left err -> print err
+    Right msg -> putStr msg
+
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
-genCircuit :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-genCircuit fieldType prog = runM $ do
+genCircuit :: Elaborable t => FieldType -> Comp t -> M (R1CS Integer)
+genCircuit fieldType prog = do
   elab <- liftEither (elaborate prog)
   case fieldType of
     GF181 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS GF181))
@@ -93,13 +109,16 @@ genCircuit fieldType prog = runM $ do
     B64 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
-genWitness_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
-genWitness_ fieldType prog xs = runM $ do
+genWitness_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> M [n]
+genWitness_ fieldType prog xs = do
   elab <- liftEither (elaborate prog)
   wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
 
+genParameters :: M ()
+genParameters = lift $ BS.writeFile "parameter.json" "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
+
 genWitness :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO [Integer]
-genWitness fieldType prog xs = genWitness_ fieldType prog xs >>= printErrorInstead
+genWitness fieldType prog xs = runM (genWitness_ fieldType prog xs) >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
@@ -177,7 +196,7 @@ findKeelungc = do
         case System.Info.arch of
           "x86_64" -> return ("docker", ["run", "-i", "banacorn/keelung"])
           _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "banacorn/keelung"])
-        else throwError InstallError
+        else throwError CannotLocateKeelungC
 
 -- | Check the version of the Keelung compiler
 readKeelungVersion :: FilePath -> [String] -> M (Int, Int, Int)

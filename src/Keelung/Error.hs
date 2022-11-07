@@ -14,7 +14,9 @@ import Keelung.Types (Addr)
 
 data Error
   = DecodeError String -- Cannot decode the output from the Keelung compiler
-  | InstallError -- Cannot locate the Keelung compiler
+  | CannotLocateKeelungC -- Cannot locate the Keelung compiler
+  | CannotLocateProver -- Cannot locate the prover
+  | CannotLocateVerifier -- Cannot locate the verifier
   | CannotReadVersionError -- Cannot read the version of the Keelung compiler
   | VersionMismatchError Int Int Int -- The version of the Keelung compiler is not supported
   | ElabError ElabError
@@ -23,7 +25,9 @@ data Error
 
 instance Show Error where
   show (DecodeError err) = "Decode Error: " ++ err
-  show InstallError = "Cannot locate the Keelung compiler"
+  show CannotLocateKeelungC = "Cannot locate the Keelung compiler"
+  show CannotLocateProver = "Cannot locate the prover"
+  show CannotLocateVerifier = "Cannot locate the verifier"
   show CannotReadVersionError = "Cannot read the version of the Keelung compiler"
   show (VersionMismatchError major minor patch) =
     "The version of the Keelung compiler is not supported: \n"

@@ -104,7 +104,7 @@ loop3 n m = do
       let x' = access2 squares (i, j)
       assert (x' `Eq` (x * x))
 
-bits2 :: Comp (Arr Boolean)
-bits2 = do
+uint :: Comp (Arr Boolean)
+uint = do
   x <- inputUInt @4
   return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
