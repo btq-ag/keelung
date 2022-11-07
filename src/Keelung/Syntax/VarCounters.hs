@@ -24,9 +24,11 @@ module Keelung.Syntax.VarCounters
     outputVars,
     inputVarsRange,
     boolVarsRange,
+    numInputVarsRange,
+    customInputVarsTotalRange,
+    customInputVarsRanges,
     -- Blended index of variables
-    blendedNumInputVars,
-    blendedCustomInputVars,
+    blendedCustomInputVarSizes,
     blendNumInputVar,
     blendCustomInputVar,
     blendBoolInputVar,
@@ -43,7 +45,7 @@ module Keelung.Syntax.VarCounters
     -- Helper function for pretty printing
     indent,
     ----
-    getBitVar,
+    lookupBinRepStart
   )
 where
 
@@ -51,9 +53,7 @@ import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq ((:|>)))
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
@@ -226,55 +226,64 @@ outputVars counters = [0 .. outputVarSize counters - 1]
 inputVarsRange :: VarCounters -> (Int, Int)
 inputVarsRange counters = (varOutput counters, pinnedVarSize counters)
 
+numInputVarsRange :: VarCounters -> (Int, Int)
+numInputVarsRange counters = (varOutput counters, varOutput counters + varNumInput counters)
+
+customInputVarsTotalRange :: VarCounters -> (Int, Int)
+customInputVarsTotalRange counters = (varOutput counters + varNumInput counters, varOutput counters + varNumInput counters + totalCustomInputSize counters)
+
+customInputVarsRanges :: VarCounters -> IntMap (Int, Int)
+customInputVarsRanges counters =
+  let startIndex = varOutput counters + varNumInput counters
+   in snd $ IntMap.mapAccumWithKey (\acc _ size -> (acc + size, (acc, acc + size))) startIndex (varCustomInputs counters)
+
 boolVarsRange :: VarCounters -> (Int, Int)
 boolVarsRange counters = (varOutput counters + varNumInput counters + totalCustomInputSize counters, pinnedVarSize counters)
 
 --------------------------------------------------------------------------------
 
--- | Return the variable index of the bit of a Number input variable
-getBitVar :: VarCounters -> Int -> Int -> Maybe Int
-getBitVar counters blendedIndex bitIndex = (+) bitIndex <$> getIndex
+lookupBinRepStart :: VarCounters -> Var -> Maybe Var
+lookupBinRepStart counters var
+  | var < varOutput counters = Nothing
+  | var < varOutput counters + varNumInput counters =
+    let nth = var - varOutput counters
+     in Just $
+          outputVarSize counters
+            + numInputVarSize counters
+            + totalCustomInputSize counters
+            + boolInputVarSize counters
+            + varNumWidth counters * nth
+  | var < varOutput counters + varNumInput counters + totalCustomInputSize counters =
+    let nth = var - (varOutput counters + varNumInput counters)
+     in case IntMap.lookupGT nth altCustomInputMap of
+          Nothing -> Nothing
+          Just (_, width) ->
+            Just $
+              outputVarSize counters
+                + numInputVarSize counters
+                + totalCustomInputSize counters
+                + boolInputVarSize counters
+                + numBinRepVarSize counters
+                + width * nth
+  | otherwise = Nothing
   where
-    getIndex :: Maybe Int
-    getIndex =
-      case getInputSequence counters Seq.!? (blendedIndex - varOutput counters) of
-        Just (NumInput n) ->
-          Just $
-            outputVarSize counters
-              + numInputVarSize counters
-              + totalCustomInputSize counters
-              + boolInputVarSize counters
-              + varNumWidth counters * n
-        Just (CustomInput width n) ->
-          Just $
-            outputVarSize counters
-              + numInputVarSize counters
-              + totalCustomInputSize counters
-              + boolInputVarSize counters
-              + numBinRepVarSize counters
-              -- size of all custom inputs of width smaller than this one
-              + IntMap.foldlWithKey'
-                (\acc w size -> acc + w * size)
-                0
-                (IntMap.filterWithKey (\w _ -> w < width) (varCustomInputs counters))
-              + width * n
-        _ -> Nothing
-
--- | Return the blended indices of all Number input variables
-blendedNumInputVars :: VarCounters -> [Var]
-blendedNumInputVars counters = mapMaybe extractNumInput (zip [varOutput counters ..] (toList (varInputSequence counters)))
-  where
-    extractNumInput :: (Int, InputVar) -> Maybe Var
-    extractNumInput (index, NumInput _) = Just index
-    extractNumInput _ = Nothing
+    -- mapping of [(index, width)]
+    altCustomInputMap :: IntMap Int
+    altCustomInputMap =
+      IntMap.fromList $
+        snd $
+          foldl
+            (\(accSize, accList) (width, size) -> (accSize + size, (accSize + size, width) : accList))
+            (0, [])
+            (IntMap.toList (varCustomInputs counters))
 
 -- | Return the blended indices of all Custom input variables along with their bit width
 --    [(bitWidth, blendedIndices)]
-blendedCustomInputVars :: VarCounters -> IntMap IntSet
-blendedCustomInputVars counters =
+blendedCustomInputVarSizes :: VarCounters -> IntMap Int
+blendedCustomInputVarSizes counters =
   IntMap.foldlWithKey'
-    ( \acc index inputVar -> case inputVar of
-        CustomInput width _ -> IntMap.insertWith (<>) width (IntSet.singleton index) acc
+    ( \acc _ inputVar -> case inputVar of
+        CustomInput width _ -> IntMap.insertWith (+) width 1 acc
         _ -> acc
     )
     mempty
