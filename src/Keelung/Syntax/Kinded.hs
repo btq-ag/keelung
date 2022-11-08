@@ -35,11 +35,14 @@ data Number
   | Rational Rational -- Rationals
   | NumVar Var -- Number Variables
   | NumInputVar Var -- Input Number Variables
-  -- Operators on numbers
+  -- | PackNum [Boolean] -- Pack a list of Booleans into a Number
+  -- Numeric operators on numbers
   | Add Number Number
   | Sub Number Number
   | Mul Number Number
   | Div Number Number
+  | -- Bitwise operators on numbers
+    AndNum Number Number
   | -- Conditionals
     IfNum Boolean Number Number
   | -- Conversion between Booleans and Numbers
@@ -68,10 +71,12 @@ instance Show Number where
     Rational n -> showsPrec prec n
     NumVar ref -> showString "$" . shows ref
     NumInputVar ref -> showString "$N" . shows ref
+    -- PackNum bs -> showString "Pack(" . shows bs . showString ")"
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    AndNum x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     FromBool x -> showString "FromBool " . showsPrec prec x
     FromUInt x -> showString "FromUInt " . showsPrec prec x
@@ -106,14 +111,16 @@ data UInt (w :: Nat)
   = UInt Int Integer -- Integers
   | UIntVar Int Var -- Unsigned Integer Variables
   | UIntInputVar Int Var -- Input Unsigned Integer Variables
-  -- Operators on numbers
+  -- Numeric operators on unsigned integers
   | UIntAdd (UInt w) (UInt w)
   | UIntSub (UInt w) (UInt w)
   | UIntMul (UInt w) (UInt w)
   | UIntDiv (UInt w) (UInt w)
+  | -- Bitwise operators on unsigned integers
+    AndUInt (UInt w) (UInt w)
   | -- Conditionals
     IfUInt Boolean (UInt w) (UInt w)
-  | -- Conversion between Booleans and Numbers
+  | -- Conversion between Booleans and unsigned integers
     ToUInt Boolean
   deriving (Eq)
 
@@ -126,6 +133,7 @@ instance Show (UInt w) where
     UIntSub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     UIntMul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     UIntDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    AndUInt x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     IfUInt p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToUInt x -> showString "ToU " . showsPrec prec x
 

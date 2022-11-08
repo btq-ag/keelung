@@ -40,8 +40,7 @@ module Keelung.Monad
     inputs,
     inputs2,
     inputs3,
-    (!!!),
-
+  
     -- * Statements
     cond,
     assert,
@@ -66,8 +65,6 @@ import Keelung.Syntax
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 import Prelude hiding (product, sum)
-
-infixl 9 !!!
 
 --------------------------------------------------------------------------------
 
@@ -185,26 +182,17 @@ class Proper t where
   -- | Conditional clause
   cond :: Boolean -> t -> t -> t
 
-  -- | Retrieve the i-th bit and return it as Boolean
-  --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
-  --      where n is the number of bits of the Number
-  --   You can access the MSB with (-1) because the index is modulo n
-  (!!!) :: t -> Int -> Boolean
-
 instance Proper Number where
   input = inputNum
   cond = IfNum
-  x !!! i = NumBit x i
 
 instance Proper Boolean where
   input = inputBool
   cond = IfBool
-  x !!! _ = x
 
 instance KnownNat w => Proper (UInt w) where
   input = inputUInt
   cond = IfUInt
-  x !!! i = UIntBit x i
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number

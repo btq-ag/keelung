@@ -4,6 +4,7 @@ module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
     module Keelung.Monad,
+    module Keelung.Syntax.Bits,
     run,
     compile,
     compileO0,
@@ -36,6 +37,7 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
+import Keelung.Syntax.Bits
 import Keelung.Syntax.Simplify (Elaborable, convert)
 import qualified Keelung.Syntax.Typed as C
 import qualified System.Directory as Path
