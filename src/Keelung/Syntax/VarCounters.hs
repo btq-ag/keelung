@@ -188,7 +188,7 @@ customInputSizeOf width counters = fromMaybe 0 (IntMap.lookup width (varCustomIn
 
 -- | Size of custom input variables of all bit width combined
 totalCustomInputSize :: VarCounters -> Int
-totalCustomInputSize counters = IntMap.size (varCustomInputs counters)
+totalCustomInputSize counters = IntMap.foldl' (+) 0 (varCustomInputs counters)
 
 intermediateVarSize :: VarCounters -> Int
 intermediateVarSize = varIntermediate
