@@ -45,7 +45,7 @@ module Keelung.Syntax.VarCounters
     -- Helper function for pretty printing
     indent,
     ----
-    lookupBinRepStart
+    lookupBinRepStart,
   )
 where
 
@@ -242,9 +242,12 @@ boolVarsRange counters = (varOutput counters + varNumInput counters + totalCusto
 
 --------------------------------------------------------------------------------
 
+-- | Blended index -> bin rep index
 lookupBinRepStart :: VarCounters -> Var -> Maybe Var
 lookupBinRepStart counters var
+  -- outputs 
   | var < varOutput counters = Nothing
+  -- number inputs
   | var < varOutput counters + varNumInput counters =
     let nth = var - varOutput counters
      in Just $
@@ -253,29 +256,30 @@ lookupBinRepStart counters var
             + totalCustomInputSize counters
             + boolInputVarSize counters
             + varNumWidth counters * nth
+  -- custom inputs
   | var < varOutput counters + varNumInput counters + totalCustomInputSize counters =
     let nth = var - (varOutput counters + varNumInput counters)
-     in case IntMap.lookupGT nth altCustomInputMap of
+        offset = 
+          outputVarSize counters
+            + numInputVarSize counters
+            + totalCustomInputSize counters
+            + boolInputVarSize counters
+            + numBinRepVarSize counters
+     in case lookupCustomInputBinRepStart (convertCustomInputMap (varCustomInputs counters)) nth of
           Nothing -> Nothing
-          Just (_, width) ->
-            Just $
-              outputVarSize counters
-                + numInputVarSize counters
-                + totalCustomInputSize counters
-                + boolInputVarSize counters
-                + numBinRepVarSize counters
-                + width * nth
+          Just index -> Just (offset + index)
   | otherwise = Nothing
   where
-    -- mapping of [(index, width)]
-    altCustomInputMap :: IntMap Int
-    altCustomInputMap =
-      IntMap.fromList $
-        snd $
-          foldl
-            (\(accSize, accList) (width, size) -> (accSize + size, (accSize + size, width) : accList))
-            (0, [])
-            (IntMap.toList (varCustomInputs counters))
+    -- objective: convert CustomInputMap like [(3, 1), (4, 2), (5, 1)] into [(0, (3, 0)), (1, (4, 3)), (3, (5, 11))]
+    convertCustomInputMap :: IntMap Int -> IntMap (Int, Int)
+    convertCustomInputMap =
+      snd
+        . IntMap.foldlWithKey'
+          (\((accKey, accVal), acc) width size -> ((accKey + size, accVal + width * size), IntMap.insert accKey (width, accVal) acc))
+          ((0, 0), mempty)
+
+    lookupCustomInputBinRepStart :: IntMap (Int, Int) -> Int -> Maybe Int
+    lookupCustomInputBinRepStart xs index = IntMap.lookupLE index xs >>= \(key, (width, offset)) -> Just $ offset + width * (index - key)
 
 -- | Return the blended indices of all Custom input variables along with their bit width
 --    [(bitWidth, blendedIndices)]
@@ -294,8 +298,11 @@ blendNumInputVar :: VarCounters -> Int -> Int
 blendNumInputVar counters index = index + varOutput counters
 
 -- | Return the blended index of a Custom input variable
-blendCustomInputVar :: VarCounters -> Int -> Int
-blendCustomInputVar counters index = index + varOutput counters + varNumInput counters
+blendCustomInputVar :: VarCounters -> Int -> Int -> Int
+blendCustomInputVar counters width index =
+  let offset = varOutput counters + varNumInput counters
+      smallerEntries = IntMap.filterWithKey (\width' _ -> width' < width) (varCustomInputs counters)
+   in offset + IntMap.size smallerEntries + index
 
 -- | Return the blended index of a Boolean input variable
 blendBoolInputVar :: VarCounters -> Int -> Int
