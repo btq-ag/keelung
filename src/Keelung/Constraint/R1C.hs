@@ -18,7 +18,23 @@ import qualified Keelung.Constraint.Polynomial as Poly
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
 data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
-  deriving (Eq, Generic, NFData)
+  deriving (Generic, NFData)
+
+instance (Eq n, Num n) => Eq (R1C n) where
+  R1C a b c == R1C a' b' c' =
+    -- if the RHS are the same
+    (c == c' && (a == a' && b == b' || a == b' && b == a'))
+      -- if the RHS are the negation of each other
+      || ( negate' c == c'
+             && ( negate' a == a' && b == b'
+                    || a == a' && negate' b == b'
+                    || negate' a == b' && b == a'
+                    || a == b' && negate' b == a'
+                )
+         )
+    where
+      negate' (Left n) = Left (-n)
+      negate' (Right p) = Right (Poly.negate p)
 
 instance Functor R1C where
   fmap f (R1C a b c) = R1C (fmapE a) (fmapE b) (fmapE c)
