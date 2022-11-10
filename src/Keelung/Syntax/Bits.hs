@@ -10,10 +10,6 @@ module Keelung.Syntax.Bits where
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
 
-infixl 9 !!!
-infixl 8 .&.
-infixl 7 .|.
-
 class Bits a where
   -- {-# MINIMAL bitWidth #-}
   -- bitWidth :: a -> Int
@@ -21,11 +17,22 @@ class Bits a where
   -- | Bitwise \"and\"
   (.&.) :: a -> a -> a
 
+  infixl 8 .&.
+
   -- | Bitwise \"or\"
   (.|.) :: a -> a -> a
 
+  infixl 7 .|.
+
   -- | Bitwise \"xor\"
   (.^.) :: a -> a -> a
+
+  infixl 6 .^.
+
+  -- | Rotates right, extends less significant bits with 0
+  rotate :: a -> Int -> a
+
+  infixl 8 `rotate`
 
   -- | Retrieve the i-th bit and return it as Boolean
   --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
@@ -33,24 +40,27 @@ class Bits a where
   --   You can access the MSB with (-1) because the index is modulo n
   (!!!) :: a -> Int -> Boolean
 
-  -- pack :: [Boolean] -> a
+  infixl 9 !!!
 
 instance Bits Number where
   (.&.) = AndNum
   (.|.) = OrNum
   (.^.) = XorNum
+  rotate = flip RotateRNum
   (!!!) = NumBit
 
 instance Bits Boolean where
   (.&.) = And
   (.|.) = Or
   (.^.) = Xor
+  rotate x _ = x
   x !!! _ = x
 
 instance KnownNat w => Bits (UInt w) where
   (.&.) = AndUInt
   (.|.) = OrUInt
   (.^.) = XorUInt
+  rotate = flip RotateRUInt
   (!!!) = UIntBit
 
 -- testBit :: a -> Int -> Boolean
@@ -62,7 +72,7 @@ instance KnownNat w => Bits (UInt w) where
 -- instance {-# OVERLAPPABLE #-} (GaloisField a, Integral a) => Bits a where
 --   bitSize x = go 0 (order x)
 --     where
---       go i n = if n == 0 then i else go (i + 1) (Data.Bits.unsafeShiftR n 1)
+--       go i n = if n == 0 then i else go (i + 1) (Data.Bits.unsafeRotateR n 1)
 
 -- -- | Specialized instance for `B64`
 -- instance {-# INCOHERENT #-} Bits B64 where

@@ -35,9 +35,9 @@ data Number
   | Rational Rational -- Rationals
   | NumVar Var -- Number Variables
   | NumInputVar Var -- Input Number Variables
-  -- | PackNum [Boolean] -- Pack a list of Booleans into a Number
-  -- Numeric operators on numbers
-  | Add Number Number
+  | -- | PackNum [Boolean] -- Pack a list of Booleans into a Number
+    -- Numeric operators on numbers
+    Add Number Number
   | Sub Number Number
   | Mul Number Number
   | Div Number Number
@@ -45,6 +45,7 @@ data Number
     AndNum Number Number
   | OrNum Number Number
   | XorNum Number Number
+  | RotateRNum Int Number
   | -- Conditionals
     IfNum Boolean Number Number
   | -- Conversion between Booleans and Numbers
@@ -81,6 +82,7 @@ instance Show Number where
     AndNum x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrNum x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorNum x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
+    RotateRNum n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     FromBool x -> showString "FromBool " . showsPrec prec x
     FromUInt x -> showString "FromUInt " . showsPrec prec x
@@ -124,6 +126,7 @@ data UInt (w :: Nat)
     AndUInt (UInt w) (UInt w)
   | OrUInt (UInt w) (UInt w)
   | XorUInt (UInt w) (UInt w)
+  | RotateRUInt Int (UInt w)
   | -- Conditionals
     IfUInt Boolean (UInt w) (UInt w)
   | -- Conversion between Booleans and unsigned integers
@@ -142,6 +145,7 @@ instance Show (UInt w) where
     AndUInt x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrUInt x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorUInt x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
+    RotateRUInt n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfUInt p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToUInt x -> showString "ToU " . showsPrec prec x
 

@@ -76,6 +76,7 @@ data Expr
   | And Expr Expr
   | Or Expr Expr
   | Xor Expr Expr
+  | RotateR Int Expr
   | BEq Expr Expr
   | If Expr Expr Expr
   | ToNum Expr
@@ -96,6 +97,7 @@ sizeOfExpr expr = case expr of
   Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
   BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  RotateR _ x -> 1 + sizeOfExpr x
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
   ToNum x -> 1 + sizeOfExpr x
   Bit x _ -> 1 + sizeOfExpr x
@@ -117,6 +119,7 @@ instance Show Expr where
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    RotateR n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToNum x -> showString "ToNum " . showsPrec prec x
