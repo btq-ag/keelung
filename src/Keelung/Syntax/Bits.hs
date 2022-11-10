@@ -24,8 +24,8 @@ class Bits a where
   -- | Bitwise \"or\"
   (.|.) :: a -> a -> a
 
-  -- -- | Bitwise \"xor\"
-  -- (.^.) :: a -> a -> a
+  -- | Bitwise \"xor\"
+  (.^.) :: a -> a -> a
 
   -- | Retrieve the i-th bit and return it as Boolean
   --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
@@ -38,17 +38,20 @@ class Bits a where
 instance Bits Number where
   (.&.) = AndNum
   (.|.) = OrNum
-  x !!! i = NumBit x i
+  (.^.) = XorNum
+  (!!!) = NumBit
 
 instance Bits Boolean where
   (.&.) = And
   (.|.) = Or
+  (.^.) = Xor
   x !!! _ = x
 
 instance KnownNat w => Bits (UInt w) where
   (.&.) = AndUInt
   (.|.) = OrUInt
-  x !!! i = UIntBit x i
+  (.^.) = XorUInt
+  (!!!) = UIntBit
 
 -- testBit :: a -> Int -> Boolean
 -- testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then true else false

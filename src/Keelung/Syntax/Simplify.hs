@@ -47,6 +47,7 @@ instance Elaborable Kinded.Number where
     Kinded.Div x y -> Div <$> convertM x <*> convertM y
     Kinded.AndNum x y -> And <$> convertM x <*> convertM y
     Kinded.OrNum x y -> Or <$> convertM x <*> convertM y
+    Kinded.XorNum x y -> Xor <$> convertM x <*> convertM y
     Kinded.IfNum p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.FromBool x -> ToNum <$> convertM x
     Kinded.FromUInt x -> ToNum <$> convertM x
@@ -62,6 +63,7 @@ instance Elaborable (Kinded.UInt w) where
     Kinded.UIntDiv x y -> Div <$> convertM x <*> convertM y
     Kinded.AndUInt x y -> And <$> convertM x <*> convertM y
     Kinded.OrUInt x y -> Or <$> convertM x <*> convertM y
+    Kinded.XorUInt x y -> Xor <$> convertM x <*> convertM y
     Kinded.IfUInt p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.ToUInt x -> ToNum <$> convertM x
 

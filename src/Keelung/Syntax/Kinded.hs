@@ -44,6 +44,7 @@ data Number
   | -- Bitwise operators on numbers
     AndNum Number Number
   | OrNum Number Number
+  | XorNum Number Number
   | -- Conditionals
     IfNum Boolean Number Number
   | -- Conversion between Booleans and Numbers
@@ -79,6 +80,7 @@ instance Show Number where
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     AndNum x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrNum x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
+    XorNum x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
     IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     FromBool x -> showString "FromBool " . showsPrec prec x
     FromUInt x -> showString "FromUInt " . showsPrec prec x
@@ -121,6 +123,7 @@ data UInt (w :: Nat)
   | -- Bitwise operators on unsigned integers
     AndUInt (UInt w) (UInt w)
   | OrUInt (UInt w) (UInt w)
+  | XorUInt (UInt w) (UInt w)
   | -- Conditionals
     IfUInt Boolean (UInt w) (UInt w)
   | -- Conversion between Booleans and unsigned integers
@@ -138,6 +141,7 @@ instance Show (UInt w) where
     UIntDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     AndUInt x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrUInt x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
+    XorUInt x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
     IfUInt p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToUInt x -> showString "ToU " . showsPrec prec x
 
