@@ -11,6 +11,8 @@ import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
 
 infixl 9 !!!
+infixl 8 .&.
+infixl 7 .|.
 
 class Bits a where
   -- {-# MINIMAL bitWidth #-}
@@ -18,6 +20,12 @@ class Bits a where
 
   -- | Bitwise \"and\"
   (.&.) :: a -> a -> a
+
+  -- | Bitwise \"or\"
+  (.|.) :: a -> a -> a
+
+  -- -- | Bitwise \"xor\"
+  -- (.^.) :: a -> a -> a
 
   -- | Retrieve the i-th bit and return it as Boolean
   --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
@@ -29,14 +37,17 @@ class Bits a where
 
 instance Bits Number where
   (.&.) = AndNum
+  (.|.) = OrNum
   x !!! i = NumBit x i
 
 instance Bits Boolean where
   (.&.) = And
+  (.|.) = Or
   x !!! _ = x
 
 instance KnownNat w => Bits (UInt w) where
   (.&.) = AndUInt
+  (.|.) = OrUInt
   x !!! i = UIntBit x i
 
 -- testBit :: a -> Int -> Boolean
