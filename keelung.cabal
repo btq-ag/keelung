@@ -34,6 +34,7 @@ library
       Keelung.Field.N
       Keelung.Monad
       Keelung.Syntax
+      Keelung.Syntax.BinRep
       Keelung.Syntax.Bits
       Keelung.Syntax.Kinded
       Keelung.Syntax.Simplify

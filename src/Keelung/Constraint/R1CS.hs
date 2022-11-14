@@ -5,12 +5,12 @@
 module Keelung.Constraint.R1CS where
 
 import Control.DeepSeq (NFData)
-import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Syntax.BinRep (BinRep (..), BinReps)
+import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -25,11 +25,10 @@ data R1CS n = R1CS
     -- | For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n],
     -- | For restoring binary representation of Number input variables
-    --   [(inputIndex, binRepIndex)]
-    r1csNumBinReps :: IntMap Var,
+    r1csNumBinReps :: BinReps,
     -- | For restoring binary representation of custom output variables
     --   [(bitWidth, [(inputIndex, binRepIndex)])]
-    r1csCustomBinReps :: IntMap (IntMap Var)
+    r1csCustomBinReps :: BinReps
   }
   deriving (Generic, Eq, NFData, Functor)
 
@@ -41,12 +40,10 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
       <> showTotalConstraintSize
       <> showOrdinaryConstraints
       <> showBooleanConstraints
-      <> showBinRepConstraints
+      <> show (numBinReps <> customBinReps)
       <> indent (show counters)
       <> "}"
     where
-      numBitWidth = getNumBitWidth counters
-
       totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
       showTotalConstraintSize =
         "  Total constriant size: "
@@ -91,52 +88,6 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
                   <> "      ..\n"
                   <> showBooleanConstraint (end - 1)
 
-      showBinRepConstraints =
-        if totalBinRepConstraintSize == 0
-          then ""
-          else
-            "  Binary representation constriants (" <> show (numInputVarSize counters + totalCustomInputSize counters) <> "):\n"
-              <> unlines
-                ( map
-                    (uncurry (showBinRepConstraint numBitWidth))
-                    (IntMap.toList numBinReps)
-                    ++ concatMap
-                      ( \(bitWidth, pairs) ->
-                          map
-                            (uncurry (showBinRepConstraint bitWidth))
-                            (IntMap.toList pairs)
-                      )
-                      (IntMap.toList customBinReps)
-                )
-        where
-          showBinRepConstraint 2 var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-          showBinRepConstraint 3 var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-              <> " + 4$"
-              <> show (binRep + 2)
-          showBinRepConstraint width var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-              <> " + ... + 2^"
-              <> show (width - 1)
-              <> "$"
-              <> show (binRep + width - 1)
-
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
@@ -146,8 +97,6 @@ toR1Cs (R1CS cs counters _ numBinReps customBinReps) =
     <> numBinRepConstraints
     <> customBinRepConstraints
   where
-    numBitWidth = getNumBitWidth counters
-
     booleanInputVarConstraints =
       let (start, end) = boolVarsRange counters
        in map
@@ -161,27 +110,23 @@ toR1Cs (R1CS cs counters _ numBinReps customBinReps) =
 
     numBinRepConstraints =
       map
-        ( \(input, binRep) ->
+        ( \binRep ->
             R1C
               (Left 1)
-              (Poly.buildEither 0 [(input, 1)])
-              (Poly.buildEither 0 [(binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. numBitWidth - 1]])
+              (Poly.buildEither 0 [(binRepVar binRep, 1)])
+              (Poly.buildEither 0 [(binRepBitsIndex binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. binRepBitWidth binRep - 1]])
         )
-        (IntMap.toList numBinReps)
+        (BinRep.toList numBinReps)
 
     customBinRepConstraints =
-      concatMap
-        ( \(width, pairs) ->
-            map
-              ( \(input, binRep) ->
-                  R1C
-                    (Left 1)
-                    (Poly.buildEither 0 [(input, 1)])
-                    (Poly.buildEither 0 [(binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. width - 1]])
-              )
-              (IntMap.toList pairs)
+      map
+        ( \binRep ->
+            R1C
+              (Left 1)
+              (Poly.buildEither 0 [(binRepVar binRep, 1)])
+              (Poly.buildEither 0 [(binRepBitsIndex binRep + i, fromInteger ((2 :: Integer) ^ i)) | i <- [0 .. binRepBitWidth binRep - 1]])
         )
-        (IntMap.toList customBinReps)
+        (BinRep.toList customBinReps)
 
 --------------------------------------------------------------------------------
 
