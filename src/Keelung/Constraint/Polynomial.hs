@@ -7,14 +7,14 @@ module Keelung.Constraint.Polynomial
     buildEither,
     buildMaybe,
     singleVar,
+    singleton,
     vars,
     varSize,
     coeffs,
     mergeCoeffs,
     constant,
-    isConstant,
     view,
-    mapVars,
+    renumberVars,
     evaluate,
     --
     delete,
@@ -93,9 +93,13 @@ buildMaybe c xs =
         then Nothing
         else Just (Poly c xs')
 
--- | Create a polynomial from a single variable and its coefficient.
+-- | Create a polynomial from a single variable
 singleVar :: Num n => Var -> Poly n
 singleVar x = Poly 0 (IntMap.singleton x 1)
+
+-- | Create a polynomial from a single variable and its coefficient
+singleton :: Num n => Var -> n -> Poly n
+singleton x c = Poly 0 (IntMap.singleton x c)
 
 -- | Return the set of variables.
 vars :: Poly n -> IntSet
@@ -117,17 +121,13 @@ mergeCoeffs xs ys = IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys
 constant :: Poly n -> n
 constant (Poly c _) = c
 
--- | See of a polynomial is a constant.
-isConstant :: Poly n -> Bool
-isConstant (Poly _ xs) = IntMap.null xs
-
 -- | View pattern for Poly
 view :: Poly n -> (n, IntMap n)
 view (Poly c xs) = (c, xs)
 
 -- | For renumbering the variables.
-mapVars :: (Var -> Var) -> Poly n -> Poly n
-mapVars f (Poly c xs) = Poly c (IntMap.mapKeys f xs)
+renumberVars :: (Var -> Var) -> Poly n -> Poly n
+renumberVars f (Poly c xs) = Poly c (IntMap.mapKeys f xs)
 
 -- | Given an assignment of variables, return the value of the polynomial.
 evaluate :: (Num n, Eq n) => Poly n -> IntMap n -> n

@@ -107,4 +107,4 @@ isRank1 :: R1C n -> Bool
 isRank1 (R1C a b _) = isConstant a || isConstant b
   where
     isConstant (Left _) = True
-    isConstant (Right xs) = Poly.isConstant xs
+    isConstant (Right _) = False
