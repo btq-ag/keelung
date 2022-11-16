@@ -7,8 +7,6 @@ import Control.DeepSeq (NFData)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
-import Data.Set (Set)
-import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Keelung.Types (Var)
 
@@ -48,18 +46,21 @@ instance Show BinRep where
      in "$" <> show var <> " = $" <> show (index + w - w') <> " + 2$" <> show (index + w - w' + 1) <> " + ... + 2^" <> show (w - 1) <> "$" <> show (index + w - w' - 1)
 
 instance Ord BinRep where
-  compare (BinRep x _ _ _r1) (BinRep y _ _ _r2) = compare x y 
-  -- compare (BinRep x _ _ r1) (BinRep y _ _ r2) = case compare r1 r2 of
-  --   EQ -> compare x y
-  --   result -> result
+  compare (BinRep x _ _ _r1) (BinRep y _ _ _r2) = compare x y
+
+-- compare (BinRep x _ _ r1) (BinRep y _ _ r2) = case compare r1 r2 of
+--   EQ -> compare x y
+--   result -> result
 
 fromNumBinRep :: Int -> (Var, Var) -> BinRep
 fromNumBinRep width (var, index) = BinRep var width index 0
 
 --------------------------------------------------------------------------------
 
--- | A collection of BinReps sorted according to their bitwidth
-newtype BinReps = BinReps {unBinReps :: IntMap (Set BinRep)}
+-- | A collection of BinReps sorted according to
+--    1. their bitwidth
+--    2. their corresponding variable
+newtype BinReps = BinReps {unBinReps :: IntMap (IntMap BinRep)}
   deriving (Eq, Generic, NFData)
 
 instance Serialize BinReps
@@ -87,10 +88,13 @@ fromList :: [BinRep] -> BinReps
 fromList = foldl (flip insert) mempty
 
 toList :: BinReps -> [BinRep]
-toList = concatMap Set.toList . IntMap.elems . unBinReps
+toList = concatMap IntMap.elems . IntMap.elems . unBinReps
 
 insert :: BinRep -> BinReps -> BinReps
-insert binRep xs = BinReps $ IntMap.insertWith (<>) (binRepBitWidth binRep) (Set.singleton binRep) (unBinReps xs)
+insert binRep xs = BinReps $ IntMap.insertWith (<>) (binRepBitWidth binRep) (IntMap.singleton (binRepVar binRep) binRep) (unBinReps xs)
 
 size :: BinReps -> Int
-size = IntMap.foldl' (\acc set -> acc + Set.size set) 0 . unBinReps
+size = IntMap.foldl' (\acc set -> acc + IntMap.size set) 0 . unBinReps
+
+lookup :: Int -> Var -> BinReps -> Maybe BinRep
+lookup width var (BinReps binReps) = IntMap.lookup width binReps >>= IntMap.lookup var
