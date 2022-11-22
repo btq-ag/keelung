@@ -29,14 +29,14 @@ module Keelung.Syntax.VarCounters
     customInputVarsRanges,
     -- Blended index of variables
     blendedCustomInputVarSizes,
-    blendNumInputVar,
-    blendCustomInputVar,
-    blendBoolInputVar,
+    blendInputVarN,
+    blendInputVarU,
+    blendInputVarB,
     blendIntermediateVar,
     -- For modifying the counters
-    bumpNumInputVar,
-    bumpBoolInputVar,
-    bumpCustomInputVar,
+    bumpInputVarN,
+    bumpInputVarB,
+    bumpInputVarU,
     bumpIntermediateVar,
     setOutputVarSize,
     setIntermediateVarSize,
@@ -245,7 +245,7 @@ boolVarsRange counters = (varOutput counters + varNumInput counters + totalCusto
 -- | Blended index -> bin rep index
 lookupBinRepStart :: VarCounters -> Var -> Maybe Var
 lookupBinRepStart counters var
-  -- outputs 
+  -- outputs
   | var < varOutput counters = Nothing
   -- number inputs
   | var < varOutput counters + varNumInput counters =
@@ -259,7 +259,7 @@ lookupBinRepStart counters var
   -- custom inputs
   | var < varOutput counters + varNumInput counters + totalCustomInputSize counters =
     let nth = var - (varOutput counters + varNumInput counters)
-        offset = 
+        offset =
           outputVarSize counters
             + numInputVarSize counters
             + totalCustomInputSize counters
@@ -294,19 +294,19 @@ blendedCustomInputVarSizes counters =
     (IntMap.fromList (zip [varOutput counters ..] (toList (varInputSequence counters))))
 
 -- | Return the blended index of a Number input variable
-blendNumInputVar :: VarCounters -> Int -> Int
-blendNumInputVar counters index = index + varOutput counters
+blendInputVarN :: VarCounters -> Int -> Int
+blendInputVarN counters index = index + varOutput counters
 
 -- | Return the blended index of a Custom input variable
-blendCustomInputVar :: VarCounters -> Int -> Int -> Int
-blendCustomInputVar counters width index =
+blendInputVarU :: VarCounters -> Int -> Int -> Int
+blendInputVarU counters width index =
   let offset = varOutput counters + varNumInput counters
       smallerEntries = IntMap.filterWithKey (\width' _ -> width' < width) (varCustomInputs counters)
    in offset + IntMap.size smallerEntries + index
 
 -- | Return the blended index of a Boolean input variable
-blendBoolInputVar :: VarCounters -> Int -> Int
-blendBoolInputVar counters index = index + varOutput counters + varNumInput counters + totalCustomInputSize counters
+blendInputVarB :: VarCounters -> Int -> Int
+blendInputVarB counters index = index + varOutput counters + varNumInput counters + totalCustomInputSize counters
 
 -- | Return the blended index of an intermediate variable
 blendIntermediateVar :: VarCounters -> Int -> Int
@@ -315,8 +315,8 @@ blendIntermediateVar counters index = index + pinnedVarSize counters
 --------------------------------------------------------------------------------
 
 -- | Bump the Number input variable counter
-bumpNumInputVar :: VarCounters -> VarCounters
-bumpNumInputVar counters =
+bumpInputVarN :: VarCounters -> VarCounters
+bumpInputVarN counters =
   let var = varNumInput counters
    in counters
         { varNumInput = var + 1,
@@ -324,8 +324,8 @@ bumpNumInputVar counters =
         }
 
 -- | Bump the Boolean input variable counter
-bumpBoolInputVar :: VarCounters -> VarCounters
-bumpBoolInputVar counters =
+bumpInputVarB :: VarCounters -> VarCounters
+bumpInputVarB counters =
   let var = varBoolInput counters
    in counters
         { varBoolInput = var + 1,
@@ -333,8 +333,8 @@ bumpBoolInputVar counters =
         }
 
 -- | Bump a custom input variable counter of some bit width
-bumpCustomInputVar :: Int -> VarCounters -> VarCounters
-bumpCustomInputVar width counters =
+bumpInputVarU :: Int -> VarCounters -> VarCounters
+bumpInputVarU width counters =
   let (result, after) = IntMap.insertLookupWithKey f width 1 (varCustomInputs counters)
    in counters
         { varCustomInputs = after,

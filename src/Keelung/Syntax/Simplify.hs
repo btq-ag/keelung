@@ -26,8 +26,8 @@ convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
         )
 
 convertAssignment :: Kinded.Assignment -> HeapM Assignment
-convertAssignment (Kinded.BoolAssignment var e) = Assignment (NumVar var) <$> convertM e
-convertAssignment (Kinded.NumAssignment var e) = Assignment (BoolVar var) <$> convertM e
+convertAssignment (Kinded.BoolAssignment var e) = Assignment (VarN var) <$> convertM e
+convertAssignment (Kinded.NumAssignment var e) = Assignment (VarB var) <$> convertM e
 
 --------------------------------------------------------------------------------
 
@@ -39,41 +39,41 @@ instance Elaborable Kinded.Number where
   convertM expr = case expr of
     Kinded.Integer n -> return $ Val (Integer n)
     Kinded.Rational n -> return $ Val (Rational n)
-    Kinded.NumVar var -> return $ Var (NumVar var)
-    Kinded.NumInputVar var -> return $ Var (NumInputVar var)
+    Kinded.VarN var -> return $ Var (VarN var)
+    Kinded.InputVarN var -> return $ Var (InputVarN var)
     Kinded.Add x y -> Add <$> convertM x <*> convertM y
     Kinded.Sub x y -> Sub <$> convertM x <*> convertM y
     Kinded.Mul x y -> Mul <$> convertM x <*> convertM y
     Kinded.Div x y -> Div <$> convertM x <*> convertM y
-    Kinded.AndNum x y -> And <$> convertM x <*> convertM y
-    Kinded.OrNum x y -> Or <$> convertM x <*> convertM y
-    Kinded.XorNum x y -> Xor <$> convertM x <*> convertM y
-    Kinded.RotateRNum n x -> RotateR n <$> convertM x
-    Kinded.IfNum p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    -- Kinded.AndN x y -> And <$> convertM x <*> convertM y
+    -- Kinded.OrN x y -> Or <$> convertM x <*> convertM y
+    -- Kinded.XorN x y -> Xor <$> convertM x <*> convertM y
+    -- Kinded.RoRN n x -> RotateR n <$> convertM x
+    Kinded.IfN p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.FromBool x -> ToNum <$> convertM x
     Kinded.FromUInt x -> ToNum <$> convertM x
 
 instance Elaborable (Kinded.UInt w) where
   convertM expr = case expr of
     Kinded.UInt w n -> return $ Val (Unsigned w n)
-    Kinded.UIntVar w n -> return $ Var (UIntVar w n)
-    Kinded.UIntInputVar w n -> return $ Var (UIntInputVar w n)
-    Kinded.UIntAdd x y -> Add <$> convertM x <*> convertM y
-    Kinded.UIntSub x y -> Sub <$> convertM x <*> convertM y
-    Kinded.UIntMul x y -> Mul <$> convertM x <*> convertM y
-    Kinded.UIntDiv x y -> Div <$> convertM x <*> convertM y
-    Kinded.AndUInt x y -> And <$> convertM x <*> convertM y
-    Kinded.OrUInt x y -> Or <$> convertM x <*> convertM y
-    Kinded.XorUInt x y -> Xor <$> convertM x <*> convertM y
-    Kinded.RotateRUInt n x -> RotateR n <$> convertM x
-    Kinded.IfUInt p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.VarU w n -> return $ Var (VarU w n)
+    Kinded.InputVarU w n -> return $ Var (InputVarU w n)
+    Kinded.AddU x y -> Add <$> convertM x <*> convertM y
+    Kinded.SubU x y -> Sub <$> convertM x <*> convertM y
+    Kinded.MulU x y -> Mul <$> convertM x <*> convertM y
+    -- Kinded.UIntDiv x y -> Div <$> convertM x <*> convertM y
+    Kinded.AndU x y -> And <$> convertM x <*> convertM y
+    Kinded.OrU x y -> Or <$> convertM x <*> convertM y
+    Kinded.XorU x y -> Xor <$> convertM x <*> convertM y
+    Kinded.RoRU n x -> RotateR n <$> convertM x
+    Kinded.IfU p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.ToUInt x -> ToNum <$> convertM x
 
 instance Elaborable Kinded.Boolean where
   convertM expr = case expr of
     Kinded.Boolean b -> return $ Val (Boolean b)
-    Kinded.BoolVar var -> return $ Var (BoolVar var)
-    Kinded.BoolInputVar var -> return $ Var (BoolInputVar var)
+    Kinded.VarB var -> return $ Var (VarB var)
+    Kinded.InputVarB var -> return $ Var (InputVarB var)
     Kinded.NumBit n i -> Bit <$> convertM n <*> return i
     Kinded.UIntBit n i -> Bit <$> convertM n <*> return i
     Kinded.Eq x y -> Eq <$> convertM x <*> convertM y
@@ -82,7 +82,7 @@ instance Elaborable Kinded.Boolean where
     Kinded.Xor x y -> Xor <$> convertM x <*> convertM y
     Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.UEq x y -> BEq <$> convertM x <*> convertM y
-    Kinded.IfBool p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.IfB p x y -> If <$> convertM p <*> convertM x <*> convertM y
 
 instance Elaborable () where
   convertM expr = case expr of
@@ -118,6 +118,6 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
         Just (elemType, array) -> case IntMap.lookup i array of
           Nothing -> error "HeapM: index ouf of bounds"
           Just addr'' -> case elemType of
-            Kinded.NumElem -> return $ Var $ NumVar addr''
-            Kinded.BoolElem -> return $ Var $ BoolVar addr''
+            Kinded.NumElem -> return $ Var $ VarN addr''
+            Kinded.BoolElem -> return $ Var $ VarB addr''
             Kinded.ArrElem _ len' -> readArray addr'' len'

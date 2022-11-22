@@ -154,22 +154,22 @@ freshVar = do
   return index
 
 -- | Allocate a fresh input variable.
-freshNumInputVar :: Comp Var
-freshNumInputVar = do
+freshInputVarN :: Comp Var
+freshInputVarN = do
   index <- gets (numInputVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpNumInputVar (compVarCounters st)})
+  modify (\st -> st {compVarCounters = bumpInputVarN (compVarCounters st)})
   return index
 
-freshBoolInputVar :: Comp Var
-freshBoolInputVar = do
+freshInputVarB :: Comp Var
+freshInputVarB = do
   index <- gets (boolInputVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpBoolInputVar (compVarCounters st)})
+  modify (\st -> st {compVarCounters = bumpInputVarB (compVarCounters st)})
   return index
 
-freshUIntInputVar :: Int -> Comp Var
-freshUIntInputVar width = do
+freshInputVarU :: Int -> Comp Var
+freshInputVarU width = do
   index <- gets (customInputSizeOf width . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpCustomInputVar width (compVarCounters st)})
+  modify (\st -> st {compVarCounters = bumpInputVarU width (compVarCounters st)})
   return index
 
 --------------------------------------------------------------------------------
@@ -184,27 +184,27 @@ class Proper t where
 
 instance Proper Number where
   input = inputNum
-  cond = IfNum
+  cond = IfN
 
 instance Proper Boolean where
   input = inputBool
-  cond = IfBool
+  cond = IfB
 
 instance KnownNat w => Proper (UInt w) where
   input = inputUInt
-  cond = IfUInt
+  cond = IfU
 
 -- | Requests a fresh Num input variable
 inputNum :: Comp Number
-inputNum = NumInputVar <$> freshNumInputVar
+inputNum = InputVarN <$> freshInputVarN
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
-inputBool = BoolInputVar <$> freshBoolInputVar
+inputBool = InputVarB <$> freshInputVarB
 
 -- | Requests a fresh Unsigned integer input variable of some bit width
 inputUInt :: forall w. KnownNat w => Comp (UInt w)
-inputUInt = UIntInputVar width <$> freshUIntInputVar width
+inputUInt = InputVarU width <$> freshInputVarU width
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
@@ -318,32 +318,32 @@ instance Mutable Number where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compNumAsgns = NumAssignment var val : compNumAsgns st}
-    return (var, NumVar var)
+    return (var, VarN var)
 
   typeOf _ = NumElem
 
-  updateM (ArrayRef _ _ addr) i (NumVar n) = writeHeap addr NumElem (i, n)
+  updateM (ArrayRef _ _ addr) i (VarN n) = writeHeap addr NumElem (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElement NumElem elemAddr = NumVar elemAddr
+  constructElement NumElem elemAddr = VarN elemAddr
   constructElement _ _ = error "expecting element to be of Num"
 
 instance Mutable Boolean where
   alloc val = do
     var <- freshVar
     modify' $ \st -> st {compBoolAsgns = BoolAssignment var val : compBoolAsgns st}
-    return (var, BoolVar var)
+    return (var, VarB var)
 
   typeOf _ = BoolElem
 
-  updateM (ArrayRef _ _ addr) i (BoolVar n) = writeHeap addr BoolElem (i, n)
+  updateM (ArrayRef _ _ addr) i (VarB n) = writeHeap addr BoolElem (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElement BoolElem elemAddr = BoolVar elemAddr
+  constructElement BoolElem elemAddr = VarB elemAddr
   constructElement _ _ = error "expecting element to be of Bool"
 
 -- -- | Access an element from a 1-D array

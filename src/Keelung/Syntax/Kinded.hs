@@ -33,8 +33,8 @@ import Keelung.Types
 data Number
   = Integer Integer -- Integers
   | Rational Rational -- Rationals
-  | NumVar Var -- Number Variables
-  | NumInputVar Var -- Input Number Variables
+  | VarN Var -- Number Variables
+  | InputVarN Var -- Input Number Variables
   | -- | PackNum [Boolean] -- Pack a list of Booleans into a Number
     -- Numeric operators on numbers
     Add Number Number
@@ -42,12 +42,13 @@ data Number
   | Mul Number Number
   | Div Number Number
   | -- Bitwise operators on numbers
-    AndNum Number Number
-  | OrNum Number Number
-  | XorNum Number Number
-  | RotateRNum Int Number
-  | -- Conditionals
-    IfNum Boolean Number Number
+    --   AndN Number Number
+
+    -- | OrN Number Number
+    -- | XorN Number Number
+    -- RoRN I nt Number
+    -- Conditionals
+    IfN Boolean Number Number
   | -- Conversion between Booleans and Numbers
     FromBool Boolean
   | forall w. KnownNat w => FromUInt (UInt w)
@@ -55,13 +56,13 @@ data Number
 instance Eq Number where
   Integer x == Integer y = x == y
   Rational x == Rational y = x == y
-  NumVar x == NumVar y = x == y
-  NumInputVar x == NumInputVar y = x == y
+  VarN x == VarN y = x == y
+  InputVarN x == InputVarN y = x == y
   Add x1 x2 == Add y1 y2 = x1 == y1 && x2 == y2
   Sub x1 x2 == Sub y1 y2 = x1 == y1 && x2 == y2
   Mul x1 x2 == Mul y1 y2 = x1 == y1 && x2 == y2
   Div x1 x2 == Div y1 y2 = x1 == y1 && x2 == y2
-  IfNum x1 x2 x3 == IfNum y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  IfN x1 x2 x3 == IfN y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
   FromBool x == FromBool y = x == y
   FromUInt x == FromUInt y = case sameNat x y of
     Just Refl -> x == y
@@ -72,18 +73,18 @@ instance Show Number where
   showsPrec prec expr = case expr of
     Integer n -> showsPrec prec n
     Rational n -> showsPrec prec n
-    NumVar ref -> showString "$" . shows ref
-    NumInputVar ref -> showString "$N" . shows ref
+    VarN ref -> showString "$" . shows ref
+    InputVarN ref -> showString "$N" . shows ref
     -- PackNum bs -> showString "Pack(" . shows bs . showString ")"
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
-    AndNum x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
-    OrNum x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
-    XorNum x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
-    RotateRNum n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
-    IfNum p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    -- AndN x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
+    -- OrN x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
+    -- XorN x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
+    -- RoRN n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
+    IfN p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     FromBool x -> showString "FromBool " . showsPrec prec x
     FromUInt x -> showString "FromUInt " . showsPrec prec x
 
@@ -115,20 +116,19 @@ instance Fractional Number where
 -- | Unsigned Integers
 data UInt (w :: Nat)
   = UInt Int Integer -- Integers
-  | UIntVar Int Var -- Unsigned Integer Variables
-  | UIntInputVar Int Var -- Input Unsigned Integer Variables
+  | VarU Int Var -- Unsigned Integer Variables
+  | InputVarU Int Var -- Input Unsigned Integer Variables
   -- Numeric operators on unsigned integers
-  | UIntAdd (UInt w) (UInt w)
-  | UIntSub (UInt w) (UInt w)
-  | UIntMul (UInt w) (UInt w)
-  | UIntDiv (UInt w) (UInt w)
+  | AddU (UInt w) (UInt w)
+  | SubU (UInt w) (UInt w)
+  | MulU (UInt w) (UInt w)
   | -- Bitwise operators on unsigned integers
-    AndUInt (UInt w) (UInt w)
-  | OrUInt (UInt w) (UInt w)
-  | XorUInt (UInt w) (UInt w)
-  | RotateRUInt Int (UInt w)
+    AndU (UInt w) (UInt w)
+  | OrU (UInt w) (UInt w)
+  | XorU (UInt w) (UInt w)
+  | RoRU Int (UInt w)
   | -- Conditionals
-    IfUInt Boolean (UInt w) (UInt w)
+    IfU Boolean (UInt w) (UInt w)
   | -- Conversion between Booleans and unsigned integers
     ToUInt Boolean
   deriving (Eq)
@@ -136,23 +136,22 @@ data UInt (w :: Nat)
 instance Show (UInt w) where
   showsPrec prec expr = case expr of
     UInt _ n -> showsPrec prec n
-    UIntVar _ ref -> showString "$" . shows ref
-    UIntInputVar width ref -> showString "$U[" . shows width . showString "]" . shows ref
-    UIntAdd x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
-    UIntSub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
-    UIntMul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    UIntDiv x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
-    AndUInt x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
-    OrUInt x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
-    XorUInt x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
-    RotateRUInt n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
-    IfUInt p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    VarU _ ref -> showString "$" . shows ref
+    InputVarU width ref -> showString "$U[" . shows width . showString "]" . shows ref
+    AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
+    OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
+    XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
+    RoRU n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
+    IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToUInt x -> showString "ToU " . showsPrec prec x
 
 instance KnownNat w => Num (UInt w) where
-  (+) = UIntAdd
-  (-) = UIntSub
-  (*) = UIntMul
+  (+) = AddU
+  (-) = SubU
+  (*) = MulU
   abs = id
 
   -- law of `signum`: abs x * signum x == x
@@ -167,8 +166,8 @@ instance KnownNat w => Num (UInt w) where
       go n = UInt (fromIntegral width) (fromIntegral n)
 
 instance KnownNat w => Semiring (UInt w) where
-  plus = UIntAdd
-  times = UIntMul
+  plus = AddU
+  times = MulU
   zero = 0
   one = 1
 
@@ -184,8 +183,8 @@ instance KnownNat w => Ring (UInt w) where
 -- | Booleans
 data Boolean
   = Boolean Bool
-  | BoolVar Var -- Boolean Variables
-  | BoolInputVar Var -- Input Boolean Variables
+  | VarB Var -- Boolean Variables
+  | InputVarB Var -- Input Boolean Variables
   | NumBit Number Int
   | forall w. KnownNat w => UIntBit (UInt w) Int
   | -- Operators on Booleans
@@ -197,12 +196,12 @@ data Boolean
   | Eq Number Number
   | forall w. KnownNat w => UEq (UInt w) (UInt w)
   | -- Conditionals
-    IfBool Boolean Boolean Boolean
+    IfB Boolean Boolean Boolean
 
 instance Eq Boolean where
   Boolean x == Boolean y = x == y
-  BoolVar x == BoolVar y = x == y
-  BoolInputVar x == BoolInputVar y = x == y
+  VarB x == VarB y = x == y
+  InputVarB x == InputVarB y = x == y
   NumBit x1 x2 == NumBit y1 y2 = x1 == y1 && x2 == y2
   And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
   Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
@@ -214,14 +213,14 @@ instance Eq Boolean where
       Just Refl -> (x1 == x2) == (y1 == y2)
       Nothing -> False
     Nothing -> False
-  IfBool x1 x2 x3 == IfBool y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  IfB x1 x2 x3 == IfB y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
   _ == _ = False
 
 instance Show Boolean where
   showsPrec prec expr = case expr of
     Boolean b -> showsPrec prec b
-    BoolVar ref -> showString "$" . shows ref
-    BoolInputVar ref -> showString "$B" . shows ref
+    VarB ref -> showString "$" . shows ref
+    InputVarB ref -> showString "$B" . shows ref
     NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     UIntBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
@@ -230,7 +229,7 @@ instance Show Boolean where
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     UEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    IfBool p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
 
@@ -251,7 +250,7 @@ fromBool = FromBool
 
 -- | For converting numbers to booleans
 toBool :: Number -> Boolean
-toBool x = IfBool (x `Eq` 0) false true
+toBool x = IfB (x `Eq` 0) false true
 
 -- | Smart constructor for 'True'
 true :: Boolean
@@ -263,11 +262,11 @@ false = Boolean False
 
 -- | Helper function for not-`Eq`
 neq :: Number -> Number -> Boolean
-neq x y = IfBool (x `Eq` y) false true
+neq x y = IfB (x `Eq` y) false true
 
 -- | Helper function for not-`BEq`
 nbeq :: Boolean -> Boolean -> Boolean
-nbeq x y = IfBool (x `BEq` y) false true
+nbeq x y = IfB (x `BEq` y) false true
 
 -- | Helper function for negating a boolean expression
 neg :: Boolean -> Boolean

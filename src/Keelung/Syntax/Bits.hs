@@ -42,12 +42,12 @@ class Bits a where
 
   infixl 9 !!!
 
-instance Bits Number where
-  (.&.) = AndNum
-  (.|.) = OrNum
-  (.^.) = XorNum
-  rotate = flip RotateRNum
-  (!!!) = NumBit
+-- instance Bits Number where
+--   (.&.) = AndN
+--   (.|.) = OrN
+--   (.^.) = XorN
+--   rotate = flip RoRN
+--   (!!!) = NumBit
 
 instance Bits Boolean where
   (.&.) = And
@@ -57,10 +57,10 @@ instance Bits Boolean where
   x !!! _ = x
 
 instance KnownNat w => Bits (UInt w) where
-  (.&.) = AndUInt
-  (.|.) = OrUInt
-  (.^.) = XorUInt
-  rotate = flip RotateRUInt
+  (.&.) = AndU
+  (.|.) = OrU
+  (.^.) = XorU
+  rotate = flip RoRU
   (!!!) = UIntBit
 
 -- testBit :: a -> Int -> Boolean

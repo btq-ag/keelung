@@ -40,27 +40,23 @@ instance Serialize Val
 --------------------------------------------------------------------------------
 
 data Ref
-  = NumVar Var
-  | NumInputVar Var
-  | BoolVar Var
-  | BoolInputVar Var
-  | UIntVar Int Var
-  | UIntInputVar Int Var
-  deriving
-    ( Generic,
-      Eq,
-      NFData
-    )
+  = VarN Var
+  | InputVarN Var
+  | VarB Var
+  | InputVarB Var
+  | VarU Int Var
+  | InputVarU Int Var
+  deriving (Generic, Eq, NFData)
 
 instance Serialize Ref
 
 instance Show Ref where
-  show (NumVar n) = "$" <> show n
-  show (NumInputVar n) = "$N" <> show n
-  show (BoolVar n) = "$" <> show n
-  show (BoolInputVar n) = "$B" <> show n
-  show (UIntVar _ n) = "$" <> show n
-  show (UIntInputVar w n) = "$U[" <> show w <> "]" <> show n
+  show (VarN n) = "$N" <> show n
+  show (InputVarN n) = "$N" <> show n
+  show (VarB n) = "$B" <> show n
+  show (InputVarB n) = "$B" <> show n
+  show (VarU w n) = "$U[" <> show w <> "]" <> show n
+  show (InputVarU w n) = "$U[" <> show w <> "]" <> show n
 
 --------------------------------------------------------------------------------
 
