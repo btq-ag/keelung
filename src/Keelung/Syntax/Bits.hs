@@ -29,7 +29,7 @@ class Bits a where
 
   infixl 6 .^.
 
-  -- | Rotates right, extends less significant bits with 0
+  -- | Rotates left, extends less significant bits with 0
   rotate :: a -> Int -> a
 
   infixl 8 `rotate`
@@ -64,7 +64,7 @@ instance KnownNat w => Bits (UInt w) where
   (.&.) = AndU
   (.|.) = OrU
   (.^.) = XorU
-  rotate = flip RoRU
+  rotate = flip RoLU
   (!!!) = UIntBit
   not = NotU
 

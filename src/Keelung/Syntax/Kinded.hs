@@ -127,7 +127,7 @@ data UInt (w :: Nat)
   | OrU (UInt w) (UInt w)
   | XorU (UInt w) (UInt w)
   | NotU (UInt w)
-  | RoRU Int (UInt w)
+  | RoLU Int (UInt w)
   | -- Conditionals
     IfU Boolean (UInt w) (UInt w)
   | -- Conversion between Booleans and unsigned integers
@@ -146,7 +146,7 @@ instance KnownNat w => Show (UInt w) where
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
     NotU x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
-    RoRU n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
+    RoLU n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToUInt x -> showString "ToU " . showsPrec prec x
 

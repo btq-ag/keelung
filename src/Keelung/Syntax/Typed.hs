@@ -116,6 +116,7 @@ data UInt
   | OrU Width UInt UInt
   | XorU Width UInt UInt
   | NotU Width UInt
+  | RoLU Width Int UInt
   | IfU Width Boolean UInt UInt
   | LoopholeU Width Expr
   deriving (Generic, Eq, NFData)
@@ -134,6 +135,7 @@ instance Show UInt where
     OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
+    RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     LoopholeU _ _ -> error "LoopholeU"
 
@@ -145,9 +147,7 @@ data Expr
   | Number Number
   | UInt UInt
   | Array (Array Int Expr)
-  | RotateR Int Expr
-  | -- | EqB Expr Expr
-    ToNum Expr
+  | ToNum Expr
   | Bit Expr Int
   deriving (Generic, Eq, NFData)
 
@@ -158,7 +158,6 @@ instance Show Expr where
     Number num -> shows num
     UInt uint -> shows uint
     Array xs -> showList (toList xs)
-    RotateR n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     ToNum x -> showString "ToNum " . showsPrec prec x
     Bit x i -> shows x . showString "[" . shows i . showString "]"
 

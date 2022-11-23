@@ -9,11 +9,11 @@ import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
 import GHC.TypeLits (KnownNat)
 import qualified Keelung.Monad as Kinded
+import Keelung.Syntax.Kinded (widthOf)
 import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
 import qualified Keelung.Types as Kinded
-import Keelung.Syntax.Kinded (widthOf)
 
 --------------------------------------------------------------------------------
 
@@ -114,7 +114,7 @@ instance KnownNat w => Elaborable (Kinded.UInt w) where
     Kinded.OrU x y -> UInt <$> (OrU (widthOf expr) <$> encode x <*> encode y)
     Kinded.XorU x y -> UInt <$> (XorU (widthOf expr) <$> encode x <*> encode y)
     Kinded.NotU x -> UInt . NotU (widthOf expr) <$> encode x
-    Kinded.RoRU n x -> RotateR n <$> convertM x
+    Kinded.RoLU n x -> UInt <$> (RoLU (widthOf expr) n <$> encode x)
     Kinded.IfU p x y -> UInt <$> (IfU (widthOf expr) <$> encode p <*> encode x <*> encode y)
     Kinded.ToUInt x -> ToNum <$> convertM x
 
