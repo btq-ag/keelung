@@ -8,6 +8,7 @@ module Keelung.Syntax.Kinded
   ( Number (..),
     Boolean (..),
     UInt (..),
+    widthOf,
     Arr (..),
     ArrM (..),
     Cmp (..),
@@ -15,8 +16,7 @@ module Keelung.Syntax.Kinded
     toBool,
     true,
     false,
-    nbeq,
-    neg,
+    complement,
   )
 where
 
@@ -115,9 +115,9 @@ instance Fractional Number where
 
 -- | Unsigned Integers
 data UInt (w :: Nat)
-  = UInt Int Integer -- Integers
-  | VarU Int Var -- Unsigned Integer Variables
-  | InputVarU Int Var -- Input Unsigned Integer Variables
+  = UInt Integer -- Integers
+  | VarU Var -- Unsigned Integer Variables
+  | InputVarU Var -- Input Unsigned Integer Variables
   -- Numeric operators on unsigned integers
   | AddU (UInt w) (UInt w)
   | SubU (UInt w) (UInt w)
@@ -134,11 +134,11 @@ data UInt (w :: Nat)
     ToUInt Boolean
   deriving (Eq)
 
-instance Show (UInt w) where
+instance KnownNat w => Show (UInt w) where
   showsPrec prec expr = case expr of
-    UInt _ n -> showsPrec prec n
-    VarU _ ref -> showString "$" . shows ref
-    InputVarU width ref -> showString "$U[" . shows width . showString "]" . shows ref
+    UInt n -> showsPrec prec n
+    VarU var -> showString "$" . shows var
+    InputVarU var -> showString "$U[" . shows (widthOf expr) . showString "]" . shows var
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -157,15 +157,13 @@ instance KnownNat w => Num (UInt w) where
   abs = id
 
   -- law of `signum`: abs x * signum x == x
-  signum x =
-    let width = natVal x
-     in UInt (fromIntegral width) 1
+  signum _ = UInt 1
 
   fromInteger = go
     where
-      width = natVal (Proxy :: Proxy w)
+      -- width = natVal (Proxy :: Proxy w)
       go :: forall width. KnownNat width => Integer -> UInt width
-      go n = UInt (fromIntegral width) (fromIntegral n)
+      go n = UInt (fromIntegral n)
 
 instance KnownNat w => Semiring (UInt w) where
   plus = AddU
@@ -182,6 +180,15 @@ instance KnownNat w => Ring (UInt w) where
 
 --------------------------------------------------------------------------------
 
+-- | Typeclass for deriving the bit width of an expression
+class HasWidth a where
+  widthOf :: a -> Int
+
+instance KnownNat w => HasWidth (UInt w) where
+  widthOf _ = fromIntegral $ natVal (Proxy :: Proxy w)
+
+--------------------------------------------------------------------------------
+
 -- | Booleans
 data Boolean
   = Boolean Bool
@@ -194,9 +201,9 @@ data Boolean
   | Or Boolean Boolean
   | Xor Boolean Boolean
   | -- Equalities
-    BEq Boolean Boolean
-  | Eq Number Number
-  | forall w. KnownNat w => UEq (UInt w) (UInt w)
+    EqB Boolean Boolean
+  | EqN Number Number
+  | forall w. KnownNat w => EqU (UInt w) (UInt w)
   | -- Conditionals
     IfB Boolean Boolean Boolean
 
@@ -208,9 +215,9 @@ instance Eq Boolean where
   And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
   Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
   Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
-  BEq x1 x2 == BEq y1 y2 = x1 == y1 && x2 == y2
-  Eq x1 x2 == Eq y1 y2 = x1 == y1 && x2 == y2
-  UEq x1 x2 == UEq y1 y2 = case sameNat x1 x2 of
+  EqB x1 x2 == EqB y1 y2 = x1 == y1 && x2 == y2
+  EqN x1 x2 == EqN y1 y2 = x1 == y1 && x2 == y2
+  EqU x1 x2 == EqU y1 y2 = case sameNat x1 x2 of
     Just Refl -> case sameNat y1 y2 of
       Just Refl -> (x1 == x2) == (y1 == y2)
       Nothing -> False
@@ -225,12 +232,12 @@ instance Show Boolean where
     InputVarB ref -> showString "$B" . shows ref
     NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     UIntBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
-    Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
-    BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    UEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
@@ -252,7 +259,7 @@ fromBool = FromBool
 
 -- | For converting numbers to booleans
 toBool :: Number -> Boolean
-toBool x = IfB (x `Eq` 0) false true
+toBool x = IfB (x `EqN` 0) false true
 
 -- | Smart constructor for 'True'
 true :: Boolean
@@ -266,18 +273,26 @@ false = Boolean False
 -- neq :: Number -> Number -> Boolean
 -- neq x y = IfB (x `Eq` y) false true
 
--- | Helper function for not-`BEq`
-nbeq :: Boolean -> Boolean -> Boolean
-nbeq x y = IfB (x `BEq` y) false true
+-- -- | Helper function for not-`EqB`
+-- nbeq :: Boolean -> Boolean -> Boolean
+-- nbeq x y = IfB (x `EqB` y) false true
 
 -- | Helper function for negating a boolean expression
-neg :: Boolean -> Boolean
-neg x = true `Xor` x
+complement :: Boolean -> Boolean
+complement x = true `Xor` x
 
 class Cmp a where
   eq :: a -> a -> Boolean
   neq :: a -> a -> Boolean
 
 instance Cmp Boolean where
-  eq = BEq
+  eq = EqB
+  neq x y = IfB (x `eq` y) false true
+
+instance Cmp Number where
+  eq = EqN
+  neq x y = IfB (x `eq` y) false true
+
+instance KnownNat w => Cmp (UInt w) where
+  eq = EqU
   neq x y = IfB (x `eq` y) false true

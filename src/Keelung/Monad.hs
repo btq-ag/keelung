@@ -70,13 +70,13 @@ import Prelude hiding (product, sum)
 
 -- | An Assignment associates an expression with a reference
 data Assignment
-  = BoolAssignment Var Boolean
-  | NumAssignment Var Number
+  = AssignmentB Var Boolean
+  | AssignmentN Var Number
   deriving (Eq)
 
 instance Show Assignment where
-  show (BoolAssignment var expr) = "$" <> show var <> " := " <> show expr
-  show (NumAssignment var expr) = "$" <> show var <> " := " <> show expr
+  show (AssignmentB var expr) = "$" <> show var <> " := " <> show expr
+  show (AssignmentN var expr) = "$" <> show var <> " := " <> show expr
 
 --------------------------------------------------------------------------------
 
@@ -204,7 +204,7 @@ inputBool = InputVarB <$> freshInputVarB
 
 -- | Requests a fresh Unsigned integer input variable of some bit width
 inputUInt :: forall w. KnownNat w => Comp (UInt w)
-inputUInt = InputVarU width <$> freshInputVarU width
+inputUInt = InputVarU <$> freshInputVarU width
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
@@ -317,7 +317,7 @@ instance Mutable ref => Mutable (ArrM ref) where
 instance Mutable Number where
   alloc val = do
     var <- freshVar
-    modify' $ \st -> st {compNumAsgns = NumAssignment var val : compNumAsgns st}
+    modify' $ \st -> st {compNumAsgns = AssignmentN var val : compNumAsgns st}
     return (var, VarN var)
 
   typeOf _ = NumElem
@@ -333,7 +333,7 @@ instance Mutable Number where
 instance Mutable Boolean where
   alloc val = do
     var <- freshVar
-    modify' $ \st -> st {compBoolAsgns = BoolAssignment var val : compBoolAsgns st}
+    modify' $ \st -> st {compBoolAsgns = AssignmentB var val : compBoolAsgns st}
     return (var, VarB var)
 
   typeOf _ = BoolElem

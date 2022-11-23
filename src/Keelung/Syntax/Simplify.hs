@@ -7,13 +7,13 @@ module Keelung.Syntax.Simplify (Elaborable (..), convert) where
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
-import Data.Proxy (Proxy (..))
-import GHC.TypeLits (KnownNat, natVal)
+import GHC.TypeLits (KnownNat)
 import qualified Keelung.Monad as Kinded
 import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
 import qualified Keelung.Types as Kinded
+import Keelung.Syntax.Kinded (widthOf)
 
 --------------------------------------------------------------------------------
 
@@ -24,15 +24,15 @@ convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
     <$> convertM expr
     <*> ( Computation
             varCounters
-            <$> mapM convertAssignment asgns
-            <*> mapM convertAssignment bsgns
+            <$> mapM encodeAssignment asgns
+            <*> mapM encodeAssignment bsgns
             <*> pure mempty
             <*> mapM convertM asgns'
         )
 
-convertAssignment :: Kinded.Assignment -> HeapM Assignment
-convertAssignment (Kinded.BoolAssignment var e) = Assignment (VarN var) <$> convertM e
-convertAssignment (Kinded.NumAssignment var e) = Assignment (VarB var) <$> convertM e
+encodeAssignment :: Kinded.Assignment -> HeapM Assignment
+encodeAssignment (Kinded.AssignmentN var e) = AssignmentN var <$> encode e
+encodeAssignment (Kinded.AssignmentB var e) = AssignmentB var <$> encode e
 
 --------------------------------------------------------------------------------
 
@@ -43,50 +43,44 @@ class Encode a b where
 instance Encode Kinded.Boolean Boolean where
   encode expr = case expr of
     Kinded.Boolean b -> return $ ValB b
+    Kinded.VarB var -> return $ VarB var
+    Kinded.InputVarB var -> return $ InputVarB var
     Kinded.And x y -> AndB <$> encode x <*> encode y
     Kinded.Or x y -> OrB <$> encode x <*> encode y
     Kinded.Xor x y -> XorB <$> encode x <*> encode y
+    Kinded.IfB p x y -> IfB <$> encode p <*> encode x <*> encode y
+    Kinded.EqB x y -> EqB <$> encode x <*> encode y
+    Kinded.EqN x y -> EqN <$> encode x <*> encode y
+    Kinded.EqU x y -> EqU (widthOf x) <$> encode x <*> encode y
     others -> LoopholeB <$> convertM others
 
 instance Encode Kinded.Number Number where
   encode expr = case expr of
     Kinded.Integer n -> return $ ValN n
     Kinded.Rational n -> return $ ValNR n
+    Kinded.VarN var -> return $ VarN var
+    Kinded.InputVarN var -> return $ InputVarN var
     Kinded.Add x y -> AddN <$> encode x <*> encode y
     Kinded.Sub x y -> SubN <$> encode x <*> encode y
     Kinded.Mul x y -> MulN <$> encode x <*> encode y
     Kinded.Div x y -> DivN <$> encode x <*> encode y
+    Kinded.IfN p x y -> IfN <$> encode p <*> encode x <*> encode y
     others -> LoopholeN <$> convertM others
-
--- Kinded.VarN n -> _
--- Kinded.InputVarN n -> _
--- Kinded.Add num num' -> _
--- Kinded.Sub num num' -> _
--- Kinded.Mul num num' -> _
--- Kinded.Div num num' -> _
--- Kinded.IfN bo num num' -> _
--- Kinded.FromBool bo -> _
--- Kinded.FromUInt ui -> _
 
 instance KnownNat w => Encode (Kinded.UInt w) UInt where
   encode expr = case expr of
-    Kinded.UInt w n -> return $ ValU w n
+    Kinded.UInt n -> return $ ValU (widthOf expr) n
+    Kinded.VarU var -> return $ VarU (widthOf expr) var
+    Kinded.InputVarU var -> return $ InputVarU (widthOf expr) var
+    Kinded.AddU x y -> AddU (widthOf x) <$> encode x <*> encode y
+    Kinded.SubU x y -> SubU (widthOf x) <$> encode x <*> encode y
+    Kinded.MulU x y -> MulU (widthOf x) <$> encode x <*> encode y
     Kinded.AndU x y -> AndU (widthOf expr) <$> encode x <*> encode y
     Kinded.OrU x y -> OrU (widthOf expr) <$> encode x <*> encode y
     Kinded.XorU x y -> XorU (widthOf expr) <$> encode x <*> encode y
     Kinded.NotU x -> NotU (widthOf expr) <$> encode x
+    Kinded.IfU p x y -> IfU (widthOf expr) <$> encode p <*> encode x <*> encode y
     others -> LoopholeU (widthOf expr) <$> convertM others
-
--- Kinded.VarU w n -> return $ LoopholeU w $ Var (VarU w n)
--- Kinded.InputVarU w n -> return $ LoopholeU w $ Var (InputVarU w n)
--- Kinded.AddU x y -> LoopholeU (widthOf expr) <$> (Add <$> convertM x <*> convertM y)
--- Kinded.SubU x y -> LoopholeU (widthOf expr) <$> (Sub <$> convertM x <*> convertM y)
--- Kinded.MulU x y -> LoopholeU (widthOf expr) <$> (Mul <$> convertM x <*> convertM y)
--- Kinded.OrU x y -> LoopholeU (widthOf expr) <$> (Or <$> convertM x <*> convertM y)
--- Kinded.XorU x y -> LoopholeU (widthOf expr) <$> (Xor <$> convertM x <*> convertM y)
--- Kinded.RoRU n x -> LoopholeU (widthOf expr) <$> (RotateR n <$> convertM x)
--- Kinded.IfU p x y -> LoopholeU (widthOf expr) <$> (If <$> convertM p <*> convertM x <*> convertM y)
--- Kinded.ToUInt x -> LoopholeU (widthOf expr) <$> (ToNum <$> convertM x)
 
 --------------------------------------------------------------------------------
 
@@ -98,8 +92,8 @@ instance Elaborable Kinded.Number where
   convertM expr = case expr of
     Kinded.Integer n -> return $ Number (ValN n)
     Kinded.Rational n -> return $ Number (ValNR n)
-    Kinded.VarN var -> return $ Var (VarN var)
-    Kinded.InputVarN var -> return $ Var (InputVarN var)
+    Kinded.VarN var -> return $ Number (VarN var)
+    Kinded.InputVarN var -> return $ Number (InputVarN var)
     Kinded.Add x y -> Number <$> (AddN <$> encode x <*> encode y)
     Kinded.Sub x y -> Number <$> (SubN <$> encode x <*> encode y)
     Kinded.Mul x y -> Number <$> (MulN <$> encode x <*> encode y)
@@ -110,9 +104,9 @@ instance Elaborable Kinded.Number where
 
 instance KnownNat w => Elaborable (Kinded.UInt w) where
   convertM expr = case expr of
-    Kinded.UInt w n -> return $ UInt (ValU w n)
-    Kinded.VarU w n -> return $ Var (VarU w n)
-    Kinded.InputVarU w n -> return $ Var (InputVarU w n)
+    Kinded.UInt n -> return $ UInt (ValU (widthOf expr) n)
+    Kinded.VarU n -> return $ UInt (VarU (widthOf expr) n)
+    Kinded.InputVarU n -> return $ UInt (InputVarU (widthOf expr) n)
     Kinded.AddU x y -> UInt <$> (AddU (widthOf expr) <$> encode x <*> encode y)
     Kinded.SubU x y -> UInt <$> (SubU (widthOf expr) <$> encode x <*> encode y)
     Kinded.MulU x y -> UInt <$> (MulU (widthOf expr) <$> encode x <*> encode y)
@@ -127,16 +121,17 @@ instance KnownNat w => Elaborable (Kinded.UInt w) where
 instance Elaborable Kinded.Boolean where
   convertM expr = case expr of
     Kinded.Boolean b -> return $ Boolean (ValB b)
-    Kinded.VarB var -> return $ Var (VarB var)
-    Kinded.InputVarB var -> return $ Var (InputVarB var)
+    Kinded.VarB var -> return $ Boolean (VarB var)
+    Kinded.InputVarB var -> return $ Boolean (InputVarB var)
     Kinded.NumBit n i -> Bit <$> convertM n <*> return i
     Kinded.UIntBit n i -> Bit <$> convertM n <*> return i
-    Kinded.Eq x y -> Eq <$> convertM x <*> convertM y
+    Kinded.EqB x y -> Boolean <$> (EqB <$> encode x <*> encode y)
+    Kinded.EqN x y -> Boolean <$> (EqN <$> encode x <*> encode y)
+    Kinded.EqU x y -> Boolean <$> (EqU (widthOf x) <$> encode x <*> encode y)
     Kinded.And x y -> Boolean <$> (AndB <$> encode x <*> encode y)
     Kinded.Or x y -> Boolean <$> (OrB <$> encode x <*> encode y)
     Kinded.Xor x y -> Boolean <$> (XorB <$> encode x <*> encode y)
-    Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
-    Kinded.UEq x y -> BEq <$> convertM x <*> convertM y
+    -- Kinded.EqU x y -> EqB <$> convertM x <*> convertM y
     Kinded.IfB p x y -> Boolean <$> (IfB <$> encode p <*> encode x <*> encode y)
 
 instance Elaborable () where
@@ -173,15 +168,6 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
         Just (elemType, array) -> case IntMap.lookup i array of
           Nothing -> error "HeapM: index ouf of bounds"
           Just addr'' -> case elemType of
-            Kinded.NumElem -> return $ Var $ VarN addr''
-            Kinded.BoolElem -> return $ Var $ VarB addr''
+            Kinded.NumElem -> return $ Number $ VarN addr''
+            Kinded.BoolElem -> return $ Boolean $ VarB addr''
             Kinded.ArrElem _ len' -> readArray addr'' len'
-
---------------------------------------------------------------------------------
-
--- | Typeclass for deriving the bit width of an expression
-class HasWidth a where
-  widthOf :: a -> Int
-
-instance KnownNat w => HasWidth (Kinded.UInt w) where
-  widthOf _ = fromInteger $ natVal (Proxy :: Proxy w)

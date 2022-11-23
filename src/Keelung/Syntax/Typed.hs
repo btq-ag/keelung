@@ -18,26 +18,26 @@ import Keelung.Field (FieldType)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
---------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
 
-data Ref
-  = VarN Var
-  | InputVarN Var
-  | VarB Var
-  | InputVarB Var
-  | VarU Int Var
-  | InputVarU Int Var
-  deriving (Generic, Eq, NFData)
+-- data Ref
+--   = VarN Var
+--   | InputVarN Var
+--   | VarB Var
+--   | InputVarB Var
+--   | VarU Int Var
+--   | InputVarU Int Var
+--   deriving (Generic, Eq, NFData)
 
-instance Serialize Ref
+-- instance Serialize Ref
 
-instance Show Ref where
-  show (VarN n) = "$N" <> show n
-  show (InputVarN n) = "$N" <> show n
-  show (VarB n) = "$B" <> show n
-  show (InputVarB n) = "$B" <> show n
-  show (VarU w n) = "$U[" <> show w <> "]" <> show n
-  show (InputVarU w n) = "$U[" <> show w <> "]" <> show n
+-- instance Show Ref where
+--   show (VarN n) = "$N" <> show n
+--   show (InputVarN n) = "$N" <> show n
+--   show (VarB n) = "$B" <> show n
+--   show (InputVarB n) = "$B" <> show n
+--   show (VarU w n) = "$U[" <> show w <> "]" <> show n
+--   show (InputVarU w n) = "$U[" <> show w <> "]" <> show n
 
 type Width = Int
 
@@ -45,10 +45,15 @@ type Width = Int
 
 data Boolean
   = ValB Bool
+  | VarB Var
+  | InputVarB Var
   | AndB Boolean Boolean
   | OrB Boolean Boolean
   | XorB Boolean Boolean
   | IfB Boolean Boolean Boolean
+  | EqB Boolean Boolean
+  | EqN Number Number
+  | EqU Width UInt UInt
   | LoopholeB Expr
   deriving (Generic, Eq, NFData)
 
@@ -57,11 +62,15 @@ instance Serialize Boolean
 instance Show Boolean where
   showsPrec prec expr = case expr of
     ValB n -> shows n
+    VarB var -> showString "$B" . shows var
+    InputVarB var -> showString "$B" . shows var
     AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    -- NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
+    EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     LoopholeB _ -> error "LoopholeB"
 
 --------------------------------------------------------------------------------
@@ -69,6 +78,8 @@ instance Show Boolean where
 data Number
   = ValN Integer
   | ValNR Rational
+  | VarN Var
+  | InputVarN Var
   | AddN Number Number
   | SubN Number Number
   | MulN Number Number
@@ -83,6 +94,8 @@ instance Show Number where
   showsPrec prec expr = case expr of
     ValN n -> shows n
     ValNR n -> shows n
+    VarN var -> showString "$N" . shows var
+    InputVarN var -> showString "$N" . shows var
     AddN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -94,6 +107,8 @@ instance Show Number where
 
 data UInt
   = ValU Width Integer
+  | VarU Width Var
+  | InputVarU Width Var
   | AddU Width UInt UInt
   | SubU Width UInt UInt
   | MulU Width UInt UInt
@@ -110,6 +125,8 @@ instance Serialize UInt
 instance Show UInt where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
+    VarU w var -> showString "$U[" . shows w . showString "]" . shows var
+    InputVarU w var -> showString "$U[" . shows w . showString "]" . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -127,12 +144,10 @@ data Expr
   | Boolean Boolean
   | Number Number
   | UInt UInt
-  | Var Ref
   | Array (Array Int Expr)
-  | Eq Expr Expr
   | RotateR Int Expr
-  | BEq Expr Expr
-  | ToNum Expr
+  | -- | EqB Expr Expr
+    ToNum Expr
   | Bit Expr Int
   deriving (Generic, Eq, NFData)
 
@@ -142,11 +157,8 @@ instance Show Expr where
     Boolean bool -> shows bool
     Number num -> shows num
     UInt uint -> shows uint
-    Var var -> shows var
     Array xs -> showList (toList xs)
-    Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     RotateR n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
-    BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     ToNum x -> showString "ToNum " . showsPrec prec x
     Bit x i -> shows x . showString "[" . shows i . showString "]"
 
@@ -196,11 +208,22 @@ prettyList2 n list = case list of
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
-data Assignment = Assignment Ref Expr
+data Assignment
+  = AssignmentB Var Boolean
+  | AssignmentBI Var Boolean
+  | AssignmentN Var Number
+  | AssignmentNI Var Number
+  | AssignmentU Width Var UInt
+  | AssignmentUI Width Var UInt
   deriving (Generic, NFData)
 
 instance Show Assignment where
-  show (Assignment var expr) = show var <> " := " <> show expr
+  show (AssignmentB var bool) = "$" <> show var <> " := " <> show bool
+  show (AssignmentBI var bool) = "$" <> show var <> " := " <> show bool
+  show (AssignmentN var num) = "$" <> show var <> " := " <> show num
+  show (AssignmentNI var num) = "$" <> show var <> " := " <> show num
+  show (AssignmentU _ var uint) = "$" <> show var <> " := " <> show uint
+  show (AssignmentUI _ var uint) = "$" <> show var <> " := " <> show uint
 
 instance Serialize Assignment
 
@@ -258,8 +281,20 @@ allocVar = do
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
 
-assignNum :: Ref -> Expr -> Comp ()
-assignNum var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
+assignN :: Var -> Number -> Comp ()
+assignN var e = modify' $ \st -> st {compNumAsgns = AssignmentN var e : compNumAsgns st}
 
-assignBool :: Ref -> Expr -> Comp ()
-assignBool var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
+assignNI :: Var -> Number -> Comp ()
+assignNI var e = modify' $ \st -> st {compNumAsgns = AssignmentNI var e : compNumAsgns st}
+
+assignB :: Var -> Boolean -> Comp ()
+assignB var e = modify' $ \st -> st {compBoolAsgns = AssignmentB var e : compBoolAsgns st}
+
+assignBI :: Var -> Boolean -> Comp ()
+assignBI var e = modify' $ \st -> st {compBoolAsgns = AssignmentBI var e : compBoolAsgns st}
+
+assignU :: Width -> Var -> UInt -> Comp ()
+assignU w var e = modify' $ \st -> st {compUIntAsgns = IntMap.insertWith (<>) w [AssignmentU w var e] (compUIntAsgns st)}
+
+assignUI :: Width -> Var -> UInt -> Comp ()
+assignUI w var e = modify' $ \st -> st {compUIntAsgns = IntMap.insertWith (<>) w [AssignmentUI w var e] (compUIntAsgns st)}

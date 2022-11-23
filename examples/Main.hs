@@ -80,16 +80,16 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 
 assertToBe42 :: Comp ()
 assertToBe42 = do
-  x <- input
-  assert (x `Eq` 42)
+  x <- inputNum
+  assert (x `eq` 42)
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output
 assertSquare :: Comp ()
 assertSquare = do
-  x <- input
-  y <- input
-  assert ((x * x) `Eq` y)
+  x <- inputNum
+  y <- inputNum
+  assert ((x * x) `eq` y)
 
 loop3 :: Int -> Int -> Comp ()
 loop3 n m = do
@@ -102,7 +102,7 @@ loop3 n m = do
     forM_ [0 .. m - 1] $ \j -> do
       let x = access2 xs (i, j)
       let x' = access2 squares (i, j)
-      assert (x' `Eq` (x * x))
+      assert ((x' :: Number) `eq` (x * x))
 
 uint :: Comp (Arr Boolean)
 uint = do
