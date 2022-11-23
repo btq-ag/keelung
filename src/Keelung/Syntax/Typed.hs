@@ -60,8 +60,28 @@ instance Show Ref where
 
 --------------------------------------------------------------------------------
 
+type Width = Int
+
+data UInt
+  = ValU Width Integer
+  | NotU Width UInt
+  | LoopholeU Width Expr
+  deriving (Generic, Eq, NFData)
+
+instance Serialize UInt
+
+instance Show UInt where
+  showsPrec prec expr = case expr of
+    ValU _ n -> showsPrec 11 n
+    NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
+    LoopholeU _ _ -> error "LoopholeU"
+
+
+--------------------------------------------------------------------------------
+
 data Expr
   = Val Val
+  | UInt UInt
   | Var Ref
   | Array (Array Int Expr)
   | Add Expr Expr
@@ -77,28 +97,28 @@ data Expr
   | If Expr Expr Expr
   | ToNum Expr
   | Bit Expr Int
-  | NotU Expr
   deriving (Generic, Eq, NFData)
 
-sizeOfExpr :: Expr -> Int
-sizeOfExpr expr = case expr of
-  Val _ -> 1
-  Var _ -> 1
-  Array xs -> sum (fmap sizeOfExpr xs)
-  Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Div x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Eq x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  And x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
-  RotateR _ x -> 1 + sizeOfExpr x
-  If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
-  ToNum x -> 1 + sizeOfExpr x
-  Bit x _ -> 1 + sizeOfExpr x
-  NotU x -> 1 + sizeOfExpr x
+-- sizeOfExpr :: Expr -> Int
+-- sizeOfExpr expr = case expr of
+--   Val _ -> 1
+--   UInt _ -> 1
+--   Var _ -> 1
+--   Array xs -> sum (fmap sizeOfExpr xs)
+--   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Div x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Eq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   And x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+--   RotateR _ x -> 1 + sizeOfExpr x
+--   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+--   ToNum x -> 1 + sizeOfExpr x
+--   Bit x _ -> 1 + sizeOfExpr x
+--   NotU x -> 1 + sizeOfExpr x
 
 isOfUnit :: Expr -> Bool
 isOfUnit (Val Unit) = True
@@ -107,6 +127,7 @@ isOfUnit _ = False
 instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
+    UInt uint -> shows uint
     Var var -> shows var
     Array xs -> showList (toList xs)
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
@@ -122,7 +143,6 @@ instance Show Expr where
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToNum x -> showString "ToNum " . showsPrec prec x
     Bit x i -> shows x . showString "[" . shows i . showString "]"
-    NotU x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
 
 instance Serialize Expr
 

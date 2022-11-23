@@ -1,9 +1,13 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | Module for converting Kinded syntax to Typed syntax
 module Keelung.Syntax.Simplify (Elaborable (..), convert) where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
+import Data.Proxy (Proxy (..))
+import GHC.TypeLits (KnownNat, natVal)
 import qualified Keelung.Monad as Kinded
 import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
@@ -31,6 +35,28 @@ convertAssignment (Kinded.NumAssignment var e) = Assignment (VarB var) <$> conve
 
 --------------------------------------------------------------------------------
 
+-- | Typeclass for encoding stuff into something Keelung can understand
+class EncodeU a where
+  encodeU :: a -> HeapM UInt
+
+instance KnownNat w =>EncodeU (Kinded.UInt w) where
+  encodeU expr = case expr of
+    Kinded.UInt w n -> return $ LoopholeU w $ Val (Unsigned w n)
+    Kinded.VarU w n -> return $ LoopholeU w $ Var (VarU w n)
+    Kinded.InputVarU w n -> return $ LoopholeU w $ Var (InputVarU w n)
+    Kinded.AddU x y -> LoopholeU (widthOf expr) <$> (Add <$> convertM x <*> convertM y)
+    Kinded.SubU x y -> LoopholeU (widthOf expr) <$> (Sub <$> convertM x <*> convertM y)
+    Kinded.MulU x y -> LoopholeU (widthOf expr) <$> (Mul <$> convertM x <*> convertM y)
+    Kinded.AndU x y -> LoopholeU (widthOf expr) <$> (And <$> convertM x <*> convertM y)
+    Kinded.OrU x y -> LoopholeU (widthOf expr) <$> (Or <$> convertM x <*> convertM y)
+    Kinded.XorU x y -> LoopholeU (widthOf expr) <$> (Xor <$> convertM x <*> convertM y)
+    Kinded.NotU x -> NotU (widthOf expr) <$> encodeU x
+    Kinded.RoRU n x -> LoopholeU (widthOf expr) <$> (RotateR n <$> convertM x)
+    Kinded.IfU p x y -> LoopholeU (widthOf expr) <$> (If <$> convertM p <*> convertM x <*> convertM y)
+    Kinded.ToUInt x -> LoopholeU (widthOf expr) <$> (ToNum <$> convertM x)
+
+--------------------------------------------------------------------------------
+
 -- | Typeclass for removing kinds
 class Elaborable a where
   convertM :: a -> HeapM Expr
@@ -53,7 +79,7 @@ instance Elaborable Kinded.Number where
     Kinded.FromBool x -> ToNum <$> convertM x
     Kinded.FromUInt x -> ToNum <$> convertM x
 
-instance Elaborable (Kinded.UInt w) where
+instance KnownNat w => Elaborable (Kinded.UInt w) where
   convertM expr = case expr of
     Kinded.UInt w n -> return $ Val (Unsigned w n)
     Kinded.VarU w n -> return $ Var (VarU w n)
@@ -64,7 +90,7 @@ instance Elaborable (Kinded.UInt w) where
     Kinded.AndU x y -> And <$> convertM x <*> convertM y
     Kinded.OrU x y -> Or <$> convertM x <*> convertM y
     Kinded.XorU x y -> Xor <$> convertM x <*> convertM y
-    Kinded.NotU x -> NotU <$> convertM x
+    Kinded.NotU x -> UInt . NotU (widthOf expr) <$> encodeU x
     Kinded.RoRU n x -> RotateR n <$> convertM x
     Kinded.IfU p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.ToUInt x -> ToNum <$> convertM x
@@ -121,3 +147,12 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
             Kinded.NumElem -> return $ Var $ VarN addr''
             Kinded.BoolElem -> return $ Var $ VarB addr''
             Kinded.ArrElem _ len' -> readArray addr'' len'
+
+--------------------------------------------------------------------------------
+
+-- | Typeclass for deriving the bit width of an expression
+class HasWidth a where
+  widthOf :: a -> Int
+
+instance KnownNat w => HasWidth (Kinded.UInt w) where
+  widthOf _ = fromInteger $ natVal (Proxy :: Proxy w)
