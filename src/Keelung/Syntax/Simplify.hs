@@ -61,10 +61,10 @@ instance Elaborable (Kinded.UInt w) where
     Kinded.AddU x y -> Add <$> convertM x <*> convertM y
     Kinded.SubU x y -> Sub <$> convertM x <*> convertM y
     Kinded.MulU x y -> Mul <$> convertM x <*> convertM y
-    -- Kinded.UIntDiv x y -> Div <$> convertM x <*> convertM y
     Kinded.AndU x y -> And <$> convertM x <*> convertM y
     Kinded.OrU x y -> Or <$> convertM x <*> convertM y
     Kinded.XorU x y -> Xor <$> convertM x <*> convertM y
+    Kinded.NotU x -> NotU <$> convertM x
     Kinded.RoRU n x -> RotateR n <$> convertM x
     Kinded.IfU p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.ToUInt x -> ToNum <$> convertM x
