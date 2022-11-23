@@ -41,17 +41,12 @@ data Number
   | Sub Number Number
   | Mul Number Number
   | Div Number Number
-  | -- Bitwise operators on numbers
-    --   AndN Number Number
-
-    -- | OrN Number Number
-    -- | XorN Number Number
-    -- RoRN I nt Number
-    -- Conditionals
+  | -- Conditionals
     IfN Boolean Number Number
-  | -- Conversion between Booleans and Numbers
-    FromBool Boolean
-  | forall w. KnownNat w => FromUInt (UInt w)
+  | -- Conversion between types
+    BtoN Boolean
+
+-- forall w. KnownNat w => FromU (UInt w)
 
 instance Eq Number where
   Integer x == Integer y = x == y
@@ -63,10 +58,10 @@ instance Eq Number where
   Mul x1 x2 == Mul y1 y2 = x1 == y1 && x2 == y2
   Div x1 x2 == Div y1 y2 = x1 == y1 && x2 == y2
   IfN x1 x2 x3 == IfN y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
-  FromBool x == FromBool y = x == y
-  FromUInt x == FromUInt y = case sameNat x y of
-    Just Refl -> x == y
-    Nothing -> False
+  BtoN x == BtoN y = x == y
+  -- FromU x == FromU y = case sameNat x y of
+  --   Just Refl -> x == y
+  --   Nothing -> False
   _ == _ = False
 
 instance Show Number where
@@ -75,18 +70,12 @@ instance Show Number where
     Rational n -> showsPrec prec n
     VarN ref -> showString "$" . shows ref
     InputVarN ref -> showString "$N" . shows ref
-    -- PackNum bs -> showString "Pack(" . shows bs . showString ")"
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
-    -- AndN x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
-    -- OrN x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
-    -- XorN x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
-    -- RoRN n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfN p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    FromBool x -> showString "FromBool " . showsPrec prec x
-    FromUInt x -> showString "FromUInt " . showsPrec prec x
+    BtoN x -> showString "B→N " . showsPrec prec x
 
 instance Num Number where
   (+) = Add
@@ -130,8 +119,8 @@ data UInt (w :: Nat)
   | RoLU Int (UInt w)
   | -- Conditionals
     IfU Boolean (UInt w) (UInt w)
-  | -- Conversion between Booleans and unsigned integers
-    ToUInt Boolean
+  | -- Conversion between types
+    BtoU Boolean
   deriving (Eq)
 
 instance KnownNat w => Show (UInt w) where
@@ -148,7 +137,7 @@ instance KnownNat w => Show (UInt w) where
     NotU x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     RoLU n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    ToUInt x -> showString "ToU " . showsPrec prec x
+    BtoU x -> showString "B→U " . showsPrec prec x
 
 instance KnownNat w => Num (UInt w) where
   (+) = AddU
@@ -204,8 +193,8 @@ data Boolean
   | forall w. KnownNat w => EqU (UInt w) (UInt w)
   | -- Conditionals
     IfB Boolean Boolean Boolean
-    -- Bit tests on other types
-  | forall w. KnownNat w => BitU (UInt w) Int
+  | -- Bit tests on other types
+    forall w. KnownNat w => BitU (UInt w) Int
 
 instance Eq Boolean where
   Boolean x == Boolean y = x == y
@@ -254,9 +243,9 @@ data ArrM t = ArrayRef ElemType Int Addr
 
 --------------------------------------------------------------------------------
 
--- | An synonym of 'FromBool' for converting booleans to numbers
+-- | An synonym of 'FromB' for converting booleans to numbers
 fromBool :: Boolean -> Number
-fromBool = FromBool
+fromBool = BtoN
 
 -- | For converting numbers to booleans
 toBool :: Number -> Boolean

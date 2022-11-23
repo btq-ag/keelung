@@ -20,7 +20,7 @@ module Keelung
     b64,
     elaborate',
     elaborate,
-    Elaborable,
+    Encode,
     GaloisField,
     keelungVersion,
   )
@@ -38,7 +38,7 @@ import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Bits
-import Keelung.Syntax.Simplify (Elaborable, convert)
+import Keelung.Syntax.Simplify (Encode, convert)
 import qualified Keelung.Syntax.Typed as C
 import qualified System.Directory as Path
 import qualified System.IO.Error as IO
@@ -47,7 +47,7 @@ import qualified System.Process as Process
 import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
@@ -55,7 +55,7 @@ compile fieldType prog = runM $ do
     BN128 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS BN128))
     B64 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS B64))
 
-compileO0 :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
@@ -63,7 +63,7 @@ compileO0 fieldType prog = runM $ do
     BN128 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS BN128))
     B64 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS B64))
 
-compileO2 :: Elaborable t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
@@ -74,7 +74,7 @@ compileO2 fieldType prog = runM $ do
 --------------------------------------------------------------------------------
 
 -- | Generate a proof
-generate_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error (FilePath, String))
+generate_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error (FilePath, String))
 generate_ fieldType prog inputs' = runM $ do
   exists <- checkCmd "instrument_aurora_snark_proof"
   _ <- genCircuit fieldType prog
@@ -100,7 +100,7 @@ generate_ fieldType prog inputs' = runM $ do
       return (proofPath, msg)
     else throwError CannotLocateProver
 
-generate :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO ()
+generate :: Encode t => FieldType -> Comp t -> [Integer] -> IO ()
 generate fieldType prog inputs' = do
   result <- generate_ fieldType prog inputs'
   case result of
@@ -108,7 +108,7 @@ generate fieldType prog inputs' = do
     Right (_, msg) -> putStr msg
 
 -- | Generate and verify a proof
-verify_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
+verify_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
 verify_ fieldType prog inputs' = runM $ do
   (proofPath, _) <- liftEitherT $ generate_ fieldType prog inputs'
   exists <- checkCmd "instrument_aurora_snark_verify"
@@ -134,7 +134,7 @@ verify_ fieldType prog inputs' = runM $ do
       return msg
     else throwError CannotLocateVerifier
 
-verify :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO ()
+verify :: Encode t => FieldType -> Comp t -> [Integer] -> IO ()
 verify fieldType prog inputs' = do
   result <- verify_ fieldType prog inputs'
   case result of
@@ -142,7 +142,7 @@ verify fieldType prog inputs' = do
     Right msg -> putStr msg
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
-genCircuit :: Elaborable t => FieldType -> Comp t -> M (R1CS Integer)
+genCircuit :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuit fieldType prog = do
   elab <- liftEither (elaborate prog)
   case fieldType of
@@ -151,7 +151,7 @@ genCircuit fieldType prog = do
     B64 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
-genWitness_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> M [n]
+genWitness_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> M [n]
 genWitness_ fieldType prog xs = do
   elab <- liftEither (elaborate prog)
   wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
@@ -159,12 +159,12 @@ genWitness_ fieldType prog xs = do
 genParameters :: M ()
 genParameters = lift $ BS.writeFile "parameter.json" "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
 
-genWitness :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO [Integer]
+genWitness :: Encode t => FieldType -> Comp t -> [Integer] -> IO [Integer]
 genWitness fieldType prog xs = runM (genWitness_ fieldType prog xs) >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
-interpret_ :: (Serialize n, Integral n, Elaborable t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
+interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
 interpret_ fieldType prog xs = runM $ do
   elab <- liftEither (elaborate prog)
   wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
@@ -176,23 +176,23 @@ printErrorInstead (Left err) = do
 printErrorInstead (Right values) = return values
 
 -- | Interpret a program with private and public inputs
-run :: Elaborable t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
+run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
 run prog private public = interpret_ GF181 prog (private ++ public) >>= printErrorInstead
 
 -- | Interpret a program with inputs
-interpret :: Elaborable t => FieldType -> Comp t -> [Integer] -> IO [Integer]
+interpret :: Encode t => FieldType -> Comp t -> [Integer] -> IO [Integer]
 interpret fieldType prog xs = interpret_ fieldType prog xs >>= printErrorInstead
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Elaborable t => Comp t -> [GF181] -> IO [N GF181]
+gf181 :: Encode t => Comp t -> [GF181] -> IO [N GF181]
 gf181 prog xs = map N <$> (interpret_ GF181 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Elaborable t => Comp t -> [B64] -> IO [N B64]
+b64 :: Encode t => Comp t -> [B64] -> IO [N B64]
 b64 prog xs = map N <$> (interpret_ B64 prog xs >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Elaborable t => Comp t -> [BN128] -> IO [N BN128]
+bn128 :: Encode t => Comp t -> [BN128] -> IO [N BN128]
 bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
@@ -204,7 +204,7 @@ elaborate' prog = do
   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
-elaborate :: Elaborable t => Comp t -> Either Error C.Elaborated
+elaborate :: Encode t => Comp t -> Either Error C.Elaborated
 elaborate prog = convert <$> elaborate' prog
 
 --------------------------------------------------------------------------------

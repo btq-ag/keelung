@@ -55,7 +55,6 @@ data Boolean
   | EqN Number Number
   | EqU Width UInt UInt
   | BitU Width UInt Int
-  | LoopholeB Expr
   deriving (Generic, Eq, NFData)
 
 instance Serialize Boolean
@@ -73,7 +72,6 @@ instance Show Boolean where
     EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     BitU _ x i -> showParen (prec > 6) $ showsPrec 7 x . showString " [" . shows i . showString "]"
-    LoopholeB _ -> error "LoopholeB"
 
 --------------------------------------------------------------------------------
 
@@ -87,7 +85,7 @@ data Number
   | MulN Number Number
   | DivN Number Number
   | IfN Boolean Number Number
-  | LoopholeN Expr
+  | BtoN Boolean
   deriving (Generic, Eq, NFData)
 
 instance Serialize Number
@@ -103,7 +101,7 @@ instance Show Number where
     MulN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     DivN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     IfN p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    LoopholeN _ -> error "LoopholeN"
+    BtoN x -> showString "B→N " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -120,7 +118,7 @@ data UInt
   | NotU Width UInt
   | RoLU Width Int UInt
   | IfU Width Boolean UInt UInt
-  | LoopholeU Width Expr
+  | BtoU Width Boolean
   deriving (Generic, Eq, NFData)
 
 instance Serialize UInt
@@ -139,7 +137,7 @@ instance Show UInt where
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    LoopholeU _ _ -> error "LoopholeU"
+    BtoU _ x -> showString "B→U " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -149,17 +147,15 @@ data Expr
   | Number Number
   | UInt UInt
   | Array (Array Int Expr)
-  | ToNum Expr
   deriving (Generic, Eq, NFData)
 
 instance Show Expr where
   showsPrec prec expr = case expr of
     Unit -> showString "()"
-    Boolean bool -> shows bool
-    Number num -> shows num
-    UInt uint -> shows uint
+    Boolean bool -> showsPrec prec bool
+    Number num -> showsPrec prec num
+    UInt uint -> showsPrec prec uint
     Array xs -> showList (toList xs)
-    ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance Serialize Expr
 
