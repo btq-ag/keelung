@@ -40,6 +40,34 @@ convertAssignment (Kinded.NumAssignment var e) = Assignment (VarB var) <$> conve
 class Encode a b where
   encode :: a -> HeapM b
 
+instance Encode Kinded.Boolean Boolean where
+  encode expr = case expr of
+    Kinded.Boolean b -> return $ ValB b
+    Kinded.And x y -> AndB <$> encode x <*> encode y
+    Kinded.Or x y -> OrB <$> encode x <*> encode y
+    Kinded.Xor x y -> XorB <$> encode x <*> encode y
+    others -> LoopholeB <$> convertM others
+
+instance Encode Kinded.Number Number where
+  encode expr = case expr of
+    Kinded.Integer n -> return $ ValN n
+    Kinded.Rational n -> return $ ValNR n
+    Kinded.Add x y -> AddN <$> encode x <*> encode y
+    Kinded.Sub x y -> SubN <$> encode x <*> encode y
+    Kinded.Mul x y -> MulN <$> encode x <*> encode y
+    Kinded.Div x y -> DivN <$> encode x <*> encode y
+    others -> LoopholeN <$> convertM others
+
+-- Kinded.VarN n -> _
+-- Kinded.InputVarN n -> _
+-- Kinded.Add num num' -> _
+-- Kinded.Sub num num' -> _
+-- Kinded.Mul num num' -> _
+-- Kinded.Div num num' -> _
+-- Kinded.IfN bo num num' -> _
+-- Kinded.FromBool bo -> _
+-- Kinded.FromUInt ui -> _
+
 instance KnownNat w => Encode (Kinded.UInt w) UInt where
   encode expr = case expr of
     Kinded.UInt w n -> return $ ValU w n
@@ -60,14 +88,6 @@ instance KnownNat w => Encode (Kinded.UInt w) UInt where
 -- Kinded.IfU p x y -> LoopholeU (widthOf expr) <$> (If <$> convertM p <*> convertM x <*> convertM y)
 -- Kinded.ToUInt x -> LoopholeU (widthOf expr) <$> (ToNum <$> convertM x)
 
-instance Encode Kinded.Boolean Boolean where
-  encode expr = case expr of
-    Kinded.Boolean b -> return $ ValB b
-    Kinded.And x y -> AndB <$> encode x <*> encode y
-    Kinded.Or x y -> OrB <$> encode x <*> encode y
-    Kinded.Xor x y -> XorB <$> encode x <*> encode y
-    others -> LoopholeB <$> convertM others
-
 --------------------------------------------------------------------------------
 
 -- | Typeclass for removing kinds
@@ -76,19 +96,15 @@ class Elaborable a where
 
 instance Elaborable Kinded.Number where
   convertM expr = case expr of
-    Kinded.Integer n -> return $ Val (Integer n)
-    Kinded.Rational n -> return $ Val (Rational n)
+    Kinded.Integer n -> return $ Number (ValN n)
+    Kinded.Rational n -> return $ Number (ValNR n)
     Kinded.VarN var -> return $ Var (VarN var)
     Kinded.InputVarN var -> return $ Var (InputVarN var)
-    Kinded.Add x y -> Add <$> convertM x <*> convertM y
-    Kinded.Sub x y -> Sub <$> convertM x <*> convertM y
-    Kinded.Mul x y -> Mul <$> convertM x <*> convertM y
-    Kinded.Div x y -> Div <$> convertM x <*> convertM y
-    -- Kinded.AndN x y -> And <$> convertM x <*> convertM y
-    -- Kinded.OrN x y -> Or <$> convertM x <*> convertM y
-    -- Kinded.XorN x y -> Xor <$> convertM x <*> convertM y
-    -- Kinded.RoRN n x -> RotateR n <$> convertM x
-    Kinded.IfN p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.Add x y -> Number <$> (AddN <$> encode x <*> encode y)
+    Kinded.Sub x y -> Number <$> (SubN <$> encode x <*> encode y)
+    Kinded.Mul x y -> Number <$> (MulN <$> encode x <*> encode y)
+    Kinded.Div x y -> Number <$> (DivN <$> encode x <*> encode y)
+    Kinded.IfN p x y -> Number <$> (IfN <$> encode p <*> encode x <*> encode y)
     Kinded.FromBool x -> ToNum <$> convertM x
     Kinded.FromUInt x -> ToNum <$> convertM x
 
@@ -97,15 +113,15 @@ instance KnownNat w => Elaborable (Kinded.UInt w) where
     Kinded.UInt w n -> return $ UInt (ValU w n)
     Kinded.VarU w n -> return $ Var (VarU w n)
     Kinded.InputVarU w n -> return $ Var (InputVarU w n)
-    Kinded.AddU x y -> Add <$> convertM x <*> convertM y
-    Kinded.SubU x y -> Sub <$> convertM x <*> convertM y
-    Kinded.MulU x y -> Mul <$> convertM x <*> convertM y
+    Kinded.AddU x y -> UInt <$> (AddU (widthOf expr) <$> encode x <*> encode y)
+    Kinded.SubU x y -> UInt <$> (SubU (widthOf expr) <$> encode x <*> encode y)
+    Kinded.MulU x y -> UInt <$> (MulU (widthOf expr) <$> encode x <*> encode y)
     Kinded.AndU x y -> UInt <$> (AndU (widthOf expr) <$> encode x <*> encode y)
     Kinded.OrU x y -> UInt <$> (OrU (widthOf expr) <$> encode x <*> encode y)
     Kinded.XorU x y -> UInt <$> (XorU (widthOf expr) <$> encode x <*> encode y)
     Kinded.NotU x -> UInt . NotU (widthOf expr) <$> encode x
     Kinded.RoRU n x -> RotateR n <$> convertM x
-    Kinded.IfU p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.IfU p x y -> UInt <$> (IfU (widthOf expr) <$> encode p <*> encode x <*> encode y)
     Kinded.ToUInt x -> ToNum <$> convertM x
 
 instance Elaborable Kinded.Boolean where
@@ -121,11 +137,11 @@ instance Elaborable Kinded.Boolean where
     Kinded.Xor x y -> Boolean <$> (XorB <$> encode x <*> encode y)
     Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.UEq x y -> BEq <$> convertM x <*> convertM y
-    Kinded.IfB p x y -> If <$> convertM p <*> convertM x <*> convertM y
+    Kinded.IfB p x y -> Boolean <$> (IfB <$> encode p <*> encode x <*> encode y)
 
 instance Elaborable () where
   convertM expr = case expr of
-    () -> return $ Val Unit
+    () -> return Unit
 
 instance Elaborable t => Elaborable (Kinded.Arr t) where
   convertM expr = case expr of

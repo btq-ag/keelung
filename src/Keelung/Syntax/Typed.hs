@@ -20,25 +20,6 @@ import Keelung.Types
 
 --------------------------------------------------------------------------------
 
-data Val
-  = Integer Integer
-  | Rational Rational
-  | -- | Unsigned Int Integer
-    -- | Boolean Bool
-    Unit
-  deriving (Generic, Eq, NFData)
-
-instance Show Val where
-  show (Integer n) = show n
-  -- show (Unsigned _ n) = show n
-  show (Rational n) = show n
-  -- show (Boolean b) = show b
-  show Unit = "()"
-
-instance Serialize Val
-
---------------------------------------------------------------------------------
-
 data Ref
   = VarN Var
   | InputVarN Var
@@ -58,29 +39,7 @@ instance Show Ref where
   show (VarU w n) = "$U[" <> show w <> "]" <> show n
   show (InputVarU w n) = "$U[" <> show w <> "]" <> show n
 
---------------------------------------------------------------------------------
-
 type Width = Int
-
-data UInt
-  = ValU Width Integer
-  | AndU Width UInt UInt
-  | OrU Width UInt UInt
-  | XorU Width UInt UInt
-  | NotU Width UInt
-  | LoopholeU Width Expr
-  deriving (Generic, Eq, NFData)
-
-instance Serialize UInt
-
-instance Show UInt where
-  showsPrec prec expr = case expr of
-    ValU _ n -> shows n
-    AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
-    OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
-    XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
-    NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
-    LoopholeU _ _ -> error "LoopholeU"
 
 --------------------------------------------------------------------------------
 
@@ -89,6 +48,7 @@ data Boolean
   | AndB Boolean Boolean
   | OrB Boolean Boolean
   | XorB Boolean Boolean
+  | IfB Boolean Boolean Boolean
   | LoopholeB Expr
   deriving (Generic, Eq, NFData)
 
@@ -100,48 +60,93 @@ instance Show Boolean where
     AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     -- NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
     LoopholeB _ -> error "LoopholeB"
 
 --------------------------------------------------------------------------------
 
+data Number
+  = ValN Integer
+  | ValNR Rational
+  | AddN Number Number
+  | SubN Number Number
+  | MulN Number Number
+  | DivN Number Number
+  | IfN Boolean Number Number
+  | LoopholeN Expr
+  deriving (Generic, Eq, NFData)
+
+instance Serialize Number
+
+instance Show Number where
+  showsPrec prec expr = case expr of
+    ValN n -> shows n
+    ValNR n -> shows n
+    AddN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    SubN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    MulN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    DivN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    IfN p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    LoopholeN _ -> error "LoopholeN"
+
+--------------------------------------------------------------------------------
+
+data UInt
+  = ValU Width Integer
+  | AddU Width UInt UInt
+  | SubU Width UInt UInt
+  | MulU Width UInt UInt
+  | AndU Width UInt UInt
+  | OrU Width UInt UInt
+  | XorU Width UInt UInt
+  | NotU Width UInt
+  | IfU Width Boolean UInt UInt
+  | LoopholeU Width Expr
+  deriving (Generic, Eq, NFData)
+
+instance Serialize UInt
+
+instance Show UInt where
+  showsPrec prec expr = case expr of
+    ValU _ n -> shows n
+    AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
+    OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
+    XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
+    IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    LoopholeU _ _ -> error "LoopholeU"
+
+--------------------------------------------------------------------------------
+
 data Expr
-  = Val Val
-  | UInt UInt
+  = Unit
   | Boolean Boolean
+  | Number Number
+  | UInt UInt
   | Var Ref
   | Array (Array Int Expr)
-  | Add Expr Expr
-  | Sub Expr Expr
-  | Mul Expr Expr
-  | Div Expr Expr
   | Eq Expr Expr
   | RotateR Int Expr
   | BEq Expr Expr
-  | If Expr Expr Expr
   | ToNum Expr
   | Bit Expr Int
   deriving (Generic, Eq, NFData)
 
-isOfUnit :: Expr -> Bool
-isOfUnit (Val Unit) = True
-isOfUnit _ = False
-
 instance Show Expr where
   showsPrec prec expr = case expr of
-    Val val -> shows val
-    UInt uint -> shows uint
+    Unit -> showString "()"
     Boolean bool -> shows bool
+    Number num -> shows num
+    UInt uint -> shows uint
     Var var -> shows var
     Array xs -> showList (toList xs)
-    Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
-    Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
-    Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     RotateR n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToNum x -> showString "ToNum " . showsPrec prec x
     Bit x i -> shows x . showString "[" . shows i . showString "]"
 
