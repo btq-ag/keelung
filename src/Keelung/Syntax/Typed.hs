@@ -54,6 +54,7 @@ data Boolean
   | EqB Boolean Boolean
   | EqN Number Number
   | EqU Width UInt UInt
+  | BitU Width UInt Int
   | LoopholeB Expr
   deriving (Generic, Eq, NFData)
 
@@ -71,6 +72,7 @@ instance Show Boolean where
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    BitU _ x i -> showParen (prec > 6) $ showsPrec 7 x . showString " [" . shows i . showString "]"
     LoopholeB _ -> error "LoopholeB"
 
 --------------------------------------------------------------------------------
@@ -148,7 +150,6 @@ data Expr
   | UInt UInt
   | Array (Array Int Expr)
   | ToNum Expr
-  | Bit Expr Int
   deriving (Generic, Eq, NFData)
 
 instance Show Expr where
@@ -159,7 +160,6 @@ instance Show Expr where
     UInt uint -> shows uint
     Array xs -> showList (toList xs)
     ToNum x -> showString "ToNum " . showsPrec prec x
-    Bit x i -> shows x . showString "[" . shows i . showString "]"
 
 instance Serialize Expr
 

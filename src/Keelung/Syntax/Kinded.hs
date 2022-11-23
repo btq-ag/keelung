@@ -194,8 +194,6 @@ data Boolean
   = Boolean Bool
   | VarB Var -- Boolean Variables
   | InputVarB Var -- Input Boolean Variables
-  | NumBit Number Int
-  | forall w. KnownNat w => UIntBit (UInt w) Int
   | -- Operators on Booleans
     And Boolean Boolean
   | Or Boolean Boolean
@@ -206,12 +204,13 @@ data Boolean
   | forall w. KnownNat w => EqU (UInt w) (UInt w)
   | -- Conditionals
     IfB Boolean Boolean Boolean
+    -- Bit tests on other types
+  | forall w. KnownNat w => BitU (UInt w) Int
 
 instance Eq Boolean where
   Boolean x == Boolean y = x == y
   VarB x == VarB y = x == y
   InputVarB x == InputVarB y = x == y
-  NumBit x1 x2 == NumBit y1 y2 = x1 == y1 && x2 == y2
   And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
   Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
   Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
@@ -223,6 +222,9 @@ instance Eq Boolean where
       Nothing -> False
     Nothing -> False
   IfB x1 x2 x3 == IfB y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  BitU x1 x2 == BitU y1 y2 = case sameNat x1 y1 of
+    Just Refl -> x2 == y2
+    Nothing -> False
   _ == _ = False
 
 instance Show Boolean where
@@ -230,8 +232,7 @@ instance Show Boolean where
     Boolean b -> showsPrec prec b
     VarB ref -> showString "$" . shows ref
     InputVarB ref -> showString "$B" . shows ref
-    NumBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
-    UIntBit n i -> showsPrec prec n . showString "[" . shows i . showString "]"
+    BitU n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y

@@ -50,7 +50,7 @@ class Bits a where
 --   (.|.) = OrN
 --   (.^.) = XorN
 --   rotate = flip RoRN
---   (!!!) = NumBit
+--   (!!!) = BitN
 
 instance Bits Boolean where
   (.&.) = And
@@ -65,7 +65,7 @@ instance KnownNat w => Bits (UInt w) where
   (.|.) = OrU
   (.^.) = XorU
   rotate = flip RoLU
-  (!!!) = UIntBit
+  (!!!) = BitU
   not = NotU
 
 -- testBit :: a -> Int -> Boolean

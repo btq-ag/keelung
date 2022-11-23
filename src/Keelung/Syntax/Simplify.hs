@@ -123,8 +123,7 @@ instance Elaborable Kinded.Boolean where
     Kinded.Boolean b -> return $ Boolean (ValB b)
     Kinded.VarB var -> return $ Boolean (VarB var)
     Kinded.InputVarB var -> return $ Boolean (InputVarB var)
-    Kinded.NumBit n i -> Bit <$> convertM n <*> return i
-    Kinded.UIntBit n i -> Bit <$> convertM n <*> return i
+    Kinded.BitU n i -> Boolean <$> (BitU (widthOf n) <$> encode n <*> pure i)
     Kinded.EqB x y -> Boolean <$> (EqB <$> encode x <*> encode y)
     Kinded.EqN x y -> Boolean <$> (EqN <$> encode x <*> encode y)
     Kinded.EqU x y -> Boolean <$> (EqU (widthOf x) <$> encode x <*> encode y)
