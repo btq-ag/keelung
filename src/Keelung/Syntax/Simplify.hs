@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
@@ -36,24 +37,36 @@ convertAssignment (Kinded.NumAssignment var e) = Assignment (VarB var) <$> conve
 --------------------------------------------------------------------------------
 
 -- | Typeclass for encoding stuff into something Keelung can understand
-class EncodeU a where
-  encodeU :: a -> HeapM UInt
+class Encode a b where
+  encode :: a -> HeapM b
 
-instance KnownNat w =>EncodeU (Kinded.UInt w) where
-  encodeU expr = case expr of
-    Kinded.UInt w n -> return $ LoopholeU w $ Val (Unsigned w n)
-    Kinded.VarU w n -> return $ LoopholeU w $ Var (VarU w n)
-    Kinded.InputVarU w n -> return $ LoopholeU w $ Var (InputVarU w n)
-    Kinded.AddU x y -> LoopholeU (widthOf expr) <$> (Add <$> convertM x <*> convertM y)
-    Kinded.SubU x y -> LoopholeU (widthOf expr) <$> (Sub <$> convertM x <*> convertM y)
-    Kinded.MulU x y -> LoopholeU (widthOf expr) <$> (Mul <$> convertM x <*> convertM y)
-    Kinded.AndU x y -> LoopholeU (widthOf expr) <$> (And <$> convertM x <*> convertM y)
-    Kinded.OrU x y -> LoopholeU (widthOf expr) <$> (Or <$> convertM x <*> convertM y)
-    Kinded.XorU x y -> LoopholeU (widthOf expr) <$> (Xor <$> convertM x <*> convertM y)
-    Kinded.NotU x -> NotU (widthOf expr) <$> encodeU x
-    Kinded.RoRU n x -> LoopholeU (widthOf expr) <$> (RotateR n <$> convertM x)
-    Kinded.IfU p x y -> LoopholeU (widthOf expr) <$> (If <$> convertM p <*> convertM x <*> convertM y)
-    Kinded.ToUInt x -> LoopholeU (widthOf expr) <$> (ToNum <$> convertM x)
+instance KnownNat w => Encode (Kinded.UInt w) UInt where
+  encode expr = case expr of
+    Kinded.UInt w n -> return $ ValU w n
+    Kinded.AndU x y -> AndU (widthOf expr) <$> encode x <*> encode y
+    Kinded.OrU x y -> OrU (widthOf expr) <$> encode x <*> encode y
+    Kinded.XorU x y -> XorU (widthOf expr) <$> encode x <*> encode y
+    Kinded.NotU x -> NotU (widthOf expr) <$> encode x
+    others -> LoopholeU (widthOf expr) <$> convertM others
+
+-- Kinded.VarU w n -> return $ LoopholeU w $ Var (VarU w n)
+-- Kinded.InputVarU w n -> return $ LoopholeU w $ Var (InputVarU w n)
+-- Kinded.AddU x y -> LoopholeU (widthOf expr) <$> (Add <$> convertM x <*> convertM y)
+-- Kinded.SubU x y -> LoopholeU (widthOf expr) <$> (Sub <$> convertM x <*> convertM y)
+-- Kinded.MulU x y -> LoopholeU (widthOf expr) <$> (Mul <$> convertM x <*> convertM y)
+-- Kinded.OrU x y -> LoopholeU (widthOf expr) <$> (Or <$> convertM x <*> convertM y)
+-- Kinded.XorU x y -> LoopholeU (widthOf expr) <$> (Xor <$> convertM x <*> convertM y)
+-- Kinded.RoRU n x -> LoopholeU (widthOf expr) <$> (RotateR n <$> convertM x)
+-- Kinded.IfU p x y -> LoopholeU (widthOf expr) <$> (If <$> convertM p <*> convertM x <*> convertM y)
+-- Kinded.ToUInt x -> LoopholeU (widthOf expr) <$> (ToNum <$> convertM x)
+
+instance Encode Kinded.Boolean Boolean where
+  encode expr = case expr of
+    Kinded.Boolean b -> return $ ValB b
+    Kinded.And x y -> AndB <$> encode x <*> encode y
+    Kinded.Or x y -> OrB <$> encode x <*> encode y
+    Kinded.Xor x y -> XorB <$> encode x <*> encode y
+    others -> LoopholeB <$> convertM others
 
 --------------------------------------------------------------------------------
 
@@ -81,31 +94,31 @@ instance Elaborable Kinded.Number where
 
 instance KnownNat w => Elaborable (Kinded.UInt w) where
   convertM expr = case expr of
-    Kinded.UInt w n -> return $ Val (Unsigned w n)
+    Kinded.UInt w n -> return $ UInt (ValU w n)
     Kinded.VarU w n -> return $ Var (VarU w n)
     Kinded.InputVarU w n -> return $ Var (InputVarU w n)
     Kinded.AddU x y -> Add <$> convertM x <*> convertM y
     Kinded.SubU x y -> Sub <$> convertM x <*> convertM y
     Kinded.MulU x y -> Mul <$> convertM x <*> convertM y
-    Kinded.AndU x y -> And <$> convertM x <*> convertM y
-    Kinded.OrU x y -> Or <$> convertM x <*> convertM y
-    Kinded.XorU x y -> Xor <$> convertM x <*> convertM y
-    Kinded.NotU x -> UInt . NotU (widthOf expr) <$> encodeU x
+    Kinded.AndU x y -> UInt <$> (AndU (widthOf expr) <$> encode x <*> encode y)
+    Kinded.OrU x y -> UInt <$> (OrU (widthOf expr) <$> encode x <*> encode y)
+    Kinded.XorU x y -> UInt <$> (XorU (widthOf expr) <$> encode x <*> encode y)
+    Kinded.NotU x -> UInt . NotU (widthOf expr) <$> encode x
     Kinded.RoRU n x -> RotateR n <$> convertM x
     Kinded.IfU p x y -> If <$> convertM p <*> convertM x <*> convertM y
     Kinded.ToUInt x -> ToNum <$> convertM x
 
 instance Elaborable Kinded.Boolean where
   convertM expr = case expr of
-    Kinded.Boolean b -> return $ Val (Boolean b)
+    Kinded.Boolean b -> return $ Boolean (ValB b)
     Kinded.VarB var -> return $ Var (VarB var)
     Kinded.InputVarB var -> return $ Var (InputVarB var)
     Kinded.NumBit n i -> Bit <$> convertM n <*> return i
     Kinded.UIntBit n i -> Bit <$> convertM n <*> return i
     Kinded.Eq x y -> Eq <$> convertM x <*> convertM y
-    Kinded.And x y -> And <$> convertM x <*> convertM y
-    Kinded.Or x y -> Or <$> convertM x <*> convertM y
-    Kinded.Xor x y -> Xor <$> convertM x <*> convertM y
+    Kinded.And x y -> Boolean <$> (AndB <$> encode x <*> encode y)
+    Kinded.Or x y -> Boolean <$> (OrB <$> encode x <*> encode y)
+    Kinded.Xor x y -> Boolean <$> (XorB <$> encode x <*> encode y)
     Kinded.BEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.UEq x y -> BEq <$> convertM x <*> convertM y
     Kinded.IfB p x y -> If <$> convertM p <*> convertM x <*> convertM y

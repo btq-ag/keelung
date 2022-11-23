@@ -23,16 +23,16 @@ import Keelung.Types
 data Val
   = Integer Integer
   | Rational Rational
-  | Unsigned Int Integer
-  | Boolean Bool
-  | Unit
+  | -- | Unsigned Int Integer
+    -- | Boolean Bool
+    Unit
   deriving (Generic, Eq, NFData)
 
 instance Show Val where
   show (Integer n) = show n
-  show (Unsigned _ n) = show n
+  -- show (Unsigned _ n) = show n
   show (Rational n) = show n
-  show (Boolean b) = show b
+  -- show (Boolean b) = show b
   show Unit = "()"
 
 instance Serialize Val
@@ -64,6 +64,9 @@ type Width = Int
 
 data UInt
   = ValU Width Integer
+  | AndU Width UInt UInt
+  | OrU Width UInt UInt
+  | XorU Width UInt UInt
   | NotU Width UInt
   | LoopholeU Width Expr
   deriving (Generic, Eq, NFData)
@@ -72,16 +75,40 @@ instance Serialize UInt
 
 instance Show UInt where
   showsPrec prec expr = case expr of
-    ValU _ n -> showsPrec 11 n
+    ValU _ n -> shows n
+    AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
+    OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
+    XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
     LoopholeU _ _ -> error "LoopholeU"
 
+--------------------------------------------------------------------------------
+
+data Boolean
+  = ValB Bool
+  | AndB Boolean Boolean
+  | OrB Boolean Boolean
+  | XorB Boolean Boolean
+  | LoopholeB Expr
+  deriving (Generic, Eq, NFData)
+
+instance Serialize Boolean
+
+instance Show Boolean where
+  showsPrec prec expr = case expr of
+    ValB n -> shows n
+    AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
+    OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
+    XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    -- NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
+    LoopholeB _ -> error "LoopholeB"
 
 --------------------------------------------------------------------------------
 
 data Expr
   = Val Val
   | UInt UInt
+  | Boolean Boolean
   | Var Ref
   | Array (Array Int Expr)
   | Add Expr Expr
@@ -89,36 +116,12 @@ data Expr
   | Mul Expr Expr
   | Div Expr Expr
   | Eq Expr Expr
-  | And Expr Expr
-  | Or Expr Expr
-  | Xor Expr Expr
   | RotateR Int Expr
   | BEq Expr Expr
   | If Expr Expr Expr
   | ToNum Expr
   | Bit Expr Int
   deriving (Generic, Eq, NFData)
-
--- sizeOfExpr :: Expr -> Int
--- sizeOfExpr expr = case expr of
---   Val _ -> 1
---   UInt _ -> 1
---   Var _ -> 1
---   Array xs -> sum (fmap sizeOfExpr xs)
---   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Div x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Eq x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   And x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
---   RotateR _ x -> 1 + sizeOfExpr x
---   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
---   ToNum x -> 1 + sizeOfExpr x
---   Bit x _ -> 1 + sizeOfExpr x
---   NotU x -> 1 + sizeOfExpr x
 
 isOfUnit :: Expr -> Bool
 isOfUnit (Val Unit) = True
@@ -128,6 +131,7 @@ instance Show Expr where
   showsPrec prec expr = case expr of
     Val val -> shows val
     UInt uint -> shows uint
+    Boolean bool -> shows bool
     Var var -> shows var
     Array xs -> showList (toList xs)
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
@@ -135,9 +139,6 @@ instance Show Expr where
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     Eq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
-    Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
-    Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     RotateR n x -> showParen (prec > 8) $ showString "ROTATE " . showsPrec 9 n . showString " " . showsPrec 9 x
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
