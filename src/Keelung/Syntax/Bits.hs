@@ -43,7 +43,7 @@ class Bits a where
   infixl 9 !!!
 
   -- | Reverse all the bits in the argument
-  not :: a -> a
+  complement :: a -> a
 
 -- instance Bits Number where
 --   (.&.) = AndN
@@ -58,7 +58,7 @@ instance Bits Boolean where
   (.^.) = Xor
   rotate x _ = x
   x !!! _ = x
-  not = Xor true
+  complement = Not
 
 instance KnownNat w => Bits (UInt w) where
   (.&.) = AndU
@@ -66,7 +66,7 @@ instance KnownNat w => Bits (UInt w) where
   (.^.) = XorU
   rotate = flip RoLU
   (!!!) = BitU
-  not = NotU
+  complement = NotU
 
 -- testBit :: a -> Int -> Boolean
 -- testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then true else false

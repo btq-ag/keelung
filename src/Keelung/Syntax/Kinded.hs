@@ -15,8 +15,7 @@ module Keelung.Syntax.Kinded
     fromBool,
     toBool,
     true,
-    false,
-    complement,
+    false
   )
 where
 
@@ -187,6 +186,7 @@ data Boolean
     And Boolean Boolean
   | Or Boolean Boolean
   | Xor Boolean Boolean
+  | Not Boolean
   | -- Equalities
     EqB Boolean Boolean
   | EqN Number Number
@@ -226,6 +226,7 @@ instance Show Boolean where
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    Not x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
@@ -268,8 +269,8 @@ false = Boolean False
 -- nbeq x y = IfB (x `EqB` y) false true
 
 -- | Helper function for negating a boolean expression
-complement :: Boolean -> Boolean
-complement x = true `Xor` x
+-- complement :: Boolean -> Boolean
+-- complement x = true `Xor` x
 
 class Cmp a where
   eq :: a -> a -> Boolean

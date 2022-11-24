@@ -18,27 +18,6 @@ import Keelung.Field (FieldType)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
--- --------------------------------------------------------------------------------
-
--- data Ref
---   = VarN Var
---   | InputVarN Var
---   | VarB Var
---   | InputVarB Var
---   | VarU Int Var
---   | InputVarU Int Var
---   deriving (Generic, Eq, NFData)
-
--- instance Serialize Ref
-
--- instance Show Ref where
---   show (VarN n) = "$N" <> show n
---   show (InputVarN n) = "$N" <> show n
---   show (VarB n) = "$B" <> show n
---   show (InputVarB n) = "$B" <> show n
---   show (VarU w n) = "$U[" <> show w <> "]" <> show n
---   show (InputVarU w n) = "$U[" <> show w <> "]" <> show n
-
 type Width = Int
 
 --------------------------------------------------------------------------------
@@ -50,6 +29,7 @@ data Boolean
   | AndB Boolean Boolean
   | OrB Boolean Boolean
   | XorB Boolean Boolean
+  | NotB Boolean
   | IfB Boolean Boolean Boolean
   | EqB Boolean Boolean
   | EqN Number Number
@@ -67,6 +47,7 @@ instance Show Boolean where
     AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
+    NotB x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y

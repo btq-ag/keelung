@@ -48,6 +48,7 @@ instance Encode' Kinded.Boolean Boolean where
     Kinded.And x y -> AndB <$> encode' x <*> encode' y
     Kinded.Or x y -> OrB <$> encode' x <*> encode' y
     Kinded.Xor x y -> XorB <$> encode' x <*> encode' y
+    Kinded.Not x -> NotB <$> encode' x
     Kinded.IfB p x y -> IfB <$> encode' p <*> encode' x <*> encode' y
     Kinded.EqB x y -> EqB <$> encode' x <*> encode' y
     Kinded.EqN x y -> EqN <$> encode' x <*> encode' y
