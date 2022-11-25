@@ -36,6 +36,7 @@ library
       Keelung.Syntax
       Keelung.Syntax.BinRep
       Keelung.Syntax.Bits
+      Keelung.Syntax.Counters
       Keelung.Syntax.Kinded
       Keelung.Syntax.Simplify
       Keelung.Syntax.Typed
