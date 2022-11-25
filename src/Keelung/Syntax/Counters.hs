@@ -1,11 +1,21 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Syntax.Counters where
+module Keelung.Syntax.Counters
+  ( Counters (Counters),
+    SmallCounters (SmallCounters),
+    VarKind (..),
+    VarSort (..),
+    bump,
+    reindex,
+    prettyPrint,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 
 ------------------------------------------------------------------------------
@@ -30,6 +40,19 @@ data SmallCounters = SmallCounters
   }
   deriving (Generic, NFData, Eq, Show)
 
+instance Serialize SmallCounters
+
+instance Semigroup SmallCounters where
+  SmallCounters sF1 sB1 sUBinReps1 sU1 <> SmallCounters sF2 sB2 sUBinReps2 sU2 =
+    SmallCounters
+      (sF1 + sF2)
+      (sB1 + sB2)
+      (IntMap.unionWith (+) sUBinReps1 sUBinReps2)
+      (IntMap.unionWith (+) sU1 sU2)
+
+instance Monoid SmallCounters where
+  mempty = SmallCounters 0 0 IntMap.empty IntMap.empty
+
 binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
 
@@ -45,6 +68,18 @@ data Counters = Counters
     countIntermediate :: !SmallCounters -- counters for intermediate variables
   }
   deriving (Generic, NFData, Eq, Show)
+
+instance Serialize Counters
+
+instance Semigroup Counters where
+  Counters cO1 cI1 cI2 <> Counters cO2 cI3 cI4 =
+    Counters
+      (cO1 <> cO2)
+      (cI1 <> cI3)
+      (cI2 <> cI4)
+
+instance Monoid Counters where
+  mempty = Counters mempty mempty mempty
 
 choose :: VarSort -> Counters -> SmallCounters
 choose OfOutput = countOutput

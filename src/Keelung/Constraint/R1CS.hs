@@ -13,6 +13,7 @@ import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
@@ -22,6 +23,8 @@ data R1CS n = R1CS
     r1csConstraints :: [R1C n],
     -- | Variable bookkeeping
     r1csVarCounters :: VarCounters,
+    -- | Variable bookkeeping
+    r1csCounters :: Counters,
     -- | For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n],
     -- | For restoring binary representation of Number input variables
@@ -35,7 +38,7 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show r1cs@(R1CS cs counters _ numBinReps customBinReps) =
+  show r1cs@(R1CS cs counters _ _ numBinReps customBinReps) =
     "R1CS {\n"
       <> showTotalConstraintSize
       <> showOrdinaryConstraints
@@ -91,7 +94,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS cs counters _ numBinReps customBinReps) =
+toR1Cs (R1CS cs counters _ _ numBinReps customBinReps) =
   cs
     <> booleanInputVarConstraints
     <> numBinRepConstraints
