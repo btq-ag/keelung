@@ -17,6 +17,7 @@ import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Syntax.Counters
 
 type Width = Int
 
@@ -209,6 +210,7 @@ instance Serialize Assignment
 data Computation = Computation
   { -- Variable bookkeeping
     compVarCounters :: !VarCounters,
+    compCounters :: !Counters,
     -- Assignments
     compNumAsgns :: [Assignment],
     compBoolAsgns :: [Assignment],
@@ -219,7 +221,7 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation varCounters numAsgns boolAsgns uintAsgns assertions) =
+  show (Computation varCounters _ numAsgns boolAsgns uintAsgns assertions) =
     "{\n" <> indent (show varCounters)
       <> "\n  Number assignments: "
       <> prettyList2 8 numAsgns
@@ -247,7 +249,7 @@ evalComp comp f = runExcept (evalStateT f comp)
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.

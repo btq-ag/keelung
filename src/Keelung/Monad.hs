@@ -40,7 +40,7 @@ module Keelung.Monad
     inputs,
     inputs2,
     inputs3,
-  
+
     -- * Statements
     cond,
     assert,
@@ -62,6 +62,7 @@ import Data.Traversable (mapAccumL)
 import GHC.TypeNats
 import Keelung.Error
 import Keelung.Syntax
+import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 import Prelude hiding (product, sum)
@@ -84,6 +85,7 @@ instance Show Assignment where
 data Computation = Computation
   { -- Variable bookkeeping
     compVarCounters :: !VarCounters,
+    compCounters :: !Counters,
     -- Size of allocated heap addresses
     compAddrSize :: Int,
     -- Heap for arrays
@@ -97,10 +99,10 @@ data Computation = Computation
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation mempty 0 mempty mempty mempty mempty
+emptyComputation = Computation mempty mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation varCounters addrSize _ numAsgns boolAsgns assertions) =
+  show (Computation varCounters _ addrSize _ numAsgns boolAsgns assertions) =
     "{\n" <> indent (show varCounters)
       <> "  address size: "
       <> show addrSize
@@ -142,13 +144,30 @@ type Comp = StateT Computation (Except ElabError)
 runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
 runComp comp f = runExcept (runStateT f comp)
 
+modifyCounter :: (Counters -> Counters) -> Comp ()
+modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
+
 --------------------------------------------------------------------------------
 -- Variable & Input Variable
 --------------------------------------------------------------------------------
 
--- | Allocate a fresh variable.
-freshVar :: Comp Var
-freshVar = do
+-- | Allocate a fresh Number variable.
+freshVarN :: Comp Var
+freshVarN = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate OfField counters
+  modifyCounter $ setCount OfIntermediate OfField (index + 1)
+
+  index <- gets (intermediateVarSize . compVarCounters)
+  modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
+  return index
+
+freshVarB :: Comp Var
+freshVarB = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate OfBoolean counters
+  modifyCounter $ setCount OfIntermediate OfBoolean (index + 1)
+
   index <- gets (intermediateVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
   return index
@@ -156,18 +175,30 @@ freshVar = do
 -- | Allocate a fresh input variable.
 freshInputVarN :: Comp Var
 freshInputVarN = do
+  counters <- gets compCounters
+  let index = getCount OfInput OfField counters
+  modifyCounter $ setCount OfInput OfField (index + 1)
+
   index <- gets (numInputVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpInputVarN (compVarCounters st)})
   return index
 
 freshInputVarB :: Comp Var
 freshInputVarB = do
+  counters <- gets compCounters
+  let index = getCount OfInput OfBoolean counters
+  modifyCounter $ setCount OfInput OfBoolean (index + 1)
+
   index <- gets (boolInputVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpInputVarB (compVarCounters st)})
   return index
 
 freshInputVarU :: Int -> Comp Var
 freshInputVarU width = do
+  counters <- gets compCounters
+  let index = getCount OfInput (OfUInt width) counters
+  modifyCounter $ setCount OfInput (OfUInt width) (index + 1)
+
   index <- gets (customInputSizeOf width . compVarCounters)
   modify (\st -> st {compVarCounters = bumpInputVarU width (compVarCounters st)})
   return index
@@ -316,7 +347,7 @@ instance Mutable ref => Mutable (ArrM ref) where
 
 instance Mutable Number where
   alloc val = do
-    var <- freshVar
+    var <- freshVarN
     modify' $ \st -> st {compNumAsgns = AssignmentN var val : compNumAsgns st}
     return (var, VarN var)
 
@@ -332,7 +363,7 @@ instance Mutable Number where
 
 instance Mutable Boolean where
   alloc val = do
-    var <- freshVar
+    var <- freshVarB
     modify' $ \st -> st {compBoolAsgns = AssignmentB var val : compBoolAsgns st}
     return (var, VarB var)
 

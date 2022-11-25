@@ -6,7 +6,8 @@ module Keelung.Syntax.Counters
     SmallCounters (SmallCounters),
     VarKind (..),
     VarSort (..),
-    bump,
+    getCount,
+    setCount,
     reindex,
     prettyPrint,
   )
@@ -100,47 +101,79 @@ prettyPrint counters@(Counters o i x) =
           1 -> ["Input variable  : $" <> show outputOffset]
           n -> ["Input variables : $" <> show outputOffset <> " .. $" <> show (outputOffset + n - 1)]
 
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- | Increment the counter for the given variable kind and sort.
-bump :: VarSort -> VarKind -> Counters -> Counters
-bump = go
+-- | Get the current count for a variable of the given kind and sort.
+getCount :: VarSort -> VarKind -> Counters -> Int
+getCount sort kind (Counters o i x) =
+  case sort of
+    OfOutput -> go o
+    OfInput -> go i
+    OfIntermediate -> go x
   where
-    go :: VarSort -> VarKind -> Counters -> Counters
-    go OfOutput OfField (Counters o i x) = Counters (bumpF o) i x
-    go OfOutput OfBoolean (Counters o i x) = Counters (bumpB o) i x
-    go OfOutput (OfUIntBinRep width) (Counters o i x) = Counters (bumpUBR width o) i x
-    go OfOutput (OfUInt width) (Counters o i x) = Counters (bumpU width o) i x
-    go OfInput OfField (Counters o i x) = Counters o (bumpF i) x
-    go OfInput OfBoolean (Counters o i x) = Counters o (bumpB i) x
-    go OfInput (OfUIntBinRep width) (Counters o i x) = Counters o (bumpUBR width i) x
-    go OfInput (OfUInt width) (Counters o i x) = Counters o (bumpU width i) x
-    go OfIntermediate OfField (Counters o i x) = Counters o i (bumpF x)
-    go OfIntermediate OfBoolean (Counters o i x) = Counters o i (bumpB x)
-    go OfIntermediate (OfUIntBinRep width) (Counters o i x) = Counters o i (bumpUBR width x)
-    go OfIntermediate (OfUInt width) (Counters o i x) = Counters o i (bumpU width x)
+    go :: SmallCounters -> Int
+    go (SmallCounters f b ubr u) =
+      case kind of
+        OfField -> f
+        OfBoolean -> b
+        OfUIntBinRep w -> IntMap.findWithDefault 0 w ubr
+        OfUInt w -> IntMap.findWithDefault 0 w u
 
-    -- Bump the counter for field element variables
-    bumpF :: SmallCounters -> SmallCounters
-    bumpF (SmallCounters f b ubr u) = SmallCounters (f + 1) b ubr u
+-- | Set the current count for a variable of the given kind and sort.
+setCount :: VarSort -> VarKind -> Int -> Counters -> Counters
+setCount sort kind n (Counters o i x) =
+  case sort of
+    OfOutput -> Counters (go o) i x
+    OfInput -> Counters o (go i) x
+    OfIntermediate -> Counters o i (go x)
+  where
+    go :: SmallCounters -> SmallCounters
+    go (SmallCounters f b ubr u) =
+      case kind of
+        OfField -> SmallCounters n b ubr u
+        OfBoolean -> SmallCounters f n ubr u
+        OfUIntBinRep w -> SmallCounters f b (IntMap.insert w n ubr) u
+        OfUInt w -> SmallCounters f b ubr (IntMap.insert w n u)
 
-    -- Bump the counter for Boolean variables
-    bumpB :: SmallCounters -> SmallCounters
-    bumpB (SmallCounters f b ubr u) = SmallCounters f (b + 1) ubr u
+-- -- | Increment the counter for the given variable kind and sort.
+-- bump :: VarSort -> VarKind -> Counters -> (Counters, Int)
+-- bump = go
+--   where
+--     go :: VarSort -> VarKind -> Counters -> (Counters, Int)
+--     go OfOutput OfField (Counters o i x) = let (o', n) = bumpF o in (Counters o' i x, n)
+--     go OfOutput OfBoolean (Counters o i x) = let (o', n) = bumpB o in (Counters o' i x, n)
+--     go OfOutput (OfUIntBinRep width) (Counters o i x) = let (o', n) = bumpUBR width o in (Counters o' i x, n)
+--     go OfOutput (OfUInt width) (Counters o i x) = let (o', n) = bumpU width o in (Counters o' i x, n)
+--     go OfInput OfField (Counters o i x) = let (i', n) = bumpF i in (Counters o i' x, n)
+--     go OfInput OfBoolean (Counters o i x) = let (i', n) = bumpB i in (Counters o i' x, n)
+--     go OfInput (OfUIntBinRep width) (Counters o i x) = let (x', n) = bumpUBR width x in (Counters o i x', n)
+--     go OfInput (OfUInt width) (Counters o i x) = let (i', n) = bumpU width i in (Counters o i' x, n)
+--     go OfIntermediate OfField (Counters o i x) = let (x', n) = bumpF x in (Counters o i x', n)
+--     go OfIntermediate OfBoolean (Counters o i x) = let (x', n) = bumpB x in (Counters o i x', n)
+--     go OfIntermediate (OfUIntBinRep width) (Counters o i x) = let (x', n) = bumpUBR width x in (Counters o i x', n)
+--     go OfIntermediate (OfUInt width) (Counters o i x) = let (x', n) = bumpU width x in (Counters o i x', n)
 
-    -- Bump the counter for binary representations of unsigned integer variables
-    bumpUBR :: Width -> SmallCounters -> SmallCounters
-    bumpUBR w (SmallCounters f b ubr u) =
-      SmallCounters f b ubr' u
-      where
-        ubr' = IntMap.insertWith (+) w 1 ubr
+--     -- Bump the counter for field element variables
+--     bumpF :: SmallCounters -> (SmallCounters, Int)
+--     bumpF (SmallCounters f b ubr u) = (SmallCounters (f + 1) b ubr u, f)
 
-    -- Bump the counter for unsigned integer variables
-    bumpU :: Width -> SmallCounters -> SmallCounters
-    bumpU w (SmallCounters f b ubr u) =
-      SmallCounters f b ubr u'
-      where
-        u' = IntMap.insertWith (+) w 1 u
+--     -- Bump the counter for Boolean variables
+--     bumpB :: SmallCounters -> (SmallCounters, Int)
+--     bumpB (SmallCounters f b ubr u) = (SmallCounters f (b + 1) ubr u, b)
+
+--     -- Bump the counter for binary representations of unsigned integer variables
+--     bumpUBR :: Width -> SmallCounters -> (SmallCounters, Int)
+--     bumpUBR w (SmallCounters f b ubr u) =
+--       (SmallCounters f b ubr' u, fromMaybe 0 (IntMap.lookup w ubr))
+--       where
+--         ubr' = IntMap.insertWith (+) w 1 ubr
+
+--     -- Bump the counter for unsigned integer variables
+--     bumpU :: Width -> SmallCounters -> (SmallCounters, Int)
+--     bumpU w (SmallCounters f b ubr u) =
+--       (SmallCounters f b ubr u', fromMaybe 0 (IntMap.lookup w u))
+--       where
+--         u' = IntMap.insertWith (+) w 1 u
 
 --------------------------------------------------------------------------------
 
