@@ -28,7 +28,7 @@ data SmallCounters = SmallCounters
     sizeUBinReps :: !(IntMap Int), -- size of binary representations of unsigned integers
     sizeU :: !(IntMap Int) -- size of unsigned integer variables
   }
-  deriving (Generic, NFData, Eq)
+  deriving (Generic, NFData, Eq, Show)
 
 binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
@@ -44,12 +44,26 @@ data Counters = Counters
     countInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters -- counters for intermediate variables
   }
-  deriving (Generic, NFData, Eq)
+  deriving (Generic, NFData, Eq, Show)
 
 choose :: VarSort -> Counters -> SmallCounters
 choose OfOutput = countOutput
 choose OfInput = countInput
 choose OfIntermediate = countIntermediate
+
+prettyPrint :: Counters -> [String]
+prettyPrint counters@(Counters o i x) =
+  let inputOffset = offsetOfSort counters OfInput
+      outputOffset = offsetOfSort counters OfOutput
+   in ["Total variable size: " <> show (smallCounterSize o + smallCounterSize i + smallCounterSize x)]
+        <> case smallCounterSize o of
+          0 -> []
+          1 -> ["Output variable : $" <> show inputOffset]
+          n -> ["Output variables: $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1)]
+        <> case smallCounterSize i of
+          0 -> []
+          1 -> ["Input variable  : $" <> show outputOffset]
+          n -> ["Input variables : $" <> show outputOffset <> " .. $" <> show (outputOffset + n - 1)]
 
 ------------------------------------------------------------------------------
 
@@ -97,15 +111,15 @@ bump = go
 
 -- | Re-index variables of different sorts and kinds
 reindex :: Counters -> VarSort -> VarKind -> Var -> Var
-reindex counter sort kind index = offsetOfSort sort + offsetOfKind kind (choose sort counter) + index
-  where
-    offsetOfSort :: VarSort -> Int
-    offsetOfSort OfOutput = 0
-    offsetOfSort OfInput = smallCounterSize (countOutput counter)
-    offsetOfSort OfIntermediate = offsetOfSort OfInput + smallCounterSize (countInput counter)
+reindex counters sort kind index = offsetOfSort counters sort + offsetOfKind (choose sort counters) kind + index
 
-    offsetOfKind :: VarKind -> SmallCounters -> Int
-    offsetOfKind OfField _ = 0
-    offsetOfKind OfBoolean (SmallCounters f _ _ _) = f
-    offsetOfKind (OfUIntBinRep width) (SmallCounters f b ubr _) = f + b + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) ubr)
-    offsetOfKind (OfUInt width) (SmallCounters f b ubr u) = f + b + binRepSize ubr + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
+offsetOfSort :: Counters -> VarSort -> Int
+offsetOfSort _ OfOutput = 0
+offsetOfSort counters OfInput = smallCounterSize (countOutput counters)
+offsetOfSort counters OfIntermediate = offsetOfSort counters OfInput + smallCounterSize (countInput counters)
+
+offsetOfKind :: SmallCounters -> VarKind -> Int
+offsetOfKind _ OfField = 0
+offsetOfKind (SmallCounters f _ _ _) OfBoolean = f
+offsetOfKind (SmallCounters f b ubr _) (OfUIntBinRep width) = f + b + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) ubr)
+offsetOfKind (SmallCounters f b ubr u) (OfUInt width) = f + b + binRepSize ubr + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
