@@ -165,7 +165,7 @@ addCount sort typ n (Counters o i x is) =
     adjustSmallCounters (SmallCounters f b ubr u) =
       case typ of
         OfField -> SmallCounters (f + n) b ubr u
-        OfBoolean -> SmallCounters f (f + n) ubr u
+        OfBoolean -> SmallCounters f (b + n) ubr u
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
         OfUInt w -> SmallCounters f b (IntMap.insertWith (+) w n ubr) (IntMap.insertWith (+) w n u)
 
