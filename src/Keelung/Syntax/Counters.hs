@@ -7,6 +7,7 @@ module Keelung.Syntax.Counters
     VarKind (..),
     VarSort (..),
     getCount,
+    getCountOfAll,
     getInputSequence,
     getInputVarRange,
     addCount,
@@ -128,13 +129,20 @@ getCount sort kind (Counters o i x _) =
         OfUIntBinRep w -> IntMap.findWithDefault 0 w ubr
         OfUInt w -> IntMap.findWithDefault 0 w u
 
+getCountOfAll :: VarSort -> Counters -> Int
+getCountOfAll sort (Counters o i x _) =
+  case sort of
+    OfOutput -> smallCounterSize o
+    OfInput -> smallCounterSize i
+    OfIntermediate -> smallCounterSize x
+
 getInputSequence :: Counters -> Seq (VarKind, Int)
 getInputSequence = countInputSequence
 
 getInputVarRange :: Counters -> (Int, Int)
 getInputVarRange counters =
   let inputOffset = offsetOfSort counters OfInput
-      inputSize = smallCounterSize (countInput counters)
+      inputSize = getCountOfAll OfInput counters
    in (inputOffset, inputOffset + inputSize - 1)
 
 -- | Set the current count for a variable of the given kind and sort.
