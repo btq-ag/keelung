@@ -154,9 +154,9 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 -- | Allocate a fresh Number variable.
 freshVarN :: Comp Var
 freshVarN = do
-  counters <- gets compCounters
-  let index = getCount OfIntermediate OfField counters
-  modifyCounter $ setCount OfIntermediate OfField (index + 1)
+  -- counters <- gets compCounters
+  -- let index = getCount OfIntermediate OfField counters
+  -- modifyCounter $ setCount OfIntermediate OfField (index + 1)
 
   index <- gets (intermediateVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
@@ -164,9 +164,9 @@ freshVarN = do
 
 freshVarB :: Comp Var
 freshVarB = do
-  counters <- gets compCounters
-  let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ setCount OfIntermediate OfBoolean (index + 1)
+  -- counters <- gets compCounters
+  -- let index = getCount OfIntermediate OfBoolean counters
+  -- modifyCounter $ setCount OfIntermediate OfBoolean (index + 1)
 
   index <- gets (intermediateVarSize . compVarCounters)
   modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
@@ -177,30 +177,31 @@ freshInputVarN :: Comp Var
 freshInputVarN = do
   counters <- gets compCounters
   let index = getCount OfInput OfField counters
-  modifyCounter $ setCount OfInput OfField (index + 1)
-
-  index <- gets (numInputVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpInputVarN (compVarCounters st)})
+  modifyCounter $ addCount OfInput OfField 1
   return index
+
+-- index <- gets (numInputVarSize . compVarCounters)
+-- modify (\st -> st {compVarCounters = bumpInputVarN (compVarCounters st)})
+-- return index
 
 freshInputVarB :: Comp Var
 freshInputVarB = do
   counters <- gets compCounters
   let index = getCount OfInput OfBoolean counters
-  modifyCounter $ setCount OfInput OfBoolean (index + 1)
+  modifyCounter $ addCount OfInput OfBoolean 1
 
-  index <- gets (boolInputVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpInputVarB (compVarCounters st)})
+  -- index <- gets (boolInputVarSize . compVarCounters)
+  -- modify (\st -> st {compVarCounters = bumpInputVarB (compVarCounters st)})
   return index
 
 freshInputVarU :: Int -> Comp Var
 freshInputVarU width = do
   counters <- gets compCounters
   let index = getCount OfInput (OfUInt width) counters
-  modifyCounter $ setCount OfInput (OfUInt width) (index + 1)
+  modifyCounter $ addCount OfInput (OfUInt width) 1
 
-  index <- gets (customInputSizeOf width . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpInputVarU width (compVarCounters st)})
+  -- index <- gets (customInputSizeOf width . compVarCounters)
+  -- modify (\st -> st {compVarCounters = bumpInputVarU width (compVarCounters st)})
   return index
 
 --------------------------------------------------------------------------------

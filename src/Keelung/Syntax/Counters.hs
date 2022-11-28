@@ -7,7 +7,9 @@ module Keelung.Syntax.Counters
     VarKind (..),
     VarSort (..),
     getCount,
-    setCount,
+    getInputSequence,
+    getInputVarRange,
+    addCount,
     reindex,
     prettyPrint,
   )
@@ -16,6 +18,8 @@ where
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 
@@ -27,6 +31,9 @@ type Width = Int
 
 -- | "Kinds" of variables.
 data VarKind = OfField | OfBoolean | OfUIntBinRep Width | OfUInt Width
+  deriving (Generic, NFData, Eq, Show)
+
+instance Serialize VarKind
 
 -- | "Sorts" of variables.
 data VarSort = OfOutput | OfInput | OfIntermediate
@@ -66,21 +73,23 @@ smallCounterSize (SmallCounters f b ubr u) =
 data Counters = Counters
   { countOutput :: !SmallCounters, -- counters for output variables
     countInput :: !SmallCounters, -- counters for input variables
-    countIntermediate :: !SmallCounters -- counters for intermediate variables
+    countIntermediate :: !SmallCounters, -- counters for intermediate variables
+    countInputSequence :: !(Seq (VarKind, Int)) -- Sequence of input variables
   }
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cO1 cI1 cI2 <> Counters cO2 cI3 cI4 =
+  Counters cOut1 cIn1 cInt1 cInSeq1 <> Counters cOut2 cIn2 cInt2 cInSeq2 =
     Counters
-      (cO1 <> cO2)
-      (cI1 <> cI3)
-      (cI2 <> cI4)
+      (cOut1 <> cOut2)
+      (cIn1 <> cIn2)
+      (cInt1 <> cInt2)
+      (cInSeq1 <> cInSeq2)
 
 instance Monoid Counters where
-  mempty = Counters mempty mempty mempty
+  mempty = Counters mempty mempty mempty mempty
 
 choose :: VarSort -> Counters -> SmallCounters
 choose OfOutput = countOutput
@@ -88,7 +97,7 @@ choose OfInput = countInput
 choose OfIntermediate = countIntermediate
 
 prettyPrint :: Counters -> [String]
-prettyPrint counters@(Counters o i x) =
+prettyPrint counters@(Counters o i x _) =
   let inputOffset = offsetOfSort counters OfInput
       outputOffset = offsetOfSort counters OfOutput
    in ["Total variable size: " <> show (smallCounterSize o + smallCounterSize i + smallCounterSize x)]
@@ -105,7 +114,7 @@ prettyPrint counters@(Counters o i x) =
 
 -- | Get the current count for a variable of the given kind and sort.
 getCount :: VarSort -> VarKind -> Counters -> Int
-getCount sort kind (Counters o i x) =
+getCount sort kind (Counters o i x _) =
   case sort of
     OfOutput -> go o
     OfInput -> go i
@@ -119,61 +128,35 @@ getCount sort kind (Counters o i x) =
         OfUIntBinRep w -> IntMap.findWithDefault 0 w ubr
         OfUInt w -> IntMap.findWithDefault 0 w u
 
+getInputSequence :: Counters -> Seq (VarKind, Int)
+getInputSequence = countInputSequence
+
+getInputVarRange :: Counters -> (Int, Int)
+getInputVarRange counters =
+  let inputOffset = offsetOfSort counters OfInput
+      inputSize = smallCounterSize (countInput counters)
+   in (inputOffset, inputOffset + inputSize - 1)
+
 -- | Set the current count for a variable of the given kind and sort.
-setCount :: VarSort -> VarKind -> Int -> Counters -> Counters
-setCount sort kind n (Counters o i x) =
+addCount :: VarSort -> VarKind -> Int -> Counters -> Counters
+addCount sort kind n (Counters o i x is) =
   case sort of
-    OfOutput -> Counters (go o) i x
-    OfInput -> Counters o (go i) x
-    OfIntermediate -> Counters o i (go x)
+    OfOutput -> Counters (adjustSmallCounters o) i x (is <> newInputSequence)
+    OfInput -> Counters o (adjustSmallCounters i) x (is <> newInputSequence)
+    OfIntermediate -> Counters o i (adjustSmallCounters x) (is <> newInputSequence)
   where
-    go :: SmallCounters -> SmallCounters
-    go (SmallCounters f b ubr u) =
+    adjustSmallCounters :: SmallCounters -> SmallCounters
+    adjustSmallCounters (SmallCounters f b ubr u) =
       case kind of
-        OfField -> SmallCounters n b ubr u
-        OfBoolean -> SmallCounters f n ubr u
-        OfUIntBinRep w -> SmallCounters f b (IntMap.insert w n ubr) u
-        OfUInt w -> SmallCounters f b ubr (IntMap.insert w n u)
+        OfField -> SmallCounters (f + n) b ubr u
+        OfBoolean -> SmallCounters f (f + n) ubr u
+        OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
+        OfUInt w -> SmallCounters f b (IntMap.insertWith (+) w n ubr) (IntMap.insertWith (+) w n u)
 
--- -- | Increment the counter for the given variable kind and sort.
--- bump :: VarSort -> VarKind -> Counters -> (Counters, Int)
--- bump = go
---   where
---     go :: VarSort -> VarKind -> Counters -> (Counters, Int)
---     go OfOutput OfField (Counters o i x) = let (o', n) = bumpF o in (Counters o' i x, n)
---     go OfOutput OfBoolean (Counters o i x) = let (o', n) = bumpB o in (Counters o' i x, n)
---     go OfOutput (OfUIntBinRep width) (Counters o i x) = let (o', n) = bumpUBR width o in (Counters o' i x, n)
---     go OfOutput (OfUInt width) (Counters o i x) = let (o', n) = bumpU width o in (Counters o' i x, n)
---     go OfInput OfField (Counters o i x) = let (i', n) = bumpF i in (Counters o i' x, n)
---     go OfInput OfBoolean (Counters o i x) = let (i', n) = bumpB i in (Counters o i' x, n)
---     go OfInput (OfUIntBinRep width) (Counters o i x) = let (x', n) = bumpUBR width x in (Counters o i x', n)
---     go OfInput (OfUInt width) (Counters o i x) = let (i', n) = bumpU width i in (Counters o i' x, n)
---     go OfIntermediate OfField (Counters o i x) = let (x', n) = bumpF x in (Counters o i x', n)
---     go OfIntermediate OfBoolean (Counters o i x) = let (x', n) = bumpB x in (Counters o i x', n)
---     go OfIntermediate (OfUIntBinRep width) (Counters o i x) = let (x', n) = bumpUBR width x in (Counters o i x', n)
---     go OfIntermediate (OfUInt width) (Counters o i x) = let (x', n) = bumpU width x in (Counters o i x', n)
+    oldCount = getCount sort kind (Counters o i x is)
 
---     -- Bump the counter for field element variables
---     bumpF :: SmallCounters -> (SmallCounters, Int)
---     bumpF (SmallCounters f b ubr u) = (SmallCounters (f + 1) b ubr u, f)
-
---     -- Bump the counter for Boolean variables
---     bumpB :: SmallCounters -> (SmallCounters, Int)
---     bumpB (SmallCounters f b ubr u) = (SmallCounters f (b + 1) ubr u, b)
-
---     -- Bump the counter for binary representations of unsigned integer variables
---     bumpUBR :: Width -> SmallCounters -> (SmallCounters, Int)
---     bumpUBR w (SmallCounters f b ubr u) =
---       (SmallCounters f b ubr' u, fromMaybe 0 (IntMap.lookup w ubr))
---       where
---         ubr' = IntMap.insertWith (+) w 1 ubr
-
---     -- Bump the counter for unsigned integer variables
---     bumpU :: Width -> SmallCounters -> (SmallCounters, Int)
---     bumpU w (SmallCounters f b ubr u) =
---       (SmallCounters f b ubr u', fromMaybe 0 (IntMap.lookup w u))
---       where
---         u' = IntMap.insertWith (+) w 1 u
+    newInputSequence :: Seq (VarKind, Int)
+    newInputSequence = Seq.fromList [(kind, index) | index <- [oldCount .. oldCount + n - 1]]
 
 --------------------------------------------------------------------------------
 
@@ -184,7 +167,7 @@ reindex counters sort kind index = offsetOfSort counters sort + offsetOfKind (ch
 offsetOfSort :: Counters -> VarSort -> Int
 offsetOfSort _ OfOutput = 0
 offsetOfSort counters OfInput = smallCounterSize (countOutput counters)
-offsetOfSort counters OfIntermediate = offsetOfSort counters OfInput + smallCounterSize (countInput counters)
+offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countInput counters)
 
 offsetOfKind :: SmallCounters -> VarKind -> Int
 offsetOfKind _ OfField = 0
