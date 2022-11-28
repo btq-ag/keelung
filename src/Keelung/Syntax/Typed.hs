@@ -247,16 +247,34 @@ runComp comp f = runExcept (runStateT f comp)
 evalComp :: Computation -> Comp a -> Either ElabError a
 evalComp comp f = runExcept (evalStateT f comp)
 
+modifyCounter :: (Counters -> Counters) -> Comp ()
+modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
+
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
   (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
-allocVar :: Comp Int
-allocVar = do
-  index <- gets (intermediateVarSize . compVarCounters)
-  modify (\st -> st {compVarCounters = bumpIntermediateVar (compVarCounters st)})
+allocVarN :: Comp Var
+allocVarN = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate OfField counters
+  modifyCounter $ addCount OfIntermediate OfField 1
+  return index
+
+allocVarB :: Comp Var
+allocVarB = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate OfBoolean counters
+  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  return index
+
+allocVarU :: Width -> Comp Var
+allocVarU width = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return index
 
 assignN :: Var -> Number -> Comp ()

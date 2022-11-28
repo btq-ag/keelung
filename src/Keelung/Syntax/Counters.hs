@@ -4,14 +4,22 @@
 module Keelung.Syntax.Counters
   ( Counters (Counters),
     SmallCounters (SmallCounters),
-    VarKind (..),
+    VarType (..),
     VarSort (..),
-    getCount,
-    getCountOfAll,
-    getInputSequence,
-    getInputVarRange,
-    addCount,
     reindex,
+    getCount,
+    getCountBySort,
+    getCountByType,
+    getTotalCount,
+    addCount,
+    -- for constraint generation 
+    getOutputVarRange,
+    getInputVarRange,
+    getBooleanConstraintSize,
+    getBooleanConstraintRanges,
+    -- for parsing raw inputs
+    getInputSequence,
+    -- for pretty printing
     prettyPrint,
   )
 where
@@ -30,11 +38,11 @@ type Var = Int
 
 type Width = Int
 
--- | "Kinds" of variables.
-data VarKind = OfField | OfBoolean | OfUIntBinRep Width | OfUInt Width
+-- | "Types" of variables.
+data VarType = OfField | OfBoolean | OfUIntBinRep Width | OfUInt Width
   deriving (Generic, NFData, Eq, Show)
 
-instance Serialize VarKind
+instance Serialize VarType
 
 -- | "Sorts" of variables.
 data VarSort = OfOutput | OfInput | OfIntermediate
@@ -75,7 +83,7 @@ data Counters = Counters
   { countOutput :: !SmallCounters, -- counters for output variables
     countInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
-    countInputSequence :: !(Seq (VarKind, Int)) -- Sequence of input variables
+    countInputSequence :: !(Seq (VarType, Int)) -- Sequence of input variables
   }
   deriving (Generic, NFData, Eq, Show)
 
@@ -91,11 +99,6 @@ instance Semigroup Counters where
 
 instance Monoid Counters where
   mempty = Counters mempty mempty mempty mempty
-
-choose :: VarSort -> Counters -> SmallCounters
-choose OfOutput = countOutput
-choose OfInput = countInput
-choose OfIntermediate = countIntermediate
 
 prettyPrint :: Counters -> [String]
 prettyPrint counters@(Counters o i x _) =
@@ -113,9 +116,9 @@ prettyPrint counters@(Counters o i x _) =
 
 --------------------------------------------------------------------------------
 
--- | Get the current count for a variable of the given kind and sort.
-getCount :: VarSort -> VarKind -> Counters -> Int
-getCount sort kind (Counters o i x _) =
+-- | Get the current count for a variable of the given type and sort.
+getCount :: VarSort -> VarType -> Counters -> Int
+getCount sort typ (Counters o i x _) =
   case sort of
     OfOutput -> go o
     OfInput -> go i
@@ -123,31 +126,36 @@ getCount sort kind (Counters o i x _) =
   where
     go :: SmallCounters -> Int
     go (SmallCounters f b ubr u) =
-      case kind of
+      case typ of
         OfField -> f
         OfBoolean -> b
         OfUIntBinRep w -> IntMap.findWithDefault 0 w ubr
         OfUInt w -> IntMap.findWithDefault 0 w u
 
-getCountOfAll :: VarSort -> Counters -> Int
-getCountOfAll sort (Counters o i x _) =
+-- | Get the current count for a variable group of the given sort.
+getCountBySort :: VarSort -> Counters -> Int
+getCountBySort sort (Counters o i x _) =
   case sort of
     OfOutput -> smallCounterSize o
     OfInput -> smallCounterSize i
     OfIntermediate -> smallCounterSize x
 
-getInputSequence :: Counters -> Seq (VarKind, Int)
-getInputSequence = countInputSequence
+-- | Get the current count for a variable group of the given type.
+getCountByType :: VarType -> Counters -> Int
+getCountByType typ (Counters o i x _) =
+  case typ of
+    OfField -> sizeF o + sizeF i + sizeF x
+    OfBoolean -> sizeB o + sizeB i + sizeB x
+    OfUIntBinRep _ -> binRepSize (sizeUBinReps o) + binRepSize (sizeUBinReps i) + binRepSize (sizeUBinReps x)
+    OfUInt _ -> binRepSize (sizeU o) + binRepSize (sizeU i) + binRepSize (sizeU x)
 
-getInputVarRange :: Counters -> (Int, Int)
-getInputVarRange counters =
-  let inputOffset = offsetOfSort counters OfInput
-      inputSize = getCountOfAll OfInput counters
-   in (inputOffset, inputOffset + inputSize - 1)
+-- | Total count of variables 
+getTotalCount :: Counters -> Int
+getTotalCount (Counters o i x _) = smallCounterSize o + smallCounterSize i + smallCounterSize x
 
--- | Set the current count for a variable of the given kind and sort.
-addCount :: VarSort -> VarKind -> Int -> Counters -> Counters
-addCount sort kind n (Counters o i x is) =
+-- | Set the current count for a variable of the given type and sort.
+addCount :: VarSort -> VarType -> Int -> Counters -> Counters
+addCount sort typ n (Counters o i x is) =
   case sort of
     OfOutput -> Counters (adjustSmallCounters o) i x (is <> newInputSequence)
     OfInput -> Counters o (adjustSmallCounters i) x (is <> newInputSequence)
@@ -155,30 +163,79 @@ addCount sort kind n (Counters o i x is) =
   where
     adjustSmallCounters :: SmallCounters -> SmallCounters
     adjustSmallCounters (SmallCounters f b ubr u) =
-      case kind of
+      case typ of
         OfField -> SmallCounters (f + n) b ubr u
         OfBoolean -> SmallCounters f (f + n) ubr u
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
         OfUInt w -> SmallCounters f b (IntMap.insertWith (+) w n ubr) (IntMap.insertWith (+) w n u)
 
-    oldCount = getCount sort kind (Counters o i x is)
+    oldCount = getCount sort typ (Counters o i x is)
 
-    newInputSequence :: Seq (VarKind, Int)
-    newInputSequence = Seq.fromList [(kind, index) | index <- [oldCount .. oldCount + n - 1]]
+    newInputSequence :: Seq (VarType, Int)
+    newInputSequence = Seq.fromList [(typ, index) | index <- [oldCount .. oldCount + n - 1]]
+
+-- | For parsing raw inputs
+getInputSequence :: Counters -> Seq (VarType, Int)
+getInputSequence = countInputSequence
 
 --------------------------------------------------------------------------------
 
--- | Re-index variables of different sorts and kinds
-reindex :: Counters -> VarSort -> VarKind -> Var -> Var
-reindex counters sort kind index = offsetOfSort counters sort + offsetOfKind (choose sort counters) kind + index
+-- | Re-index variables of different sorts and types
+reindex :: Counters -> VarSort -> VarType -> Var -> Var
+reindex counters sort typ index = offsetOfSort counters sort + offsetOfKind (choose sort counters) typ + index
+  where
+    choose :: VarSort -> Counters -> SmallCounters
+    choose OfOutput = countOutput
+    choose OfInput = countInput
+    choose OfIntermediate = countIntermediate
 
 offsetOfSort :: Counters -> VarSort -> Int
 offsetOfSort _ OfOutput = 0
 offsetOfSort counters OfInput = smallCounterSize (countOutput counters)
 offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countInput counters)
 
-offsetOfKind :: SmallCounters -> VarKind -> Int
+offsetOfKind :: SmallCounters -> VarType -> Int
 offsetOfKind _ OfField = 0
 offsetOfKind (SmallCounters f _ _ _) OfBoolean = f
 offsetOfKind (SmallCounters f b ubr _) (OfUIntBinRep width) = f + b + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) ubr)
 offsetOfKind (SmallCounters f b ubr u) (OfUInt width) = f + b + binRepSize ubr + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
+
+--------------------------------------------------------------------------------
+
+getOutputVarRange :: Counters -> (Int, Int)
+getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort counters OfInput)
+
+getInputVarRange :: Counters -> (Int, Int)
+getInputVarRange counters =
+  let inputOffset = offsetOfSort counters OfInput
+      inputSize = getCountBySort OfInput counters
+   in (inputOffset, inputOffset + inputSize)
+
+-- | Variables that needed to be constrained to be Boolean
+--    1. Boolean output variables
+--    2. UInt BinReps output variables
+--    3. Boolean input variables
+--    4. UInt BinReps input variables
+getBooleanConstraintSize :: Counters -> Int
+getBooleanConstraintSize (Counters o i _ _) = f o + f i
+  where
+    f (SmallCounters _ b ubr _) = b + binRepSize ubr
+
+-- | Variables that needed to be constrained to be Boolean
+--    1. Boolean output variables
+--    2. UInt BinReps output variables
+--    3. Boolean input variables
+--    4. UInt BinReps input variables
+getBooleanConstraintRanges :: Counters -> [(Int, Int)]
+getBooleanConstraintRanges counters@(Counters o i _ _) =
+  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfInput i]
+  where
+    booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
+    booleanVarRange sort (SmallCounters _ b ubr _) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize ubr)
+
+    mergeSegments :: [(Int, Int)] -> [(Int, Int)]
+    mergeSegments [] = []
+    mergeSegments [x] = [x]
+    mergeSegments ((start, end) : (start', end') : xs)
+      | end == start' = mergeSegments ((start, end') : xs)
+      | otherwise = (start, end) : mergeSegments ((start', end') : xs)
