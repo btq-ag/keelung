@@ -19,11 +19,10 @@ import qualified Keelung.Types as Kinded
 
 convert :: Encode t => Kinded.Elaborated t -> Elaborated
 convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
-  let Kinded.Computation varCounters counters _addrSize _heap asgns bsgns asgns' = comp
+  let Kinded.Computation counters _addrSize _heap asgns bsgns asgns' = comp
   Elaborated
     <$> encode expr
     <*> ( Computation
-            varCounters
             counters
             <$> mapM encodeAssignment asgns
             <*> mapM encodeAssignment bsgns

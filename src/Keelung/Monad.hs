@@ -63,7 +63,6 @@ import GHC.TypeNats
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.VarCounters
 import Keelung.Types
 import Prelude hiding (product, sum)
 
@@ -84,7 +83,6 @@ instance Show Assignment where
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
   { -- Variable bookkeeping
-    compVarCounters :: !VarCounters,
     compCounters :: !Counters,
     -- Size of allocated heap addresses
     compAddrSize :: Int,
@@ -99,12 +97,11 @@ data Computation = Computation
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation mempty mempty 0 mempty mempty mempty mempty
+emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation varCounters _ addrSize _ numAsgns boolAsgns assertions) =
-    "{\n" <> indent (show varCounters)
-      <> "  address size: "
+  show (Computation _ addrSize _ numAsgns boolAsgns assertions) =
+    "{\n" <> "  address size: "
       <> show addrSize
       ++ "\n  num assignments: "
       ++ show numAsgns

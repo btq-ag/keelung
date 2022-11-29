@@ -15,9 +15,8 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
-import Keelung.Syntax.VarCounters
-import Keelung.Types
 import Keelung.Syntax.Counters
+import Keelung.Types
 
 type Width = Int
 
@@ -209,7 +208,6 @@ instance Serialize Assignment
 -- | Data structure for elaboration bookkeeping
 data Computation = Computation
   { -- Variable bookkeeping
-    compVarCounters :: !VarCounters,
     compCounters :: !Counters,
     -- Assignments
     compNumAsgns :: [Assignment],
@@ -221,8 +219,8 @@ data Computation = Computation
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation varCounters _ numAsgns boolAsgns uintAsgns assertions) =
-    "{\n" <> indent (show varCounters)
+  show (Computation _ numAsgns boolAsgns uintAsgns assertions) =
+    "{\n"
       <> "\n  Number assignments: "
       <> prettyList2 8 numAsgns
       <> "\n  Boolean assignments: "
@@ -252,7 +250,7 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
