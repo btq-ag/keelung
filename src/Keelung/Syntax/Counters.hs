@@ -22,7 +22,7 @@ module Keelung.Syntax.Counters
     getInputSequence,
     -- for pretty printing
     prettyPrint,
-    -- workaround for variable renumbering 
+    -- workaround for variable renumbering
     setReducedCount,
   )
 where
@@ -190,7 +190,7 @@ getInputSequence = countInputSequence
 
 -- | Re-index variables of different sorts and types
 reindex :: Counters -> VarSort -> VarType -> Var -> Var
-reindex counters sort typ index = offsetOfSort counters sort + offsetOfKind (choose sort counters) typ + index
+reindex counters sort typ index = offsetOfSort counters sort + offsetOfType (choose sort counters) typ index
   where
     choose :: VarSort -> Counters -> SmallCounters
     choose OfOutput = countOutput
@@ -202,11 +202,14 @@ offsetOfSort _ OfOutput = 0
 offsetOfSort counters OfInput = smallCounterSize (countOutput counters)
 offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countInput counters)
 
-offsetOfKind :: SmallCounters -> VarType -> Int
-offsetOfKind _ OfField = 0
-offsetOfKind (SmallCounters f _ _ _) OfBoolean = f
-offsetOfKind (SmallCounters f b ubr _) (OfUIntBinRep width) = f + b + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) ubr)
-offsetOfKind (SmallCounters f b ubr u) (OfUInt width) = f + b + binRepSize ubr + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
+offsetOfType :: SmallCounters -> VarType -> Int -> Int
+offsetOfType _ OfField index = index
+offsetOfType (SmallCounters f _ _ _) OfBoolean index = f + index
+offsetOfType (SmallCounters f b ubr _) (OfUIntBinRep width) index =
+  f + b
+    + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) ubr)
+    + width * index
+offsetOfType (SmallCounters f b ubr u) (OfUInt width) index = f + b + binRepSize ubr + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
 
 --------------------------------------------------------------------------------
 
