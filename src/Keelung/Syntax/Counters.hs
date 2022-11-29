@@ -76,9 +76,12 @@ instance Monoid SmallCounters where
 binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
 
+uIntSize :: IntMap Int -> Int
+uIntSize = sum 
+
 smallCounterSize :: SmallCounters -> Int
 smallCounterSize (SmallCounters f b ubr u) =
-  f + b + binRepSize ubr + binRepSize u
+  f + b + binRepSize ubr + uIntSize u
 
 --------------------------------------------------------------------------------
 
@@ -134,7 +137,7 @@ getCount sort typ (Counters o i x _ _) =
       case typ of
         OfField -> f
         OfBoolean -> b
-        OfUIntBinRep w -> IntMap.findWithDefault 0 w ubr
+        OfUIntBinRep w -> w * IntMap.findWithDefault 0 w ubr
         OfUInt w -> IntMap.findWithDefault 0 w u
 
 -- | Get the current count for a variable group of the given sort.
@@ -152,7 +155,7 @@ getCountByType typ (Counters o i x _ _) =
     OfField -> sizeF o + sizeF i + sizeF x
     OfBoolean -> sizeB o + sizeB i + sizeB x
     OfUIntBinRep _ -> binRepSize (sizeUBinReps o) + binRepSize (sizeUBinReps i) + binRepSize (sizeUBinReps x)
-    OfUInt _ -> binRepSize (sizeU o) + binRepSize (sizeU i) + binRepSize (sizeU x)
+    OfUInt _ -> uIntSize (sizeU o) + uIntSize (sizeU i) + uIntSize (sizeU x)
 
 setReducedCount :: Int -> Counters -> Counters
 setReducedCount n (Counters o i x s _) = Counters o i x s n
