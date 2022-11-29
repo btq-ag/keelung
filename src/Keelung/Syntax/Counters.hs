@@ -112,12 +112,12 @@ prettyPrint counters@(Counters o i x _ _) =
    in ["Total variable size: " <> show (smallCounterSize o + smallCounterSize i + smallCounterSize x)]
         <> case smallCounterSize o of
           0 -> []
-          1 -> ["Output variable : $" <> show inputOffset]
-          n -> ["Output variables: $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1)]
+          1 -> ["Output variable : $" <> show outputOffset]
+          n -> ["Output variables: $" <> show outputOffset <> " .. $" <> show (outputOffset + n - 1)]
         <> case smallCounterSize i of
           0 -> []
-          1 -> ["Input variable  : $" <> show outputOffset]
-          n -> ["Input variables : $" <> show outputOffset <> " .. $" <> show (outputOffset + n - 1)]
+          1 -> ["Input variable  : $" <> show inputOffset]
+          n -> ["Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1)]
 
 --------------------------------------------------------------------------------
 
