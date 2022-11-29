@@ -6,6 +6,7 @@ module Keelung.Types
     Addr,
     Heap,
     ElemType (..),
+    indent
   )
 where
 
@@ -46,3 +47,10 @@ instance Semigroup ElemType where
     (BoolElem, BoolElem) -> BoolElem
     (ArrElem a' l, ArrElem b' _) -> ArrElem (a' <> b') l
     _ -> error "ElemType must be the same"
+
+
+--------------------------------------------------------------------------------
+
+-- | Handy function for prettifying stuff
+indent :: String -> String
+indent = unlines . map ("  " <>) . lines

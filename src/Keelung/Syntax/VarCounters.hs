@@ -43,7 +43,6 @@ module Keelung.Syntax.VarCounters
     setNumBitWidth,
     getNumBitWidth,
     -- Helper function for pretty printing
-    indent,
     ----
     lookupBinRepStart,
   )
@@ -364,6 +363,6 @@ getNumBitWidth = varNumWidth
 
 --------------------------------------------------------------------------------
 
--- | Handy function for prettifying VarCounters
-indent :: String -> String
-indent = unlines . map ("  " <>) . lines
+-- -- | Handy function for prettifying VarCounters
+-- indent :: String -> String
+-- indent = unlines . map ("  " <>) . lines

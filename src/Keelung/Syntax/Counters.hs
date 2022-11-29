@@ -12,9 +12,10 @@ module Keelung.Syntax.Counters
     getCountByType,
     getTotalCount,
     addCount,
-    -- for constraint generation 
+    -- for constraint generation
     getOutputVarRange,
     getInputVarRange,
+    getBinRepConstraintSize,
     getBooleanConstraintSize,
     getBooleanConstraintRanges,
     -- for parsing raw inputs
@@ -149,7 +150,7 @@ getCountByType typ (Counters o i x _) =
     OfUIntBinRep _ -> binRepSize (sizeUBinReps o) + binRepSize (sizeUBinReps i) + binRepSize (sizeUBinReps x)
     OfUInt _ -> binRepSize (sizeU o) + binRepSize (sizeU i) + binRepSize (sizeU x)
 
--- | Total count of variables 
+-- | Total count of variables
 getTotalCount :: Counters -> Int
 getTotalCount (Counters o i x _) = smallCounterSize o + smallCounterSize i + smallCounterSize x
 
@@ -211,6 +212,12 @@ getInputVarRange counters =
       inputSize = getCountBySort OfInput counters
    in (inputOffset, inputOffset + inputSize)
 
+-- | Generate one BinRep constraint for each UInt input & output variable
+getBinRepConstraintSize :: Counters -> Int
+getBinRepConstraintSize (Counters o i _ _) = f o + f i
+  where
+    f (SmallCounters _ _ ubr _) = binRepSize ubr
+
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
 --    2. UInt BinReps output variables
@@ -235,7 +242,10 @@ getBooleanConstraintRanges counters@(Counters o i _ _) =
 
     mergeSegments :: [(Int, Int)] -> [(Int, Int)]
     mergeSegments [] = []
-    mergeSegments [x] = [x]
+    mergeSegments [(start, end)]
+      | end == start = []
+      | otherwise = [(start, end)]
     mergeSegments ((start, end) : (start', end') : xs)
+      | end == start = mergeSegments ((start', end') : xs)
       | end == start' = mergeSegments ((start, end') : xs)
       | otherwise = (start, end) : mergeSegments ((start', end') : xs)

@@ -53,7 +53,9 @@ instance (Eq n, Num n) => Eq (Poly n) where
 
 instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
-    compare (IntMap.size x, x, c) (IntMap.size y, y, d)
+    if Poly c x == Poly d y
+      then EQ
+      else compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
   show (Poly n xs)
