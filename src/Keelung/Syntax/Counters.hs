@@ -22,6 +22,8 @@ module Keelung.Syntax.Counters
     getInputSequence,
     -- for pretty printing
     prettyPrint,
+    -- workaround for variable renumbering 
+    setReducedCount,
   )
 where
 
@@ -84,25 +86,27 @@ data Counters = Counters
   { countOutput :: !SmallCounters, -- counters for output variables
     countInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
-    countInputSequence :: !(Seq (VarType, Int)) -- Sequence of input variables
+    countInputSequence :: !(Seq (VarType, Int)), -- Sequence of input variables
+    countReducedVarHack :: !Int -- HACK, keep track of the number of variables reduced after renumbering
   }
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cOut1 cIn1 cInt1 cInSeq1 <> Counters cOut2 cIn2 cInt2 cInSeq2 =
+  Counters cOut1 cIn1 cInt1 cInSeq1 cRed1 <> Counters cOut2 cIn2 cInt2 cInSeq2 cRed2 =
     Counters
       (cOut1 <> cOut2)
       (cIn1 <> cIn2)
       (cInt1 <> cInt2)
       (cInSeq1 <> cInSeq2)
+      (cRed1 + cRed2)
 
 instance Monoid Counters where
-  mempty = Counters mempty mempty mempty mempty
+  mempty = Counters mempty mempty mempty mempty 0
 
 prettyPrint :: Counters -> [String]
-prettyPrint counters@(Counters o i x _) =
+prettyPrint counters@(Counters o i x _ _) =
   let inputOffset = offsetOfSort counters OfInput
       outputOffset = offsetOfSort counters OfOutput
    in ["Total variable size: " <> show (smallCounterSize o + smallCounterSize i + smallCounterSize x)]
@@ -119,7 +123,7 @@ prettyPrint counters@(Counters o i x _) =
 
 -- | Get the current count for a variable of the given type and sort.
 getCount :: VarSort -> VarType -> Counters -> Int
-getCount sort typ (Counters o i x _) =
+getCount sort typ (Counters o i x _ _) =
   case sort of
     OfOutput -> go o
     OfInput -> go i
@@ -135,7 +139,7 @@ getCount sort typ (Counters o i x _) =
 
 -- | Get the current count for a variable group of the given sort.
 getCountBySort :: VarSort -> Counters -> Int
-getCountBySort sort (Counters o i x _) =
+getCountBySort sort (Counters o i x _ _) =
   case sort of
     OfOutput -> smallCounterSize o
     OfInput -> smallCounterSize i
@@ -143,24 +147,27 @@ getCountBySort sort (Counters o i x _) =
 
 -- | Get the current count for a variable group of the given type.
 getCountByType :: VarType -> Counters -> Int
-getCountByType typ (Counters o i x _) =
+getCountByType typ (Counters o i x _ _) =
   case typ of
     OfField -> sizeF o + sizeF i + sizeF x
     OfBoolean -> sizeB o + sizeB i + sizeB x
     OfUIntBinRep _ -> binRepSize (sizeUBinReps o) + binRepSize (sizeUBinReps i) + binRepSize (sizeUBinReps x)
     OfUInt _ -> binRepSize (sizeU o) + binRepSize (sizeU i) + binRepSize (sizeU x)
 
+setReducedCount :: Int -> Counters -> Counters
+setReducedCount n (Counters o i x s _) = Counters o i x s n
+
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i x _) = smallCounterSize o + smallCounterSize i + smallCounterSize x
+getTotalCount (Counters o i x _ reduced) = smallCounterSize o + smallCounterSize i + smallCounterSize x - reduced
 
 -- | Set the current count for a variable of the given type and sort.
 addCount :: VarSort -> VarType -> Int -> Counters -> Counters
-addCount sort typ n (Counters o i x is) =
+addCount sort typ n (Counters o i x is r) =
   case sort of
-    OfOutput -> Counters (adjustSmallCounters o) i x (is <> newInputSequence)
-    OfInput -> Counters o (adjustSmallCounters i) x (is <> newInputSequence)
-    OfIntermediate -> Counters o i (adjustSmallCounters x) (is <> newInputSequence)
+    OfOutput -> Counters (adjustSmallCounters o) i x is r
+    OfInput -> Counters o (adjustSmallCounters i) x (is <> newInputSequence) r
+    OfIntermediate -> Counters o i (adjustSmallCounters x) is r
   where
     adjustSmallCounters :: SmallCounters -> SmallCounters
     adjustSmallCounters (SmallCounters f b ubr u) =
@@ -170,7 +177,7 @@ addCount sort typ n (Counters o i x is) =
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
         OfUInt w -> SmallCounters f b (IntMap.insertWith (+) w n ubr) (IntMap.insertWith (+) w n u)
 
-    oldCount = getCount sort typ (Counters o i x is)
+    oldCount = getCount sort typ (Counters o i x is r)
 
     newInputSequence :: Seq (VarType, Int)
     newInputSequence = Seq.fromList [(typ, index) | index <- [oldCount .. oldCount + n - 1]]
@@ -214,7 +221,7 @@ getInputVarRange counters =
 
 -- | Generate one BinRep constraint for each UInt input & output variable
 getBinRepConstraintSize :: Counters -> Int
-getBinRepConstraintSize (Counters o i _ _) = f o + f i
+getBinRepConstraintSize (Counters o i _ _ _) = f o + f i
   where
     f (SmallCounters _ _ ubr _) = binRepSize ubr
 
@@ -224,7 +231,7 @@ getBinRepConstraintSize (Counters o i _ _) = f o + f i
 --    3. Boolean input variables
 --    4. UInt BinReps input variables
 getBooleanConstraintSize :: Counters -> Int
-getBooleanConstraintSize (Counters o i _ _) = f o + f i
+getBooleanConstraintSize (Counters o i _ _ _) = f o + f i
   where
     f (SmallCounters _ b ubr _) = b + binRepSize ubr
 
@@ -234,7 +241,7 @@ getBooleanConstraintSize (Counters o i _ _) = f o + f i
 --    3. Boolean input variables
 --    4. UInt BinReps input variables
 getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters@(Counters o i _ _) =
+getBooleanConstraintRanges counters@(Counters o i _ _ _) =
   mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfInput i]
   where
     booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
