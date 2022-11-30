@@ -278,12 +278,12 @@ class Cmp a where
 
 instance Cmp Boolean where
   eq = EqB
-  neq x y = IfB (x `eq` y) false true
+  neq x y = Not (x `eq` y)
 
 instance Cmp Number where
   eq = EqN
-  neq x y = IfB (x `eq` y) false true
+  neq x y = Not (x `eq` y)
 
 instance KnownNat w => Cmp (UInt w) where
   eq = EqU
-  neq x y = IfB (x `eq` y) false true
+  neq x y = Not (x `eq` y)
