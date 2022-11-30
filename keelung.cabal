@@ -40,7 +40,6 @@ library
       Keelung.Syntax.Kinded
       Keelung.Syntax.Simplify
       Keelung.Syntax.Typed
-      Keelung.Syntax.VarCounters
       Keelung.Types
   other-modules:
       Paths_keelung

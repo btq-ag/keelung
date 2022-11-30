@@ -20,10 +20,13 @@ module Keelung.Syntax.Counters
     getBooleanConstraintRanges,
     -- for parsing raw inputs
     getInputSequence,
-    -- for pretty printing
-    prettyPrint,
     -- workaround for variable renumbering
     setReducedCount,
+    -- for pretty printing
+    prettyConstraints,
+    prettyVariables,
+    prettyBooleanConstraints,
+    prettyBinRepConstraints,
   )
 where
 
@@ -34,6 +37,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Syntax.BinRep (BinRep (..))
 
 ------------------------------------------------------------------------------
 
@@ -77,7 +81,7 @@ binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
 
 uIntSize :: IntMap Int -> Int
-uIntSize = sum 
+uIntSize = sum
 
 smallCounterSize :: SmallCounters -> Int
 smallCounterSize (SmallCounters f b ubr u) =
@@ -107,20 +111,6 @@ instance Semigroup Counters where
 
 instance Monoid Counters where
   mempty = Counters mempty mempty mempty mempty 0
-
-prettyPrint :: Counters -> [String]
-prettyPrint counters@(Counters o i x _ _) =
-  let inputOffset = offsetOfSort counters OfInput
-      outputOffset = offsetOfSort counters OfOutput
-   in ["Total variable size: " <> show (smallCounterSize o + smallCounterSize i + smallCounterSize x)]
-        <> case smallCounterSize o of
-          0 -> []
-          1 -> ["Output variable : $" <> show outputOffset]
-          n -> ["Output variables: $" <> show outputOffset <> " .. $" <> show (outputOffset + n - 1)]
-        <> case smallCounterSize i of
-          0 -> []
-          1 -> ["Input variable  : $" <> show inputOffset]
-          n -> ["Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1)]
 
 --------------------------------------------------------------------------------
 
@@ -262,3 +252,112 @@ getBooleanConstraintRanges counters@(Counters o i _ _ _) =
       | end == start = mergeSegments ((start', end') : xs)
       | end == start' = mergeSegments ((start, end') : xs)
       | otherwise = (start, end) : mergeSegments ((start', end') : xs)
+
+--------------------------------------------------------------------------------
+
+prettyVariables :: Counters -> String
+prettyVariables counters@(Counters o i _ _ _) =
+  let inputOffset = offsetOfSort counters OfInput
+      outputOffset = offsetOfSort counters OfOutput
+      totalSize = getTotalCount counters
+
+      inputVars = case smallCounterSize o of
+        0 -> ""
+        1 -> "      Output variable : $" <> show outputOffset <> "\n"
+        n -> "      Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
+      ouputVars = case smallCounterSize i of
+        0 -> ""
+        1 -> "      Input variable  : $" <> show inputOffset <> "\n"
+        n -> "      Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1) <> "\n"
+   in if totalSize == 0
+        then ""
+        else
+          "    Variables (" <> show totalSize <> "):\n\n"
+            <> ouputVars
+            <> inputVars
+            <> "\n"
+
+prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints counters cs =
+  showConstraintSummary
+    <> showOrdinaryConstraints
+    <> showBooleanConstraints
+    <> showBinRepConstraints
+  where
+    -- sizes of constraint groups
+    totalBinRepConstraintSize = getBinRepConstraintSize counters
+    booleanConstraintSize = getBooleanConstraintSize counters
+    ordinaryConstraintSize = length cs
+
+    -- summary of constraint groups
+    showConstraintSummary =
+      "  Constriant ("
+        <> show (ordinaryConstraintSize + booleanConstraintSize + totalBinRepConstraintSize)
+        <> "): \n"
+
+    -- Ordinary constraints
+    showOrdinaryConstraints =
+      if ordinaryConstraintSize == 0
+        then ""
+        else
+          "    Ordinary constriants (" <> show ordinaryConstraintSize <> "):\n\n"
+            <> unlines (map (\x -> "      " <> show x) cs)
+            <> "\n"
+
+    -- Boolean constraints
+    showBooleanConstraints =
+      if booleanConstraintSize == 0
+        then ""
+        else
+          "    Boolean constriants (" <> show booleanConstraintSize <> "):\n\n"
+            <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
+            <> "\n"
+
+    -- BinRep constraints
+    showBinRepConstraints =
+      if totalBinRepConstraintSize == 0
+        then ""
+        else
+          "    Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
+            <> unlines (map ("      " <>) (prettyBinRepConstraints counters))
+            <> "\n"
+
+prettyBooleanConstraints :: Counters -> [String]
+prettyBooleanConstraints counters =
+  concatMap showSegment (getBooleanConstraintRanges counters)
+  where
+    showSegment :: (Int, Int) -> [String]
+    showSegment (start, end) =
+      case end - start of
+        0 -> []
+        1 -> [showBooleanConstraint start]
+        2 ->
+          [ showBooleanConstraint start,
+            showBooleanConstraint (start + 1)
+          ]
+        3 ->
+          [ showBooleanConstraint start,
+            showBooleanConstraint (start + 1),
+            showBooleanConstraint (start + 2)
+          ]
+        _ ->
+          [ showBooleanConstraint start,
+            "  ...",
+            showBooleanConstraint (end - 1)
+          ]
+
+    showBooleanConstraint :: Int -> String
+    showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
+
+prettyBinRepConstraints :: Counters -> [String]
+prettyBinRepConstraints counters@(Counters o i x _ _) =
+  map show $ fromSmallCounter OfOutput o ++ fromSmallCounter OfInput i ++ fromSmallCounter OfIntermediate x
+  where
+    fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
+    fromSmallCounter sort (SmallCounters _ _ ubr _) = concatMap (fromPair sort) (IntMap.toList ubr)
+
+    fromPair :: VarSort -> (Width, Int) -> [BinRep]
+    fromPair sort (width, count) =
+      let varOffset = reindex counters sort (OfUInt width) 0
+          binRepOffset = reindex counters sort (OfUIntBinRep width) 0
+       in [BinRep (varOffset + index) width (binRepOffset + width * index) 0 | index <- [0 .. count - 1]]

@@ -35,59 +35,12 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show r1cs@(R1CS cs counters _ numBinReps customBinReps) =
+  show (R1CS cs counters _ _ _) =
     "R1CS {\n"
-      <> showTotalConstraintSize
-      <> showOrdinaryConstraints
-      <> showBooleanConstraints
-      <> show (numBinReps <> customBinReps)
-      -- <> indent (show counters)
+      <> prettyConstraints counters cs
+      <> "\n"
+      <> prettyVariables counters
       <> "}"
-    where
-      totalBinRepConstraintSize = getBinRepConstraintSize counters
-      booleanConstraintSize = getBooleanConstraintSize counters
-      showTotalConstraintSize =
-        "  Total constriant size: "
-          <> show (length cs + booleanConstraintSize + totalBinRepConstraintSize)
-          <> "\n"
-      -- constraints excluding Boolean constraints & Binary Representation constraints
-      ordinaryConstraints = r1csConstraints r1cs
-      showOrdinaryConstraints =
-        if null ordinaryConstraints
-          then "  Ordinary constraints: None"
-          else
-            "  Ordinary constraints: \n"
-              <> unlines (map (\s -> "    " <> show s) ordinaryConstraints)
-
-      showBooleanConstraints =
-        let showSegment (start, end) =
-              case end - start of
-                0 -> ""
-                1 -> showBooleanConstraint start
-                2 ->
-                  showBooleanConstraint start
-                    <> showBooleanConstraint (start + 1)
-                3 ->
-                  showBooleanConstraint start
-                    <> showBooleanConstraint (start + 1)
-                    <> showBooleanConstraint (start + 2)
-                _ ->
-                  showBooleanConstraint start
-                    <> "      ..\n"
-                    <> showBooleanConstraint (end - 1)
-            showBooleanConstraint n =
-              "    $"
-                <> show n
-                <> " = $"
-                <> show n
-                <> " * $"
-                <> show n
-                <> "\n"
-         in if booleanConstraintSize == 0
-              then ""
-              else
-                "  Boolean constriants (" <> show booleanConstraintSize <> "):\n"
-                  <> concatMap showSegment (getBooleanConstraintRanges counters)
 
 -- | Return R1Cs from a R1CS
 --   (includes constraints of boolean variables)
