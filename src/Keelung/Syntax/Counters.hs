@@ -14,6 +14,7 @@ module Keelung.Syntax.Counters
     addCount,
     -- for constraint generation
     getOutputVarRange,
+    getOutputBinRepRange,
     getInputVarRange,
     getBinRepConstraintSize,
     getBinReps,
@@ -153,7 +154,7 @@ setReducedCount n (Counters o i x s _) = Counters o i x s n
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i x _ reduced) = 
+getTotalCount (Counters o i x _ reduced) =
   -- 'countReducedVarHack' should only have effect on intermediate variables
   (smallCounterSize o + smallCounterSize i) + (0 `max` (smallCounterSize x - reduced))
 
@@ -211,6 +212,12 @@ offsetOfType (SmallCounters f b ubr u) (OfUInt width) index = f + b + binRepSize
 
 getOutputVarRange :: Counters -> (Int, Int)
 getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort counters OfInput)
+
+getOutputBinRepRange :: Counters -> (Int, Int)
+getOutputBinRepRange counters =
+  let start = offsetOfSort counters OfOutput + getCount OfOutput OfField counters + getCount OfOutput OfBoolean counters
+      size = binRepSize (sizeUBinReps (countOutput counters))
+   in (start, start + size)
 
 getInputVarRange :: Counters -> (Int, Int)
 getInputVarRange counters =
