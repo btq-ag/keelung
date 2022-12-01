@@ -38,7 +38,6 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
   show (R1CS cs counters _ _ _) =
     "R1CS {\n"
       <> prettyConstraints counters cs
-      <> "\n"
       <> prettyVariables counters
       <> "}"
 

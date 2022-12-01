@@ -153,7 +153,9 @@ setReducedCount n (Counters o i x s _) = Counters o i x s n
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i x _ reduced) = smallCounterSize o + smallCounterSize i + smallCounterSize x - reduced
+getTotalCount (Counters o i x _ reduced) = 
+  -- 'countReducedVarHack' should only have effect on intermediate variables
+  (smallCounterSize o + smallCounterSize i) + (0 `max` (smallCounterSize x - reduced))
 
 -- | Set the current count for a variable of the given type and sort.
 addCount :: VarSort -> VarType -> Int -> Counters -> Counters
