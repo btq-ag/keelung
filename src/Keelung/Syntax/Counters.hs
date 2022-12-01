@@ -16,6 +16,7 @@ module Keelung.Syntax.Counters
     getOutputVarRange,
     getInputVarRange,
     getBinRepConstraintSize,
+    getBinReps,
     getBooleanConstraintSize,
     getBooleanConstraintRanges,
     -- for parsing raw inputs
@@ -219,7 +220,20 @@ getInputVarRange counters =
 getBinRepConstraintSize :: Counters -> Int
 getBinRepConstraintSize (Counters o i _ _ _) = f o + f i
   where
-    f (SmallCounters _ _ ubr _) = binRepSize ubr
+    f (SmallCounters _ _ _ u) = uIntSize u
+
+getBinReps :: Counters -> [BinRep]
+getBinReps counters@(Counters o i x _ _) =
+  fromSmallCounter OfOutput o ++ fromSmallCounter OfInput i ++ fromSmallCounter OfIntermediate x
+  where
+    fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
+    fromSmallCounter sort (SmallCounters _ _ ubr _) = concatMap (fromPair sort) (IntMap.toList ubr)
+
+    fromPair :: VarSort -> (Width, Int) -> [BinRep]
+    fromPair sort (width, count) =
+      let varOffset = reindex counters sort (OfUInt width) 0
+          binRepOffset = reindex counters sort (OfUIntBinRep width) 0
+       in [BinRep (varOffset + index) width (binRepOffset + width * index) 0 | index <- [0 .. count - 1]]
 
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
@@ -263,16 +277,16 @@ prettyVariables counters@(Counters o i _ _ _) =
 
       inputVars = case smallCounterSize o of
         0 -> ""
-        1 -> "      Output variable : $" <> show outputOffset <> "\n"
-        n -> "      Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
+        1 -> "    Output variable : $" <> show outputOffset <> "\n"
+        n -> "    Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
       ouputVars = case smallCounterSize i of
         0 -> ""
-        1 -> "      Input variable  : $" <> show inputOffset <> "\n"
-        n -> "      Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1) <> "\n"
+        1 -> "    Input variable  : $" <> show inputOffset <> "\n"
+        n -> "    Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1) <> "\n"
    in if totalSize == 0
         then ""
         else
-          "    Variables (" <> show totalSize <> "):\n\n"
+          "  Variables (" <> show totalSize <> "):\n\n"
             <> ouputVars
             <> inputVars
             <> "\n"
@@ -350,14 +364,4 @@ prettyBooleanConstraints counters =
     showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
 
 prettyBinRepConstraints :: Counters -> [String]
-prettyBinRepConstraints counters@(Counters o i x _ _) =
-  map show $ fromSmallCounter OfOutput o ++ fromSmallCounter OfInput i ++ fromSmallCounter OfIntermediate x
-  where
-    fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-    fromSmallCounter sort (SmallCounters _ _ ubr _) = concatMap (fromPair sort) (IntMap.toList ubr)
-
-    fromPair :: VarSort -> (Width, Int) -> [BinRep]
-    fromPair sort (width, count) =
-      let varOffset = reindex counters sort (OfUInt width) 0
-          binRepOffset = reindex counters sort (OfUIntBinRep width) 0
-       in [BinRep (varOffset + index) width (binRepOffset + width * index) 0 | index <- [0 .. count - 1]]
+prettyBinRepConstraints = map show . getBinReps
