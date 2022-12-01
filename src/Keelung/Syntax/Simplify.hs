@@ -81,7 +81,8 @@ instance KnownNat w => Encode' (Kinded.UInt w) UInt where
     Kinded.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y
     Kinded.NotU x -> NotU (widthOf expr) <$> encode' x
     Kinded.IfU p x y -> IfU (widthOf expr) <$> encode' p <*> encode' x <*> encode' y
-    Kinded.RoLU i x -> RoLU (widthOf expr) i <$> encode' x
+    Kinded.RoLU w i x -> RoLU w i <$> encode' x
+    Kinded.ShLU w i x -> ShLU w i <$> encode' x
     Kinded.BtoU n -> BtoU (widthOf expr) <$> encode' n
 
 --------------------------------------------------------------------------------

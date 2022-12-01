@@ -290,8 +290,8 @@ prettyVariables counters@(Counters o i _ _ _) =
         n -> "    Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
       ouputVars = case smallCounterSize i of
         0 -> ""
-        1 -> "    Input variable  : $" <> show inputOffset <> "\n"
-        n -> "    Input variables : $" <> show inputOffset <> " .. $" <> show (inputOffset + n - 1) <> "\n"
+        1 -> "    Input  variable  : $" <> show inputOffset <> "\n"
+        n -> "    Input  variables : $" <> show inputOffset <> " ... $" <> show (inputOffset + n - 1) <> "\n"
    in if totalSize == 0
         then ""
         else

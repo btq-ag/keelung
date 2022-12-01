@@ -98,6 +98,7 @@ data UInt
   | XorU Width UInt UInt
   | NotU Width UInt
   | RoLU Width Int UInt
+  | ShLU Width Int UInt
   | IfU Width Boolean UInt UInt
   | BtoU Width Boolean
   deriving (Generic, Eq, NFData)
@@ -117,6 +118,7 @@ instance Show UInt where
     XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec prec x
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
