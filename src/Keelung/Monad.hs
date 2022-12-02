@@ -57,6 +57,7 @@ import Data.Array.Unboxed (Array)
 import qualified Data.Array.Unboxed as IArray
 import Data.Data (Proxy (..))
 import Data.Foldable (toList)
+import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Traversable (mapAccumL)
 import GHC.TypeNats
@@ -89,8 +90,8 @@ data Computation = Computation
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
-    compNumAsgns :: [Assignment],
-    compBoolAsgns :: [Assignment],
+    compAssignmentF :: IntMap Number,
+    compAssignmentB :: IntMap Boolean,
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean]
   }
@@ -100,13 +101,13 @@ emptyComputation :: Computation
 emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation _ addrSize _ numAsgns boolAsgns assertions) =
+  show (Computation _ addrSize _ aF aB assertions) =
     "{\n" <> "  address size: "
       <> show addrSize
-      ++ "\n  num assignments: "
-      ++ show numAsgns
-      ++ "\n  bool assignments: "
-      ++ show boolAsgns
+      ++ "\n  Number assignments: "
+      ++ show aF
+      ++ "\n  Boolean assignments: "
+      ++ show aB
       ++ "\n  assertions: "
       ++ show assertions
       ++ "\n\
@@ -330,7 +331,7 @@ instance Mutable ref => Mutable (ArrM ref) where
 instance Mutable Number where
   alloc val = do
     var <- freshVarN
-    modify' $ \st -> st {compNumAsgns = AssignmentN var val : compNumAsgns st}
+    modify' $ \st -> st {compAssignmentF = IntMap.insert var val (compAssignmentF st)}
     return (var, VarN var)
 
   typeOf _ = NumElem
@@ -346,7 +347,7 @@ instance Mutable Number where
 instance Mutable Boolean where
   alloc val = do
     var <- freshVarB
-    modify' $ \st -> st {compBoolAsgns = AssignmentB var val : compBoolAsgns st}
+    modify' $ \st -> st {compAssignmentB = IntMap.insert var val (compAssignmentB st)}
     return (var, VarB var)
 
   typeOf _ = BoolElem

@@ -183,6 +183,15 @@ prettyList2 n list = case list of
       map (replicate n ' ' <>) $
         "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
 
+prettyList3 :: Int -> [String] -> String
+prettyList3 n list = case list of
+  [] -> ""
+  [x] -> "[" <> x <> "]\n"
+  (x : xs) ->
+    unlines $
+      map (replicate n ' ' <>) $
+        "" : "[ " <> x : map (", " <>) xs <> ["]\n"]
+
 --------------------------------------------------------------------------------
 
 -- | An Assignment associates an expression with a reference
@@ -212,27 +221,59 @@ data Computation = Computation
   { -- Variable bookkeeping
     compCounters :: !Counters,
     -- Assignments
-    compNumAsgns :: [Assignment],
-    compBoolAsgns :: [Assignment],
-    compUIntAsgns :: IntMap [Assignment],
+    compAssignmentF :: IntMap Number,
+    compAssignmentFI :: IntMap Number,
+    compAssignmentB :: IntMap Boolean,
+    compAssignmentBI :: IntMap Boolean,
+    compAssignmentU :: IntMap (IntMap UInt),
+    compAssignmentUI :: IntMap (IntMap UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr]
   }
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation _ numAsgns boolAsgns uintAsgns assertions) =
-    "{\n"
-      <> "\n  Number assignments: "
-      <> prettyList2 8 numAsgns
-      <> "\n  Boolean assignments: "
-      <> prettyList2 8 boolAsgns
-      <> "\n  Unsigned Int assignments: "
-      <> prettyList2 8 (IntMap.elems uintAsgns)
-      <> "\n  assertions: "
+  show (Computation _ aF aFI aB aBI aU aUI assertions) =
+    "{\n\n"
+      <> "  Number assignments: "
+      <> prettyList3 8 (map (\(var, val) -> "$F" <> show var <> " := " <> show val) $ IntMap.toList aF)
+      <> prettyList3 8 (map (\(var, val) -> "$FI" <> show var <> " := " <> show val) $ IntMap.toList aFI)
+      <> "  Boolean assignments: "
+      <> prettyList3 8 (map (\(var, val) -> "$B" <> show var <> " := " <> show val) $ IntMap.toList aB)
+      <> prettyList3 8 (map (\(var, val) -> "$BI" <> show var <> " := " <> show val) $ IntMap.toList aBI)
+      <> "  Unsigned Int assignments: "
+      <> prettyUIntAssignments "$U" aU
+      <> prettyUIntAssignments "$UI" aUI
+      <> "  assertions: "
       <> prettyList2 8 assertions
-      <> "\n\
-         \}"
+      <> "\n}"
+    where
+      -- prettyUInts :: IntMap (IntMap UInt) -> String
+      prettyUIntAssignments :: String -> IntMap (IntMap UInt) -> String
+      prettyUIntAssignments prefix assignments =
+        prettyList3 8 $
+          concatMap
+            ( \(width, xs) ->
+                map (\(var, val) -> prefix <> toSubscript width <> show var <> " := " <> show val) $
+                  IntMap.toList xs
+            )
+            $ IntMap.toList assignments
+
+      toSubscript :: Int -> String
+      toSubscript = map go . show
+        where
+          go c = case c of
+            '0' -> '₀'
+            '1' -> '₁'
+            '2' -> '₂'
+            '3' -> '₃'
+            '4' -> '₄'
+            '5' -> '₅'
+            '6' -> '₆'
+            '7' -> '₇'
+            '8' -> '₈'
+            '9' -> '₉'
+            _ -> c
 
 instance Serialize Computation
 
@@ -252,7 +293,7 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
@@ -278,19 +319,19 @@ allocVarU width = do
   return index
 
 assignN :: Var -> Number -> Comp ()
-assignN var e = modify' $ \st -> st {compNumAsgns = AssignmentN var e : compNumAsgns st}
+assignN var e = modify' $ \st -> st {compAssignmentF = IntMap.insert var e (compAssignmentF st)}
 
 assignNI :: Var -> Number -> Comp ()
-assignNI var e = modify' $ \st -> st {compNumAsgns = AssignmentNI var e : compNumAsgns st}
+assignNI var e = modify' $ \st -> st {compAssignmentFI = IntMap.insert var e (compAssignmentFI st)}
 
 assignB :: Var -> Boolean -> Comp ()
-assignB var e = modify' $ \st -> st {compBoolAsgns = AssignmentB var e : compBoolAsgns st}
+assignB var e = modify' $ \st -> st {compAssignmentB = IntMap.insert var e (compAssignmentB st)}
 
 assignBI :: Var -> Boolean -> Comp ()
-assignBI var e = modify' $ \st -> st {compBoolAsgns = AssignmentBI var e : compBoolAsgns st}
+assignBI var e = modify' $ \st -> st {compAssignmentBI = IntMap.insert var e (compAssignmentBI st)}
 
 assignU :: Width -> Var -> UInt -> Comp ()
-assignU w var e = modify' $ \st -> st {compUIntAsgns = IntMap.insertWith (<>) w [AssignmentU w var e] (compUIntAsgns st)}
+assignU w var e = modify' $ \st -> st {compAssignmentU = IntMap.insertWith (<>) w (IntMap.singleton var e) (compAssignmentU st)}
 
 assignUI :: Width -> Var -> UInt -> Comp ()
-assignUI w var e = modify' $ \st -> st {compUIntAsgns = IntMap.insertWith (<>) w [AssignmentUI w var e] (compUIntAsgns st)}
+assignUI w var e = modify' $ \st -> st {compAssignmentUI = IntMap.insertWith (<>) w (IntMap.singleton var e) (compAssignmentUI st)}

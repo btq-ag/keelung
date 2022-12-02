@@ -19,20 +19,19 @@ import qualified Keelung.Types as Kinded
 
 convert :: Encode t => Kinded.Elaborated t -> Elaborated
 convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
-  let Kinded.Computation counters _addrSize _heap asgns bsgns asgns' = comp
+  let Kinded.Computation counters _addrSize _heap aF aB assertions = comp
   Elaborated
     <$> encode expr
     <*> ( Computation
             counters
-            <$> mapM encodeAssignment asgns
-            <*> mapM encodeAssignment bsgns
+            <$> mapM encode' aF
             <*> pure mempty
-            <*> mapM encode asgns'
+            <*> mapM encode' aB
+            <*> pure mempty
+            <*> pure mempty
+            <*> pure mempty
+            <*> mapM encode assertions
         )
-
-encodeAssignment :: Kinded.Assignment -> HeapM Assignment
-encodeAssignment (Kinded.AssignmentN var e) = AssignmentN var <$> encode' e
-encodeAssignment (Kinded.AssignmentB var e) = AssignmentB var <$> encode' e
 
 --------------------------------------------------------------------------------
 
