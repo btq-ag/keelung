@@ -30,7 +30,7 @@ data Boolean
   | NotB Boolean
   | IfB Boolean Boolean Boolean
   | EqB Boolean Boolean
-  | EqN Number Number
+  | EqF Field Field
   | EqU Width UInt UInt
   | BitU Width UInt Int
   deriving (Generic, Eq, NFData)
@@ -48,39 +48,39 @@ instance Show Boolean where
     NotB x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    EqN x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    EqF x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     BitU _ x i -> showParen (prec > 6) $ showsPrec 7 x . showString " [" . shows i . showString "]"
 
 --------------------------------------------------------------------------------
 
-data Number
-  = ValN Integer
-  | ValNR Rational
-  | VarN Var
-  | InputVarN Var
-  | AddN Number Number
-  | SubN Number Number
-  | MulN Number Number
-  | DivN Number Number
-  | IfN Boolean Number Number
-  | BtoN Boolean
+data Field
+  = ValF Integer
+  | ValFR Rational
+  | VarF Var
+  | VarFI Var
+  | AddF Field Field
+  | SubF Field Field
+  | MulF Field Field
+  | DivF Field Field
+  | IfF Boolean Field Field
+  | BtoF Boolean
   deriving (Generic, Eq, NFData)
 
-instance Serialize Number
+instance Serialize Field
 
-instance Show Number where
+instance Show Field where
   showsPrec prec expr = case expr of
-    ValN n -> shows n
-    ValNR n -> shows n
-    VarN var -> showString "$N" . shows var
-    InputVarN var -> showString "$N" . shows var
-    AddN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
-    SubN x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
-    MulN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    DivN x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
-    IfN p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    BtoN x -> showString "B→N " . showsPrec prec x
+    ValF n -> shows n
+    ValFR n -> shows n
+    VarF var -> showString "$F" . shows var
+    VarFI var -> showString "$F" . shows var
+    AddF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    SubF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
+    MulF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    DivF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    BtoF x -> showString "B→F " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -125,7 +125,7 @@ instance Show UInt where
 data Expr
   = Unit
   | Boolean Boolean
-  | Number Number
+  | Field Field
   | UInt UInt
   | Array (Array Int Expr)
   deriving (Generic, Eq, NFData)
@@ -134,7 +134,7 @@ instance Show Expr where
   showsPrec prec expr = case expr of
     Unit -> showString "()"
     Boolean bool -> showsPrec prec bool
-    Number num -> showsPrec prec num
+    Field num -> showsPrec prec num
     UInt uint -> showsPrec prec uint
     Array xs -> showList (toList xs)
 
@@ -196,8 +196,8 @@ prettyList3 n list = case list of
 data Assignment
   = AssignmentB Var Boolean
   | AssignmentBI Var Boolean
-  | AssignmentN Var Number
-  | AssignmentNI Var Number
+  | AssignmentF Var Field
+  | AssignmentFI Var Field
   | AssignmentU Width Var UInt
   | AssignmentUI Width Var UInt
   deriving (Generic, NFData)
@@ -205,8 +205,8 @@ data Assignment
 instance Show Assignment where
   show (AssignmentB var bool) = "$" <> show var <> " := " <> show bool
   show (AssignmentBI var bool) = "$" <> show var <> " := " <> show bool
-  show (AssignmentN var num) = "$" <> show var <> " := " <> show num
-  show (AssignmentNI var num) = "$" <> show var <> " := " <> show num
+  show (AssignmentF var num) = "$" <> show var <> " := " <> show num
+  show (AssignmentFI var num) = "$" <> show var <> " := " <> show num
   show (AssignmentU _ var uint) = "$" <> show var <> " := " <> show uint
   show (AssignmentUI _ var uint) = "$" <> show var <> " := " <> show uint
 
@@ -219,8 +219,8 @@ data Computation = Computation
   { -- Variable bookkeeping
     compCounters :: !Counters,
     -- Assignments
-    compAssignmentF :: IntMap Number,
-    compAssignmentFI :: IntMap Number,
+    compAssignmentF :: IntMap Field,
+    compAssignmentFI :: IntMap Field,
     compAssignmentB :: IntMap Boolean,
     compAssignmentBI :: IntMap Boolean,
     compAssignmentU :: IntMap (IntMap UInt),
@@ -233,7 +233,7 @@ data Computation = Computation
 instance Show Computation where
   show (Computation _ aF aFI aB aBI aU aUI assertions) =
     "{\n\n"
-      <> "  Number assignments: "
+      <> "  Field assignments: "
       <> prettyList3 8 (map (\(var, val) -> "$F" <> show var <> " := " <> show val) $ IntMap.toList aF)
       <> prettyList3 8 (map (\(var, val) -> "$FI" <> show var <> " := " <> show val) $ IntMap.toList aFI)
       <> "  Boolean assignments: "
@@ -316,11 +316,11 @@ allocVarU width = do
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return index
 
-assignN :: Var -> Number -> Comp ()
-assignN var e = modify' $ \st -> st {compAssignmentF = IntMap.insert var e (compAssignmentF st)}
+assignF :: Var -> Field -> Comp ()
+assignF var e = modify' $ \st -> st {compAssignmentF = IntMap.insert var e (compAssignmentF st)}
 
-assignNI :: Var -> Number -> Comp ()
-assignNI var e = modify' $ \st -> st {compAssignmentFI = IntMap.insert var e (compAssignmentFI st)}
+assignFI :: Var -> Field -> Comp ()
+assignFI var e = modify' $ \st -> st {compAssignmentFI = IntMap.insert var e (compAssignmentFI st)}
 
 assignB :: Var -> Boolean -> Comp ()
 assignB var e = modify' $ \st -> st {compAssignmentB = IntMap.insert var e (compAssignmentB st)}

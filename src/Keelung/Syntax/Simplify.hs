@@ -31,22 +31,22 @@ instance Encode' Kinded.Boolean Boolean where
     Kinded.Not x -> NotB <$> encode' x
     Kinded.IfB p x y -> IfB <$> encode' p <*> encode' x <*> encode' y
     Kinded.EqB x y -> EqB <$> encode' x <*> encode' y
-    Kinded.EqN x y -> EqN <$> encode' x <*> encode' y
+    Kinded.EqN x y -> EqF <$> encode' x <*> encode' y
     Kinded.EqU x y -> EqU (widthOf x) <$> encode' x <*> encode' y
     Kinded.BitU x i -> BitU (widthOf x) <$> encode' x <*> pure i
 
-instance Encode' Kinded.Number Number where
+instance Encode' Kinded.Number Field where
   encode' expr = case expr of
-    Kinded.Integer n -> return $ ValN n
-    Kinded.Rational n -> return $ ValNR n
-    Kinded.VarN var -> return $ VarN var
-    Kinded.InputVarN var -> return $ InputVarN var
-    Kinded.Add x y -> AddN <$> encode' x <*> encode' y
-    Kinded.Sub x y -> SubN <$> encode' x <*> encode' y
-    Kinded.Mul x y -> MulN <$> encode' x <*> encode' y
-    Kinded.Div x y -> DivN <$> encode' x <*> encode' y
-    Kinded.IfN p x y -> IfN <$> encode' p <*> encode' x <*> encode' y
-    Kinded.BtoN b -> BtoN <$> encode' b
+    Kinded.Integer n -> return $ ValF n
+    Kinded.Rational n -> return $ ValFR n
+    Kinded.VarN var -> return $ VarF var
+    Kinded.InputVarN var -> return $ VarFI var
+    Kinded.Add x y -> AddF <$> encode' x <*> encode' y
+    Kinded.Sub x y -> SubF <$> encode' x <*> encode' y
+    Kinded.Mul x y -> MulF <$> encode' x <*> encode' y
+    Kinded.Div x y -> DivF <$> encode' x <*> encode' y
+    Kinded.IfN p x y -> IfF <$> encode' p <*> encode' x <*> encode' y
+    Kinded.BtoN b -> BtoF <$> encode' b
 
 instance KnownNat w => Encode' (Kinded.UInt w) UInt where
   encode' expr = case expr of
@@ -75,7 +75,7 @@ instance Encode Kinded.Boolean where
   encode expr = Boolean <$> encode' expr
 
 instance Encode Kinded.Number where
-  encode expr = Number <$> encode' expr
+  encode expr = Field <$> encode' expr
 
 instance KnownNat w => Encode (Kinded.UInt w) where
   encode expr = UInt <$> encode' expr
@@ -114,7 +114,7 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
         Just (elemType, array) -> case IntMap.lookup i array of
           Nothing -> error "HeapM: index ouf of bounds"
           Just addr'' -> case elemType of
-            Kinded.NumElem -> return $ Number $ VarN addr''
+            Kinded.NumElem -> return $ Field $ VarF addr''
             Kinded.BoolElem -> return $ Boolean $ VarB addr''
             Kinded.UElem w -> return $ UInt $ VarU w addr''
             Kinded.ArrElem _ len' -> readArray addr'' len'
