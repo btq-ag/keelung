@@ -2,36 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (Encode (..), convert) where
+module Keelung.Syntax.Simplify (Encode (..), runHeapM, encode') where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
 import qualified Data.IntMap as IntMap
 import GHC.TypeLits (KnownNat)
-import qualified Keelung.Monad as Kinded
 import Keelung.Syntax.Kinded (widthOf)
 import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
 import qualified Keelung.Types as Kinded
-
---------------------------------------------------------------------------------
-
-convert :: Encode t => Kinded.Elaborated t -> Elaborated
-convert (Kinded.Elaborated expr comp) = runHeapM (Kinded.compHeap comp) $ do
-  let Kinded.Computation counters _addrSize _heap aF aB assertions = comp
-  Elaborated
-    <$> encode expr
-    <*> ( Computation
-            counters
-            <$> mapM encode' aF
-            <*> pure mempty
-            <*> mapM encode' aB
-            <*> pure mempty
-            <*> pure mempty
-            <*> pure mempty
-            <*> mapM encode assertions
-        )
 
 --------------------------------------------------------------------------------
 
@@ -135,4 +116,5 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
           Just addr'' -> case elemType of
             Kinded.NumElem -> return $ Number $ VarN addr''
             Kinded.BoolElem -> return $ Boolean $ VarB addr''
+            Kinded.UElem w -> return $ UInt $ VarU w addr''
             Kinded.ArrElem _ len' -> readArray addr'' len'

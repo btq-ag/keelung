@@ -4,9 +4,10 @@
 module Keelung.Types
   ( Var,
     Addr,
+    Width,
     Heap,
     ElemType (..),
-    indent
+    indent,
   )
 where
 
@@ -23,6 +24,9 @@ type Var = Int
 -- | An "Address" is also just a integer.
 type Addr = Int
 
+-- | Bit width
+type Width = Int
+
 --------------------------------------------------------------------------------
 
 -- | A Heap is an mapping of mappings of variables
@@ -36,6 +40,7 @@ type Heap =
 data ElemType
   = NumElem -- Field numbers
   | BoolElem -- Booleans
+  | UElem Width
   | ArrElem ElemType Int -- Arrays (with type of its elements and its size)
   deriving (Show, Eq, Generic, NFData)
 
@@ -47,7 +52,6 @@ instance Semigroup ElemType where
     (BoolElem, BoolElem) -> BoolElem
     (ArrElem a' l, ArrElem b' _) -> ArrElem (a' <> b') l
     _ -> error "ElemType must be the same"
-
 
 --------------------------------------------------------------------------------
 

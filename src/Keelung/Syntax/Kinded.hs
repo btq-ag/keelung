@@ -25,7 +25,6 @@ import Data.Foldable (toList)
 import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
-import Keelung.Syntax.Typed (Width)
 
 --------------------------------------------------------------------------------
 

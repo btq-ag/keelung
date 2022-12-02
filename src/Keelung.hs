@@ -29,17 +29,17 @@ where
 import Control.Arrow (left)
 import Control.Monad.Except
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Char8 as BSC
 import Data.Field.Galois (GaloisField)
-import Data.Serialize
+import Data.Serialize (Serialize)
+import qualified Data.Serialize as Serialize
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Bits
-import Keelung.Syntax.Simplify (Encode, convert)
-import qualified Keelung.Syntax.Typed as C
+import Keelung.Syntax.Simplify
+import qualified Keelung.Syntax.Typed as Typed
 import qualified System.Directory as Path
 import qualified System.IO.Error as IO
 import qualified System.Info
@@ -204,8 +204,24 @@ elaborate' prog = do
   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
-elaborate :: Encode t => Comp t -> Either Error C.Elaborated
-elaborate prog = convert <$> elaborate' prog
+elaborate :: Encode t => Comp t -> Either Error Typed.Elaborated
+elaborate prog = encodeElaborated <$> elaborate' prog
+  where
+    encodeElaborated :: Encode t => Elaborated t -> Typed.Elaborated
+    encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
+      let Computation counters _addrSize _heap aF aB aU assertions = comp
+      Typed.Elaborated
+        <$> encode expr
+        <*> ( Typed.Computation
+                counters
+                <$> mapM encode' aF
+                <*> pure mempty
+                <*> mapM encode' aB
+                <*> pure mempty
+                <*> pure aU
+                <*> pure mempty
+                <*> mapM encode assertions
+            )
 
 --------------------------------------------------------------------------------
 
@@ -215,8 +231,8 @@ wrapper args' payload = do
   (cmd, args) <- findKeelungc
   version <- readKeelungVersion cmd args
   checkKeelungVersion version
-  blob <- lift $ Process.readProcess cmd (args ++ args') (BSC.unpack $ encode payload)
-  let result = decode (BSC.pack blob)
+  blob <- lift $ Process.readProcess cmd (args ++ args') (BS.unpack $ Serialize.encode payload)
+  let result = Serialize.decode (BS.pack blob)
   case result of
     Left err -> throwError (DecodeError err)
     Right (Left err) -> throwError (CompileError err)

@@ -64,6 +64,8 @@ import GHC.TypeNats
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Syntax.Simplify (encode', runHeapM)
+import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
 
@@ -92,22 +94,25 @@ data Computation = Computation
     -- Assignments
     compAssignmentF :: IntMap Number,
     compAssignmentB :: IntMap Boolean,
+    compAssignmentU :: IntMap (IntMap Typed.UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean]
   }
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation mempty 0 mempty mempty mempty mempty
+emptyComputation = Computation mempty 0 mempty mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation _ addrSize _ aF aB assertions) =
+  show (Computation _ addrSize _ aF aB aU assertions) =
     "{\n" <> "  address size: "
       <> show addrSize
       ++ "\n  Number assignments: "
       ++ show aF
       ++ "\n  Boolean assignments: "
       ++ show aB
+      ++ "\n  UInt assignments: "
+      ++ show aU
       ++ "\n  assertions: "
       ++ show assertions
       ++ "\n\
@@ -162,6 +167,13 @@ freshVarB = do
   counters <- gets compCounters
   let index = getCount OfIntermediate OfBoolean counters
   modifyCounter $ addCount OfIntermediate OfBoolean 1
+  return index
+
+freshVarU :: Width -> Comp Var
+freshVarU width = do
+  counters <- gets compCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return index
 
 -- | Allocate a fresh input variable.
@@ -359,6 +371,29 @@ instance Mutable Boolean where
 
   constructElement BoolElem elemAddr = VarB elemAddr
   constructElement _ _ = error "expecting element to be of Bool"
+
+instance KnownNat w => Mutable (UInt w) where
+  alloc val = do
+    let width = widthOf val
+    var <- freshVarU width
+    heap <- gets compHeap
+    let encoded = runHeapM heap (encode' val)
+    modify' $ \st ->
+      st
+        { compAssignmentU =
+            IntMap.insertWith (<>) width (IntMap.singleton var encoded) (compAssignmentU st)
+        }
+    return (var, VarU var)
+
+  typeOf val = UElem (widthOf val)
+
+  updateM (ArrayRef _ _ addr) i val@(VarU n) = writeHeap addr (UElem (widthOf val)) (i, n)
+  updateM (ArrayRef elemType _ addr) i expr = do
+    (var, _) <- alloc expr
+    writeHeap addr elemType (i, var)
+
+  constructElement (UElem _) elemAddr = VarU elemAddr
+  constructElement _ _ = error "expecting element to be of UInt"
 
 -- -- | Access an element from a 1-D array
 accessM :: Mutable t => ArrM t -> Int -> Comp t

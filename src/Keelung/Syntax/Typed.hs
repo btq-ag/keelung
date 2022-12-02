@@ -18,8 +18,6 @@ import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 import Keelung.Types
 
-type Width = Int
-
 --------------------------------------------------------------------------------
 
 data Boolean
