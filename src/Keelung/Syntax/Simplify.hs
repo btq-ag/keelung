@@ -92,6 +92,9 @@ instance Encode t => Encode (Kinded.ArrM t) where
   encode expr = case expr of
     Kinded.ArrayRef _ len addr -> readArray addr len
 
+instance Encode t => Encode [t] where
+  encode xs = Array . Array.listArray (0, length xs - 1) <$> mapM encode xs
+
 --------------------------------------------------------------------------------
 
 -- | Reader Monad for Heap lookups
