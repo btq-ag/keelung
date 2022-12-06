@@ -192,25 +192,25 @@ prettyList3 n list = case list of
 
 --------------------------------------------------------------------------------
 
--- | An Assignment associates an expression with a reference
-data Assignment
-  = AssignmentB Var Boolean
-  | AssignmentBI Var Boolean
-  | AssignmentF Var Field
-  | AssignmentFI Var Field
-  | AssignmentU Width Var UInt
-  | AssignmentUI Width Var UInt
-  deriving (Generic, NFData)
+-- -- | An Assignment associates an expression with a reference
+-- data Assignment
+--   = AssignmentB Var Boolean
+--   | AssignmentBI Var Boolean
+--   | AssignmentF Var Field
+--   | AssignmentFI Var Field
+--   | AssignmentU Width Var UInt
+--   | AssignmentUI Width Var UInt
+--   deriving (Generic, NFData)
 
-instance Show Assignment where
-  show (AssignmentB var bool) = "$" <> show var <> " := " <> show bool
-  show (AssignmentBI var bool) = "$" <> show var <> " := " <> show bool
-  show (AssignmentF var num) = "$" <> show var <> " := " <> show num
-  show (AssignmentFI var num) = "$" <> show var <> " := " <> show num
-  show (AssignmentU _ var uint) = "$" <> show var <> " := " <> show uint
-  show (AssignmentUI _ var uint) = "$" <> show var <> " := " <> show uint
+-- instance Show Assignment where
+--   show (AssignmentB var bool) = "$" <> show var <> " := " <> show bool
+--   show (AssignmentBI var bool) = "$" <> show var <> " := " <> show bool
+--   show (AssignmentF var num) = "$" <> show var <> " := " <> show num
+--   show (AssignmentFI var num) = "$" <> show var <> " := " <> show num
+--   show (AssignmentU _ var uint) = "$" <> show var <> " := " <> show uint
+--   show (AssignmentUI _ var uint) = "$" <> show var <> " := " <> show uint
 
-instance Serialize Assignment
+-- instance Serialize Assignment
 
 --------------------------------------------------------------------------------
 

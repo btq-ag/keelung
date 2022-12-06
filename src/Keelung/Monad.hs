@@ -9,7 +9,6 @@ module Keelung.Monad
     Computation (..),
     emptyComputation,
     Elaborated (..),
-    Assignment (..),
 
     -- * Array
     Mutable (updateM),
@@ -68,18 +67,6 @@ import Keelung.Syntax.Simplify (encode', runHeapM)
 import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
-
---------------------------------------------------------------------------------
-
--- | An Assignment associates an expression with a reference
-data Assignment
-  = AssignmentB Var Boolean
-  | AssignmentN Var Number
-  deriving (Eq)
-
-instance Show Assignment where
-  show (AssignmentB var expr) = "$" <> show var <> " := " <> show expr
-  show (AssignmentN var expr) = "$" <> show var <> " := " <> show expr
 
 --------------------------------------------------------------------------------
 
