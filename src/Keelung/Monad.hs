@@ -33,7 +33,7 @@ module Keelung.Monad
 
     -- * Inputs
     input,
-    inputNum,
+    inputField,
     inputBool,
     inputUInt,
     inputs,
@@ -79,7 +79,7 @@ data Computation = Computation
     -- Heap for arrays
     compHeap :: Heap,
     -- Assignments
-    compAssignmentF :: IntMap Number,
+    compAssignmentF :: IntMap Field,
     compAssignmentB :: IntMap Boolean,
     compAssignmentU :: IntMap (IntMap Typed.UInt),
     -- Assertions are expressions that are expected to be true
@@ -94,7 +94,7 @@ instance Show Computation where
   show (Computation _ addrSize _ aF aB aU assertions) =
     "{\n" <> "  address size: "
       <> show addrSize
-      ++ "\n  Number assignments: "
+      ++ "\n  Field assignments: "
       ++ show aF
       ++ "\n  Boolean assignments: "
       ++ show aB
@@ -114,7 +114,7 @@ data Elaborated t = Elaborated
     -- | The state of computation after elaboration
     elabComp :: Computation
   }
-  -- = ElaboratedNum Number Computation
+  -- = ElaboratedNum Field Computation
   deriving (Eq)
 
 instance Show t => Show (Elaborated t) where
@@ -141,9 +141,9 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 -- Variable & Input Variable
 --------------------------------------------------------------------------------
 
--- | Allocate a fresh Number variable.
-freshVarN :: Comp Var
-freshVarN = do
+-- | Allocate a fresh Field variable.
+freshVarF :: Comp Var
+freshVarF = do
   counters <- gets compCounters
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1
@@ -164,8 +164,8 @@ freshVarU width = do
   return index
 
 -- | Allocate a fresh input variable.
-freshInputVarN :: Comp Var
-freshInputVarN = do
+freshVarFI :: Comp Var
+freshVarFI = do
   counters <- gets compCounters
   let index = getCount OfInput OfField counters
   modifyCounter $ addCount OfInput OfField 1
@@ -195,9 +195,9 @@ class Proper t where
   -- | Conditional clause
   cond :: Boolean -> t -> t -> t
 
-instance Proper Number where
-  input = inputNum
-  cond = IfN
+instance Proper Field where
+  input = inputField
+  cond = IfF
 
 instance Proper Boolean where
   input = inputBool
@@ -208,8 +208,8 @@ instance KnownNat w => Proper (UInt w) where
   cond = IfU
 
 -- | Requests a fresh Num input variable
-inputNum :: Comp Number
-inputNum = InputVarN <$> freshInputVarN
+inputField :: Comp Field
+inputField = VarFI <$> freshVarFI
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
@@ -318,29 +318,29 @@ instance Mutable ref => Mutable (ArrM ref) where
     elements <- mapM (accessM xs) [0 .. len - 1]
     allocArray elemType elements
 
-  typeOf ((ArrayRef elemType len _)) = ArrElem elemType len
+  typeOf ((ArrayRef elemType len _)) = ElemArr elemType len
 
-  constructElement (ArrElem l k) elemAddr = ArrayRef l k elemAddr
+  constructElement (ElemArr l k) elemAddr = ArrayRef l k elemAddr
   constructElement _ _ = error "expecting element to be array"
 
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-instance Mutable Number where
+instance Mutable Field where
   alloc val = do
-    var <- freshVarN
+    var <- freshVarF
     modify' $ \st -> st {compAssignmentF = IntMap.insert var val (compAssignmentF st)}
-    return (var, VarN var)
+    return (var, VarF var)
 
-  typeOf _ = NumElem
+  typeOf _ = ElemF
 
-  updateM (ArrayRef _ _ addr) i (VarN n) = writeHeap addr NumElem (i, n)
+  updateM (ArrayRef _ _ addr) i (VarF n) = writeHeap addr ElemF (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElement NumElem elemAddr = VarN elemAddr
+  constructElement ElemF elemAddr = VarF elemAddr
   constructElement _ _ = error "expecting element to be of Num"
 
 instance Mutable Boolean where
@@ -349,14 +349,14 @@ instance Mutable Boolean where
     modify' $ \st -> st {compAssignmentB = IntMap.insert var val (compAssignmentB st)}
     return (var, VarB var)
 
-  typeOf _ = BoolElem
+  typeOf _ = ElemB
 
-  updateM (ArrayRef _ _ addr) i (VarB n) = writeHeap addr BoolElem (i, n)
+  updateM (ArrayRef _ _ addr) i (VarB n) = writeHeap addr ElemB (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElement BoolElem elemAddr = VarB elemAddr
+  constructElement ElemB elemAddr = VarB elemAddr
   constructElement _ _ = error "expecting element to be of Bool"
 
 instance KnownNat w => Mutable (UInt w) where
@@ -372,14 +372,14 @@ instance KnownNat w => Mutable (UInt w) where
         }
     return (var, VarU var)
 
-  typeOf val = UElem (widthOf val)
+  typeOf val = ElemU (widthOf val)
 
-  updateM (ArrayRef _ _ addr) i val@(VarU n) = writeHeap addr (UElem (widthOf val)) (i, n)
+  updateM (ArrayRef _ _ addr) i val@(VarU n) = writeHeap addr (ElemU (widthOf val)) (i, n)
   updateM (ArrayRef elemType _ addr) i expr = do
     (var, _) <- alloc expr
     writeHeap addr elemType (i, var)
 
-  constructElement (UElem _) elemAddr = VarU elemAddr
+  constructElement (ElemU _) elemAddr = VarU elemAddr
   constructElement _ _ = error "expecting element to be of UInt"
 
 -- -- | Access an element from a 1-D array
@@ -483,7 +483,7 @@ instance Reusable Boolean where
     xs <- toArrayM [val]
     accessM xs 0
 
-instance Reusable Number where
+instance Reusable Field where
   reuse val = do
     xs <- toArrayM [val]
     accessM xs 0

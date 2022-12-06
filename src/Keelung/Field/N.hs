@@ -20,8 +20,8 @@ import Text.PrettyPrint.Leijen.Text (Pretty)
 
 --------------------------------------------------------------------------------
 
--- | Data type for displaying field numbers nicely
--- Numbers in the second half of the field are represented as negative numbers
+-- | Data type for displaying field elements nicely
+-- Elements in the second half of the field are represented as negative numbers
 newtype N a = N {unN :: a}
   deriving (Eq, Ord, Generic, NFData)
   

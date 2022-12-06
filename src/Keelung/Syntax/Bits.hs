@@ -41,7 +41,7 @@ class Bits a where
 
   -- | Retrieve the i-th bit and return it as Boolean
   --   The LSB is the 0-th bit and the MSB is the (n-1)-th bit
-  --      where n is the number of bits of the Number
+  --      where n is the bit width
   --   You can access the MSB with (-1) because the index is modulo n
   (!!!) :: a -> Int -> Boolean
 
@@ -71,13 +71,6 @@ infixl 8 .>>.
 (.<<.) = shiftL
 
 infixl 8 .<<.
-
--- instance Bits Number where
---   (.&.) = AndN
---   (.|.) = OrN
---   (.^.) = XorN
---   rotate = flip RoRN
---   (!!!) = BitN
 
 instance Bits Boolean where
   (.&.) = And

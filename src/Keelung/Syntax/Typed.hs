@@ -295,8 +295,8 @@ elaborate prog = do
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
-allocVarN :: Comp Var
-allocVarN = do
+allocVarF :: Comp Var
+allocVarF = do
   counters <- gets compCounters
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1

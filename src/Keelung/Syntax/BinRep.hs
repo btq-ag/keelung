@@ -52,8 +52,8 @@ instance Ord BinRep where
 --   EQ -> compare x y
 --   result -> result
 
-fromNumBinRep :: Int -> (Var, Var) -> BinRep
-fromNumBinRep width (var, index) = BinRep var width index 0
+-- fromNumBinRep :: Int -> (Var, Var) -> BinRep
+-- fromNumBinRep width (var, index) = BinRep var width index 0
 
 --------------------------------------------------------------------------------
 

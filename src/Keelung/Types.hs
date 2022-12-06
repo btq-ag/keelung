@@ -38,19 +38,19 @@ type Heap =
 
 -- | Type of elements of a array
 data ElemType
-  = NumElem -- Field numbers
-  | BoolElem -- Booleans
-  | UElem Width
-  | ArrElem ElemType Int -- Arrays (with type of its elements and its size)
+  = ElemF -- Field elements
+  | ElemB -- Booleans
+  | ElemU Width
+  | ElemArr ElemType Int -- Arrays (with type of its elements and its size)
   deriving (Show, Eq, Generic, NFData)
 
 instance Serialize ElemType
 
 instance Semigroup ElemType where
   a <> b = case (a, b) of
-    (NumElem, NumElem) -> NumElem
-    (BoolElem, BoolElem) -> BoolElem
-    (ArrElem a' l, ArrElem b' _) -> ArrElem (a' <> b') l
+    (ElemF, ElemF) -> ElemF
+    (ElemB, ElemB) -> ElemB
+    (ElemArr a' l, ElemArr b' _) -> ElemArr (a' <> b') l
     _ -> error "ElemType must be the same"
 
 --------------------------------------------------------------------------------

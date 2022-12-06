@@ -19,8 +19,8 @@ import Control.Exception (evaluate)
 
 -- import Control.Monad
 
--- | Outputs whether number is given.
-echo :: Comp Number
+-- | Outputs the given field element
+echo :: Comp Field
 echo = do
   x <- input -- request for an input and bind it to 'x'
   return x -- return 'x'
@@ -28,12 +28,12 @@ echo = do
 -- | A program that expects 2 inputs and returns no output
 useless :: Comp ()
 useless = do
-  _x <- inputNum -- request for an input and bind it to 'x'
+  _x <- inputField -- request for an input and bind it to 'x'
   _y <- inputBool -- request for an input and bind it to 'y'
   return () -- return nothing
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
-tempConvert :: Comp Number
+tempConvert :: Comp Field
 tempConvert = do
   toFahrenheit <- input
   degree <- input
@@ -80,15 +80,15 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
 
 assertToBe42 :: Comp ()
 assertToBe42 = do
-  x <- inputNum
+  x <- inputField
   assert (x `eq` 42)
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output
 assertSquare :: Comp ()
 assertSquare = do
-  x <- inputNum
-  y <- inputNum
+  x <- inputField
+  y <- inputField
   assert ((x * x) `eq` y)
 
 loop3 :: Int -> Int -> Comp ()
@@ -102,7 +102,7 @@ loop3 n m = do
     forM_ [0 .. m - 1] $ \j -> do
       let x = access2 xs (i, j)
       let x' = access2 squares (i, j)
-      assert ((x' :: Number) `eq` (x * x))
+      assert ((x' :: Field) `eq` (x * x))
 
 uint :: Comp (Arr Boolean)
 uint = do

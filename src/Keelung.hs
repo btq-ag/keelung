@@ -51,25 +51,25 @@ compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
-    GF181 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldNumber (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS B64))
+    GF181 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS B64))
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
-    GF181 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldNumber (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS B64))
+    GF181 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS B64))
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
-    GF181 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
-    B64 -> convertFieldNumber (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    GF181 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    B64 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
 
 --------------------------------------------------------------------------------
 
@@ -146,9 +146,9 @@ genCircuit :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuit fieldType prog = do
   elab <- liftEither (elaborate prog)
   case fieldType of
-    GF181 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldNumber (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
+    GF181 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> M [n]
@@ -332,6 +332,6 @@ liftEitherT f = do
 catchIOError :: Error -> IO a -> M a
 catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left err)))) >>= liftEither
 
--- | Prettify and convert all field numbers to 'Integer' in a 'R1CS'
-convertFieldNumber :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
-convertFieldNumber = fmap (fmap (toInteger . N))
+-- | Prettify and convert all field elements to 'Integer' in a 'R1CS'
+convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
+convertFieldElement = fmap (fmap (toInteger . N))
