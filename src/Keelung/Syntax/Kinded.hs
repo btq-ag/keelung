@@ -12,7 +12,8 @@ module Keelung.Syntax.Kinded
     Arr (..),
     ArrM (..),
     Cmp (..),
-    toBool,
+    fieldToBool,
+    uintToBool,
     true,
     false,
   )
@@ -242,9 +243,13 @@ data ArrM t = ArrayRef ElemType Int Addr
 
 --------------------------------------------------------------------------------
 
--- | For converting field elements to booleans
-toBool :: Field -> Boolean
-toBool x = IfB (x `EqF` 0) false true
+-- | For converting field elements to Booleans
+fieldToBool :: Field -> Boolean
+fieldToBool x = IfB (x `EqF` 0) false true
+
+-- | For converting unsigned integers to Booleans
+uintToBool :: KnownNat w => UInt w -> Boolean
+uintToBool x = IfB (x `EqU` 0) false true
 
 -- | Smart constructor for 'True'
 true :: Boolean

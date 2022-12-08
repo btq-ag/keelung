@@ -284,7 +284,7 @@ readKeelungVersion cmd args = do
 
 checkKeelungVersion :: (Int, Int, Int) -> M ()
 checkKeelungVersion (major, minor, patch) = do
-  if major == 0 && minor >= 8 && minor < 9 && patch >= 0
+  if major == 0 && minor >= 8 && minor < 9 && patch >= 1
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
