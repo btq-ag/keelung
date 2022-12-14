@@ -7,7 +7,7 @@ module Keelung.Constraint.Polynomial
     buildEither,
     buildMaybe,
     singleVar,
-    singleton,
+    bind,
     vars,
     varSize,
     coeffs,
@@ -98,13 +98,13 @@ buildMaybe c xs =
         then Nothing
         else Just (Poly c xs')
 
+-- | Create a simple binding of a variable to a value
+bind :: Num n => Var -> n -> Poly n
+bind x n = Poly n (IntMap.singleton x (-1))
+
 -- | Create a polynomial from a single variable
 singleVar :: Num n => Var -> Poly n
 singleVar x = Poly 0 (IntMap.singleton x 1)
-
--- | Create a polynomial from a single variable and its coefficient
-singleton :: Num n => Var -> n -> Poly n
-singleton x c = Poly 0 (IntMap.singleton x c)
 
 -- | Return the set of variables.
 vars :: Poly n -> IntSet
