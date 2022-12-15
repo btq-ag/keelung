@@ -16,6 +16,8 @@ module Keelung.Syntax.Kinded
     uintToBool,
     true,
     false,
+    neg,
+    has
   )
 where
 
@@ -277,3 +279,9 @@ instance Cmp Field where
 instance KnownNat w => Cmp (UInt w) where
   eq = EqU
   neq x y = Not (x `eq` y)
+
+neg :: Boolean -> Boolean
+neg x = true `Xor` x
+
+has :: Arr Field -> Field -> Boolean
+has arr n = foldl (\b a -> b `Or` (a `eq` n)) false arr
