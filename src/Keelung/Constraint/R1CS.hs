@@ -9,6 +9,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Syntax.BinRep (BinRep (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
 
@@ -34,12 +35,15 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
       <> prettyVariables counters
       <> "}"
 
--- | Return R1Cs from a R1CS
---   (includes constraints of boolean variables)
+-- | Return R1Cs from a R1CS, includes:
+--   1. ordinary constraints
+--   2. Boolean input variable constraints
+--   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS cs counters _) =
-  cs
+toR1Cs (R1CS ordinaryConstraints counters _) =
+  ordinaryConstraints
     <> booleanInputVarConstraints
+    <> binRepConstraints
   where
     booleanInputVarConstraints =
       let generate (start, end) =
@@ -52,6 +56,16 @@ toR1Cs (R1CS cs counters _) =
               )
               [start .. end - 1]
        in concatMap generate (getBooleanConstraintRanges counters)
+
+    binRepConstraints =
+      map
+        ( \(BinRep fVar width bVar _) ->
+            R1C
+              (Poly.buildEither 0 [(bVar + i, 2 ^ i) | i <- [0 .. width - 1]])
+              (Left 1)
+              (Right (Poly.singleVar fVar))
+        )
+        (getBinReps counters)
 
 --------------------------------------------------------------------------------
 
