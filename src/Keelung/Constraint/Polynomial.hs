@@ -5,6 +5,7 @@
 module Keelung.Constraint.Polynomial
   ( Poly,
     buildEither,
+    buildEither',
     buildMaybe,
     singleVar,
     bind,
@@ -21,7 +22,7 @@ module Keelung.Constraint.Polynomial
     merge,
     negate,
     substWithPoly,
-    substWithBindings,
+    substWithVector,
   )
 where
 
@@ -30,6 +31,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
 import Keelung.Types (Var)
 import Prelude hiding (negate)
@@ -85,6 +88,15 @@ instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
 buildEither :: (Num n, Eq n) => n -> [(Var, n)] -> Either n (Poly n)
 buildEither c xs =
   let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
+   in if IntMap.null xs'
+        then Left c
+        else Right (Poly c xs')
+
+-- | Create a polynomial from a constant and a list of coefficients.
+--   Coefficients of 0 are discarded.
+buildEither' :: (Num n, Eq n) => n -> IntMap n -> Either n (Poly n)
+buildEither' c xs =
+  let xs' = IntMap.filter (0 /=) xs
    in if IntMap.null xs'
         then Left c
         else Right (Poly c xs')
@@ -164,9 +176,16 @@ substWithPoly (Poly c xs) var (Poly d ys) =
     else return $ Poly c xs
 
 -- | Substitute variables with some values.
-substWithBindings :: (Num n, Eq n) => Poly n -> IntMap n -> Poly n
-substWithBindings (Poly c xs) bindings =
-  let intersected = IntMap.intersectionWith (*) xs bindings
-      unaffected = IntMap.difference xs bindings
-      c' = c + IntMap.foldl' (+) 0 intersected
-   in Poly c' unaffected
+substWithVector :: (Num n, Eq n) => Poly n -> Vector (Maybe n) -> Either n (Poly n)
+substWithVector (Poly c xs) bindings =
+  let (c', xs') =
+        IntMap.foldlWithKey'
+          ( \(is, us) var coeff ->
+              case bindings Vector.!? var of
+                Nothing -> (is, IntMap.insert var coeff us)
+                Just Nothing -> (is, IntMap.insert var coeff us)
+                Just (Just val) -> ((coeff * val) + is, us)
+          )
+          (c, mempty)
+          xs
+   in buildEither' c' xs'

@@ -34,6 +34,7 @@ dependencies:
 - random
 - semirings
 - QuickCheck
+- vector
 - wl-pprint-text
 
 library:

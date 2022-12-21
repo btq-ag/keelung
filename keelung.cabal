@@ -61,6 +61,7 @@ library
     , process
     , random
     , semirings
+    , vector
     , wl-pprint-text
   default-language: Haskell2010
 
@@ -87,6 +88,7 @@ executable tutorial
     , process
     , random
     , semirings
+    , vector
     , wl-pprint-text
   default-language: Haskell2010
 
@@ -114,6 +116,7 @@ test-suite keelung-test
     , process
     , random
     , semirings
+    , vector
     , wl-pprint-text
   default-language: Haskell2010
 
@@ -141,5 +144,6 @@ benchmark profile
     , process
     , random
     , semirings
+    , vector
     , wl-pprint-text
   default-language: Haskell2010
