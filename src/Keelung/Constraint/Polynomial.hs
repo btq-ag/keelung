@@ -175,7 +175,7 @@ substWithPoly (Poly c xs) var (Poly d ys) =
       buildMaybe (c + d) xs'
     else return $ Poly c xs
 
--- | Substitute variables with some values.
+-- | Substitute variables in a Poly with a vector of values.
 substWithVector :: (Num n, Eq n) => Poly n -> Vector (Maybe n) -> Either n (Poly n)
 substWithVector (Poly c xs) bindings =
   let (c', xs') =

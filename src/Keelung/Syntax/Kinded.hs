@@ -17,7 +17,7 @@ module Keelung.Syntax.Kinded
     true,
     false,
     neg,
-    has
+    has,
   )
 where
 
@@ -66,8 +66,8 @@ instance Show Field where
   showsPrec prec expr = case expr of
     Integer n -> showsPrec prec n
     Rational n -> showsPrec prec n
-    VarF ref -> showString "$" . shows ref
-    VarFI ref -> showString "$F" . shows ref
+    VarF ref -> showString "$F" . shows ref
+    VarFI ref -> showString "$FI" . shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -104,7 +104,7 @@ instance Fractional Field where
 data UInt (w :: Nat)
   = UInt Integer -- Integers
   | VarU Var -- Unsigned Integer Variables
-  | InputVarU Var -- Input Unsigned Integer Variables
+  | VarUI Var -- Input Unsigned Integer Variables
   -- Numeric operators on unsigned integers
   | AddU (UInt w) (UInt w)
   | SubU (UInt w) (UInt w)
@@ -125,8 +125,8 @@ data UInt (w :: Nat)
 instance KnownNat w => Show (UInt w) where
   showsPrec prec expr = case expr of
     UInt n -> showsPrec prec n
-    VarU var -> showString "$" . shows var
-    InputVarU var -> showString "$U[" . shows (widthOf expr) . showString "]" . shows var
+    VarU var -> showString "$U" . showString (toSubscript width) . shows var
+    VarUI var -> showString "$UI" . showString (toSubscript width) . shows var
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -138,6 +138,25 @@ instance KnownNat w => Show (UInt w) where
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU x -> showString "B→U " . showsPrec prec x
+    where
+      width :: Width
+      width = widthOf expr
+
+      toSubscript :: Int -> String
+      toSubscript = map go . show
+        where
+          go c = case c of
+            '0' -> '₀'
+            '1' -> '₁'
+            '2' -> '₂'
+            '3' -> '₃'
+            '4' -> '₄'
+            '5' -> '₅'
+            '6' -> '₆'
+            '7' -> '₇'
+            '8' -> '₈'
+            '9' -> '₉'
+            _ -> c
 
 instance KnownNat w => Num (UInt w) where
   (+) = AddU
@@ -182,7 +201,7 @@ instance KnownNat w => HasWidth (UInt w) where
 data Boolean
   = Boolean Bool
   | VarB Var -- Boolean Variables
-  | InputVarB Var -- Input Boolean Variables
+  | VarBI Var -- Input Boolean Variables
   | -- Operators on Booleans
     And Boolean Boolean
   | Or Boolean Boolean
@@ -200,7 +219,7 @@ data Boolean
 instance Eq Boolean where
   Boolean x == Boolean y = x == y
   VarB x == VarB y = x == y
-  InputVarB x == InputVarB y = x == y
+  VarBI x == VarBI y = x == y
   And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
   Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
   Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
@@ -220,8 +239,8 @@ instance Eq Boolean where
 instance Show Boolean where
   showsPrec prec expr = case expr of
     Boolean b -> showsPrec prec b
-    VarB ref -> showString "$" . shows ref
-    InputVarB ref -> showString "$B" . shows ref
+    VarB ref -> showString "$B" . shows ref
+    VarBI ref -> showString "$BI" . shows ref
     BitU n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     EqF x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y

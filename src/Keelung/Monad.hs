@@ -173,15 +173,15 @@ freshVarFI = do
   modifyCounter $ addCount OfInput OfField 1
   return index
 
-freshInputVarB :: Comp Var
-freshInputVarB = do
+freshVarBI :: Comp Var
+freshVarBI = do
   counters <- gets compCounters
   let index = getCount OfInput OfBoolean counters
   modifyCounter $ addCount OfInput OfBoolean 1
   return index
 
-freshInputVarU :: Int -> Comp Var
-freshInputVarU width = do
+freshVarUI :: Int -> Comp Var
+freshVarUI width = do
   counters <- gets compCounters
   let index = getCount OfInput (OfUInt width) counters
   modifyCounter $ addCount OfInput (OfUInt width) 1
@@ -215,11 +215,11 @@ inputField = VarFI <$> freshVarFI
 
 -- | Requests a fresh Bool input variable
 inputBool :: Comp Boolean
-inputBool = InputVarB <$> freshInputVarB
+inputBool = VarBI <$> freshVarBI
 
 -- | Requests a fresh Unsigned integer input variable of some bit width
 inputUInt :: forall w. KnownNat w => Comp (UInt w)
-inputUInt = InputVarU <$> freshInputVarU width
+inputUInt = VarUI <$> freshVarUI width
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 

@@ -23,7 +23,7 @@ import Keelung.Types
 data Boolean
   = ValB Bool
   | VarB Var
-  | InputVarB Var
+  | VarBI Var
   | AndB Boolean Boolean
   | OrB Boolean Boolean
   | XorB Boolean Boolean
@@ -41,7 +41,7 @@ instance Show Boolean where
   showsPrec prec expr = case expr of
     ValB n -> shows n
     VarB var -> showString "$B" . shows var
-    InputVarB var -> showString "$B" . shows var
+    VarBI var -> showString "$BI" . shows var
     AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
@@ -74,7 +74,7 @@ instance Show Field where
     ValF n -> shows n
     ValFR n -> shows n
     VarF var -> showString "$F" . shows var
-    VarFI var -> showString "$F" . shows var
+    VarFI var -> showString "$FI" . shows var
     AddF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -87,7 +87,7 @@ instance Show Field where
 data UInt
   = ValU Width Integer
   | VarU Width Var
-  | InputVarU Width Var
+  | VarUI Width Var
   | AddU Width UInt UInt
   | SubU Width UInt UInt
   | MulU Width UInt UInt
@@ -106,8 +106,8 @@ instance Serialize UInt
 instance Show UInt where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
-    VarU w var -> showString "$U[" . shows w . showString "]" . shows var
-    InputVarU w var -> showString "$U[" . shows w . showString "]" . shows var
+    VarU w var -> showString "$U" . showString (toSubscript w) . shows var
+    VarUI w var -> showString "$UI" . showString (toSubscript w) . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -119,6 +119,22 @@ instance Show UInt where
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU _ x -> showString "B→U " . showsPrec prec x
+    where
+      toSubscript :: Int -> String
+      toSubscript = map go . show
+        where
+          go c = case c of
+            '0' -> '₀'
+            '1' -> '₁'
+            '2' -> '₂'
+            '3' -> '₃'
+            '4' -> '₄'
+            '5' -> '₅'
+            '6' -> '₆'
+            '7' -> '₇'
+            '8' -> '₈'
+            '9' -> '₉'
+            _ -> c
 
 --------------------------------------------------------------------------------
 
@@ -189,28 +205,6 @@ prettyList3 n list = case list of
     unlines $
       map (replicate n ' ' <>) $
         "" : "[ " <> x : map (", " <>) xs <> ["]\n"]
-
---------------------------------------------------------------------------------
-
--- -- | An Assignment associates an expression with a reference
--- data Assignment
---   = AssignmentB Var Boolean
---   | AssignmentBI Var Boolean
---   | AssignmentF Var Field
---   | AssignmentFI Var Field
---   | AssignmentU Width Var UInt
---   | AssignmentUI Width Var UInt
---   deriving (Generic, NFData)
-
--- instance Show Assignment where
---   show (AssignmentB var bool) = "$" <> show var <> " := " <> show bool
---   show (AssignmentBI var bool) = "$" <> show var <> " := " <> show bool
---   show (AssignmentF var num) = "$" <> show var <> " := " <> show num
---   show (AssignmentFI var num) = "$" <> show var <> " := " <> show num
---   show (AssignmentU _ var uint) = "$" <> show var <> " := " <> show uint
---   show (AssignmentUI _ var uint) = "$" <> show var <> " := " <> show uint
-
--- instance Serialize Assignment
 
 --------------------------------------------------------------------------------
 

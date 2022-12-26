@@ -24,7 +24,7 @@ instance Encode' Kinded.Boolean Boolean where
   encode' expr = case expr of
     Kinded.Boolean b -> return $ ValB b
     Kinded.VarB var -> return $ VarB var
-    Kinded.InputVarB var -> return $ InputVarB var
+    Kinded.VarBI var -> return $ VarBI var
     Kinded.And x y -> AndB <$> encode' x <*> encode' y
     Kinded.Or x y -> OrB <$> encode' x <*> encode' y
     Kinded.Xor x y -> XorB <$> encode' x <*> encode' y
@@ -52,7 +52,7 @@ instance KnownNat w => Encode' (Kinded.UInt w) UInt where
   encode' expr = case expr of
     Kinded.UInt n -> return $ ValU (widthOf expr) n
     Kinded.VarU var -> return $ VarU (widthOf expr) var
-    Kinded.InputVarU var -> return $ InputVarU (widthOf expr) var
+    Kinded.VarUI var -> return $ VarUI (widthOf expr) var
     Kinded.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
     Kinded.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
     Kinded.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
