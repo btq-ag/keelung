@@ -36,6 +36,8 @@ module Keelung.Monad
     inputField,
     inputBool,
     inputUInt,
+    inputList,
+    inputList2,
     inputs,
     inputs2,
     inputs3,
@@ -248,6 +250,15 @@ fromArray :: Arr t -> [t]
 fromArray (Arr xs) = toList xs
 
 --------------------------------------------------------------------------------
+
+inputList :: Proper t => Int -> Comp [t]
+inputList 0    = throwError EmptyArrayError
+inputList size = replicateM size input
+
+inputList2 :: Proper t => Int -> Int -> Comp [[t]]
+inputList2 0 _ = throwError EmptyArrayError
+inputList2 _ 0 = throwError EmptyArrayError
+inputList2 sizeM sizeN = replicateM sizeM (inputList sizeN)
 
 -- | Requests a 1D-array of fresh input variables
 inputs :: Proper t => Int -> Comp (Arr t)
@@ -495,3 +506,6 @@ instance Mutable t => Reusable (ArrM t) where
 
 instance Mutable t => Reusable (Arr t) where
   reuse arr = thaw arr >>= reuse >>= freeze
+
+instance Mutable t => Reusable [t] where
+  reuse xs = toArrayM xs >>= reuse >>= fromArrayM
