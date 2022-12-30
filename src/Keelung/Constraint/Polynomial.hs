@@ -23,6 +23,7 @@ module Keelung.Constraint.Polynomial
     negate,
     substWithPoly,
     substWithVector,
+    substWithIntMap,
   )
 where
 
@@ -185,6 +186,20 @@ substWithVector (Poly c xs) bindings =
                 Nothing -> (is, IntMap.insert var coeff us)
                 Just Nothing -> (is, IntMap.insert var coeff us)
                 Just (Just val) -> ((coeff * val) + is, us)
+          )
+          (c, mempty)
+          xs
+   in buildEither' c' xs'
+
+-- | Substitute variables in a Poly with an IntMap of values.
+substWithIntMap :: (Num n, Eq n) => Poly n -> IntMap n -> Either n (Poly n)
+substWithIntMap (Poly c xs) bindings =
+  let (c', xs') =
+        IntMap.foldlWithKey'
+          ( \(is, us) var coeff ->
+              case IntMap.lookup var bindings of
+                Nothing -> (is, IntMap.insert var coeff us)
+                Just val -> ((coeff * val) + is, us)
           )
           (c, mempty)
           xs
