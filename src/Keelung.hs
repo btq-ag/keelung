@@ -9,6 +9,7 @@ module Keelung
     compile,
     compileO0,
     compileO2,
+    compileWithOpts,
     generate,
     verify,
     genCircuit,
@@ -48,28 +49,22 @@ import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compile fieldType prog = runM $ do
-  elab <- liftEither (elaborate prog)
-  case fieldType of
-    GF181 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldElement (wrapper ["protocol", "O1"] (fieldType, elab) :: M (R1CS B64))
+compile = compileWithOpts ["protocol", "O1"]
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 fieldType prog = runM $ do
-  elab <- liftEither (elaborate prog)
-  case fieldType of
-    GF181 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldElement (wrapper ["protocol", "O0"] (fieldType, elab) :: M (R1CS B64))
+compileO0 = compileWithOpts ["protocol", "O0"]
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO2 fieldType prog = runM $ do
+compileO2 = compileWithOpts ["protocol", "O2"]
+
+compileWithOpts :: Encode t => [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileWithOpts opts fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
   case fieldType of
-    GF181 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
-    B64 -> convertFieldElement (wrapper ["protocol", "O2"] (fieldType, elab) :: M (R1CS GF181))
+    GF181 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS B64))
+
 
 --------------------------------------------------------------------------------
 
