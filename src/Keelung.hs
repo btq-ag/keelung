@@ -49,21 +49,24 @@ import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compile = compileWithOpts ["protocol", "O1"]
+compile = compileWithOpts 1 []
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 = compileWithOpts ["protocol", "O0"]
+compileO0 = compileWithOpts 0 []
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO2 = compileWithOpts ["protocol", "O2"]
+compileO2 = compileWithOpts 2 []
 
-compileWithOpts :: Encode t => [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileWithOpts opts fieldType prog = runM $ do
+-- The first argument speficies an optimization level.
+compileWithOpts :: Encode t => Int -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileWithOpts level opts fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
+  let optLevel = "O" <> show level
+  let opts' = ["protocol", optLevel] ++ opts
   case fieldType of
-    GF181 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldElement (wrapper opts (fieldType, elab) :: M (R1CS B64))
+    GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
+    BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
+    B64 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS B64))
 
 
 --------------------------------------------------------------------------------
