@@ -10,6 +10,9 @@ module Keelung
     compileO0,
     compileO2,
     compileWithOpts,
+    optOptimize,
+    optProf,
+    optMemory,
     generate,
     verify,
     genCircuit,
@@ -52,7 +55,7 @@ compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile = compileWithOpts 1 []
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 = compileWithOpts 0 []
+compileO0 = compileWithOpts 0 [] 
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 = compileWithOpts 2 []
@@ -61,12 +64,25 @@ compileO2 = compileWithOpts 2 []
 compileWithOpts :: Encode t => Int -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
-  let optLevel = "O" <> show level
-  let opts' = ["protocol", optLevel] ++ opts
+  let opts' = "protocol" : optOptimize level : opts
   case fieldType of
     GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
     BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
     B64 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS B64))
+
+-- Common options
+optOptimize :: Int -> String
+optOptimize i = "O" <> show i
+
+optProf :: [String]
+optProf = ["+RTS", "-p", "-RTS"]
+
+-- Memory size in GB for RTS options -M, -H and in MB for -A
+-- Try to increase if keelungc produces segmentation fault.
+-- https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html
+optMemory :: Int -> Int -> Int -> [String]
+optMemory m h a = ["+RTS", "-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show a <> "M", "-RTS"]
+
 
 
 --------------------------------------------------------------------------------
