@@ -13,47 +13,28 @@ import Keelung.Types (Var)
 --------------------------------------------------------------------------------
 
 -- | Relation between a variable and binary representation
+--   $var = bit₀ + 2bit₁ + 4bit₂ + 8bit₃ + ... + 2^(n-1)bitₙ
 data BinRep = BinRep
   { -- | The variable
     binRepVar :: Var,
-    -- | Bit width info of the variable
-    binRepBitWidth :: Int,
-    -- | The starting index of the binary representation
-    binRepBitsIndex :: Var,
-    -- | How much the view of binary representation as been rotated
-    binRepRotates :: Int
+    -- | Total number of bits
+    binRepWidth :: Int,
+    -- | The starting index of the bits
+    binRepBitStart :: Var
   }
   deriving (Eq, Generic, NFData)
 
 instance Serialize BinRep
 
 instance Show BinRep where
-  show (BinRep var 1 index _) = "$" <> show var <> " = $" <> show index
-  show (BinRep var 2 index r) = case r `mod` 2 of
-    0 -> "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1)
-    _ -> "$" <> show var <> " = $" <> show (index + 1) <> " + 2$" <> show index
-  show (BinRep var 3 index r) = case r `mod` 3 of
-    0 -> "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1) <> " + 4$" <> show (index + 2)
-    1 -> "$" <> show var <> " = $" <> show (index + 2) <> " + 2$" <> show index <> " + 4$" <> show (index + 1)
-    _ -> "$" <> show var <> " = $" <> show (index + 1) <> " + 2$" <> show (index + 2) <> " + 4$" <> show index
-  show (BinRep var 4 index r) = case r `mod` 4 of
-    0 -> "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1) <> " + 4$" <> show (index + 2) <> " + 8$" <> show (index + 3)
-    1 -> "$" <> show var <> " = $" <> show (index + 3) <> " + 2$" <> show index <> " + 4$" <> show (index + 1) <> " + 8$" <> show (index + 2)
-    2 -> "$" <> show var <> " = $" <> show (index + 2) <> " + 2$" <> show (index + 3) <> " + 4$" <> show index <> " + 8$" <> show (index + 1)
-    _ -> "$" <> show var <> " = $" <> show (index + 1) <> " + 2$" <> show (index + 2) <> " + 4$" <> show (index + 3) <> " + 8$" <> show index
-  show (BinRep var w index r) =
-    let w' = r `mod` w
-     in "$" <> show var <> " = $" <> show (index + w - w') <> " + 2$" <> show (index + w - w' + 1) <> " + ... + 2^" <> show (w - 1) <> "$" <> show (index + w - w' - 1)
+  show (BinRep var 1 index) = "$" <> show var <> " = $" <> show index
+  show (BinRep var 2 index) = "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1)
+  show (BinRep var 3 index) = "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1) <> " + 4$" <> show (index + 2)
+  show (BinRep var 4 index) = "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1) <> " + 4$" <> show (index + 2) <> " + 8$" <> show (index + 3)
+  show (BinRep var w index) = "$" <> show var <> " = $" <> show index <> " + 2$" <> show (index + 1) <> " + ... + 2^" <> show (w - 1) <> "$" <> show (index + w - 1)
 
 instance Ord BinRep where
-  compare (BinRep x _ _ _r1) (BinRep y _ _ _r2) = compare x y
-
--- compare (BinRep x _ _ r1) (BinRep y _ _ r2) = case compare r1 r2 of
---   EQ -> compare x y
---   result -> result
-
--- fromNumBinRep :: Int -> (Var, Var) -> BinRep
--- fromNumBinRep width (var, index) = BinRep var width index 0
+  compare (BinRep x _ _) (BinRep y _ _) = compare x y
 
 --------------------------------------------------------------------------------
 
@@ -91,7 +72,7 @@ toList :: BinReps -> [BinRep]
 toList = concatMap IntMap.elems . IntMap.elems . unBinReps
 
 insert :: BinRep -> BinReps -> BinReps
-insert binRep xs = BinReps $ IntMap.insertWith (<>) (binRepBitWidth binRep) (IntMap.singleton (binRepVar binRep) binRep) (unBinReps xs)
+insert binRep xs = BinReps $ IntMap.insertWith (<>) (binRepWidth binRep) (IntMap.singleton (binRepVar binRep) binRep) (unBinReps xs)
 
 size :: BinReps -> Int
 size = IntMap.foldl' (\acc set -> acc + IntMap.size set) 0 . unBinReps

@@ -242,7 +242,7 @@ getBinReps counters@(Counters o i x _ _) =
     fromPair sort (width, count) =
       let varOffset = reindex counters sort (OfUInt width) 0
           binRepOffset = reindex counters sort (OfUIntBinRep width) 0
-       in [BinRep (varOffset + index) width (binRepOffset + width * index) 0 | index <- [0 .. count - 1]]
+       in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables

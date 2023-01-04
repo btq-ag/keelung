@@ -59,7 +59,7 @@ toR1Cs (R1CS ordinaryConstraints counters _) =
 
     binRepConstraints =
       map
-        ( \(BinRep fVar width bVar _) ->
+        ( \(BinRep fVar width bVar) ->
             R1C
               (Poly.buildEither 0 [(bVar + i, 2 ^ i) | i <- [0 .. width - 1]])
               (Left 1)
