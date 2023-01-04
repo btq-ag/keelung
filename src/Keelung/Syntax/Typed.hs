@@ -13,6 +13,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Data.Struct
+import qualified Keelung.Data.Struct as Struct
 import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
@@ -212,60 +214,25 @@ prettyList3 n list = case list of
 data Computation = Computation
   { -- Variable bookkeeping
     compCounters :: !Counters,
-    -- Assignments
-    compAssignmentF :: IntMap Field,
-    compAssignmentFI :: IntMap Field,
-    compAssignmentB :: IntMap Boolean,
-    compAssignmentBI :: IntMap Boolean,
-    compAssignmentU :: IntMap (IntMap UInt),
-    compAssignmentUI :: IntMap (IntMap UInt),
+    -- Bindings from variables to expressions
+    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
+    compExprBindingsI :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr]
   }
   deriving (Generic, NFData)
 
 instance Show Computation where
-  show (Computation _ aF aFI aB aBI aU aUI assertions) =
+  show (Computation _ eb ebi assertions) =
     "{\n\n"
-      <> "  Field assignments: "
-      <> prettyList3 8 (map (\(var, val) -> "$F" <> show var <> " := " <> show val) $ IntMap.toList aF)
-      <> prettyList3 8 (map (\(var, val) -> "$FI" <> show var <> " := " <> show val) $ IntMap.toList aFI)
-      <> "  Boolean assignments: "
-      <> prettyList3 8 (map (\(var, val) -> "$B" <> show var <> " := " <> show val) $ IntMap.toList aB)
-      <> prettyList3 8 (map (\(var, val) -> "$BI" <> show var <> " := " <> show val) $ IntMap.toList aBI)
-      <> "  Unsigned Int assignments: "
-      <> prettyUIntAssignments "$U" aU
-      <> prettyUIntAssignments "$UI" aUI
-      <> "  assertions: "
+      <> "  Bindings of expressions: \n"
+      <> show eb
+      <> "\n"
+      <> show ebi
+      <> "\n"
+      <> "  Assertions: \n"
       <> prettyList2 8 assertions
       <> "\n}"
-    where
-      -- prettyUInts :: IntMap (IntMap UInt) -> String
-      prettyUIntAssignments :: String -> IntMap (IntMap UInt) -> String
-      prettyUIntAssignments prefix assignments =
-        prettyList3 8 $
-          concatMap
-            ( \(width, xs) ->
-                map (\(var, val) -> prefix <> toSubscript width <> show var <> " := " <> show val) $
-                  IntMap.toList xs
-            )
-            $ IntMap.toList assignments
-
-      toSubscript :: Int -> String
-      toSubscript = map go . show
-        where
-          go c = case c of
-            '0' -> '₀'
-            '1' -> '₁'
-            '2' -> '₂'
-            '3' -> '₃'
-            '4' -> '₄'
-            '5' -> '₅'
-            '6' -> '₆'
-            '7' -> '₇'
-            '8' -> '₈'
-            '9' -> '₉'
-            _ -> c
 
 instance Serialize Computation
 
@@ -285,7 +252,7 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 
 elaborate :: Comp Expr -> Either String Elaborated
 elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty mempty mempty mempty mempty) prog
+  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Allocate a fresh variable.
@@ -311,19 +278,19 @@ allocVarU width = do
   return index
 
 assignF :: Var -> Field -> Comp ()
-assignF var e = modify' $ \st -> st {compAssignmentF = IntMap.insert var e (compAssignmentF st)}
+assignF var expr = modify' $ \st -> st {compExprBindings = Struct.updateF (IntMap.insert var expr) (compExprBindings st)}
 
 assignFI :: Var -> Field -> Comp ()
-assignFI var e = modify' $ \st -> st {compAssignmentFI = IntMap.insert var e (compAssignmentFI st)}
+assignFI var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateF (IntMap.insert var expr) (compExprBindingsI st)}
 
 assignB :: Var -> Boolean -> Comp ()
-assignB var e = modify' $ \st -> st {compAssignmentB = IntMap.insert var e (compAssignmentB st)}
+assignB var expr = modify' $ \st -> st {compExprBindings = Struct.updateB (IntMap.insert var expr) (compExprBindings st)}
 
 assignBI :: Var -> Boolean -> Comp ()
-assignBI var e = modify' $ \st -> st {compAssignmentBI = IntMap.insert var e (compAssignmentBI st)}
+assignBI var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateB (IntMap.insert var expr) (compExprBindingsI st)}
 
 assignU :: Width -> Var -> UInt -> Comp ()
-assignU w var e = modify' $ \st -> st {compAssignmentU = IntMap.insertWith (<>) w (IntMap.singleton var e) (compAssignmentU st)}
+assignU width var expr = modify' $ \st -> st {compExprBindings = Struct.updateU width (IntMap.insert var expr) (compExprBindings st)}
 
 assignUI :: Width -> Var -> UInt -> Comp ()
-assignUI w var e = modify' $ \st -> st {compAssignmentUI = IntMap.insertWith (<>) w (IntMap.singleton var e) (compAssignmentUI st)}
+assignUI width var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateU width (IntMap.insert var expr) (compExprBindingsI st)}

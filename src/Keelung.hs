@@ -37,6 +37,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import qualified Data.Serialize as Serialize
 import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Data.Struct (Struct (..))
 import Keelung.Error
 import Keelung.Field
 import Keelung.Monad
@@ -55,7 +56,7 @@ compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile = compileWithOpts 1 []
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 = compileWithOpts 0 [] 
+compileO0 = compileWithOpts 0 []
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 = compileWithOpts 2 []
@@ -82,8 +83,6 @@ optProf = ["+RTS", "-p", "-RTS"]
 -- https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html
 optMemory :: Int -> Int -> Int -> [String]
 optMemory m h a = ["+RTS", "-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show a <> "M", "-RTS"]
-
-
 
 --------------------------------------------------------------------------------
 
@@ -223,19 +222,15 @@ elaborate prog = encodeElaborated <$> elaborate' prog
   where
     encodeElaborated :: Encode t => Elaborated t -> Typed.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap aF aB aU assertions = comp
-      Typed.Elaborated
-        <$> encode expr
-        <*> ( Typed.Computation
-                counters
-                <$> mapM encode' aF
-                <*> pure mempty
-                <*> mapM encode' aB
-                <*> pure mempty
-                <*> pure aU
-                <*> pure mempty
-                <*> mapM encode assertions
-            )
+      let Computation counters _addrSize _heap eb assertions = comp
+       in Typed.Elaborated
+            <$> encode expr
+            <*> ( Typed.Computation
+                    counters
+                    <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
+                    <*> pure mempty
+                    <*> mapM encode assertions
+                )
 
 --------------------------------------------------------------------------------
 

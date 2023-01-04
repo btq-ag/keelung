@@ -69,6 +69,7 @@ import Keelung.Syntax.Simplify (encode', runHeapM)
 import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
+import Keelung.Data.Struct
 
 --------------------------------------------------------------------------------
 
@@ -80,29 +81,23 @@ data Computation = Computation
     compAddrSize :: Int,
     -- Heap for arrays
     compHeap :: Heap,
-    -- Assignments
-    compAssignmentF :: IntMap Field,
-    compAssignmentB :: IntMap Boolean,
-    compAssignmentU :: IntMap (IntMap Typed.UInt),
+    -- Bindings to expressions
+    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Typed.UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean]
   }
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation mempty 0 mempty mempty mempty mempty mempty
+emptyComputation = Computation mempty 0 mempty mempty mempty
 
 instance Show Computation where
-  show (Computation _ addrSize _ aF aB aU assertions) =
-    "{\n" <> "  address size: "
+  show (Computation _ addrSize _ eb assertions) =
+    "{\n" <> "  Address size: "
       <> show addrSize
-      ++ "\n  Field assignments: "
-      ++ show aF
-      ++ "\n  Boolean assignments: "
-      ++ show aB
-      ++ "\n  UInt assignments: "
-      ++ show aU
-      ++ "\n  assertions: "
+      ++ "\n  Bindings to expressions: \n"
+      ++ show eb
+      ++ "\n  Assertions: \n"
       ++ show assertions
       ++ "\n\
          \}"
@@ -341,7 +336,7 @@ instance Mutable ref => Mutable (ArrM ref) where
 instance Mutable Field where
   alloc val = do
     var <- freshVarF
-    modify' $ \st -> st {compAssignmentF = IntMap.insert var val (compAssignmentF st)}
+    modify' $ \st -> st {compExprBindings = updateF (IntMap.insert var val) (compExprBindings st)}
     return (var, VarF var)
 
   typeOf _ = ElemF
@@ -357,7 +352,7 @@ instance Mutable Field where
 instance Mutable Boolean where
   alloc val = do
     var <- freshVarB
-    modify' $ \st -> st {compAssignmentB = IntMap.insert var val (compAssignmentB st)}
+    modify' $ \st -> st {compExprBindings = updateB (IntMap.insert var val) (compExprBindings st)}
     return (var, VarB var)
 
   typeOf _ = ElemB
@@ -376,11 +371,7 @@ instance KnownNat w => Mutable (UInt w) where
     var <- freshVarU width
     heap <- gets compHeap
     let encoded = runHeapM heap (encode' val)
-    modify' $ \st ->
-      st
-        { compAssignmentU =
-            IntMap.insertWith (<>) width (IntMap.singleton var encoded) (compAssignmentU st)
-        }
+    modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var encoded) (compExprBindings st)}
     return (var, VarU var)
 
   typeOf val = ElemU (widthOf val)
