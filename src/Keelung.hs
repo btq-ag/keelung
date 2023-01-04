@@ -11,8 +11,8 @@ module Keelung
     compileO2,
     compileWithOpts,
     optOptimize,
-    optProf,
-    optMemory,
+    rtsoptProf,
+    rtsoptMemory,
     generate,
     verify,
     genCircuit,
@@ -52,19 +52,19 @@ import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compile = compileWithOpts 1 []
+compile = compileWithOpts 1 [] []
 
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO0 = compileWithOpts 0 [] 
+compileO0 = compileWithOpts 0 [] []
 
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO2 = compileWithOpts 2 []
+compileO2 = compileWithOpts 2 [] []
 
 -- The first argument speficies an optimization level.
-compileWithOpts :: Encode t => Int -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileWithOpts level opts fieldType prog = runM $ do
+compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
-  let opts' = "protocol" : optOptimize level : opts
+  let opts' = "protocol" : optOptimize level : opts <> [ "+RTS" ] <> rtsopts <> [ "-RTS" ]
   case fieldType of
     GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
     BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
@@ -74,14 +74,14 @@ compileWithOpts level opts fieldType prog = runM $ do
 optOptimize :: Int -> String
 optOptimize i = "O" <> show i
 
-optProf :: [String]
-optProf = ["+RTS", "-p", "-RTS"]
+rtsoptProf :: [String]
+rtsoptProf = ["+RTS", "-p", "-RTS"]
 
 -- Memory size in GB for RTS options -M, -H and in MB for -A
 -- Try to increase if keelungc produces segmentation fault.
 -- https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html
-optMemory :: Int -> Int -> Int -> [String]
-optMemory m h a = ["+RTS", "-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show a <> "M", "-RTS"]
+rtsoptMemory :: Int -> Int -> Int -> [String]
+rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show a <> "M"]
 
 
 
