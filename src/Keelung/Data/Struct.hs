@@ -39,3 +39,25 @@ updateU w func (Struct f b u) = Struct f b $ IntMap.adjust func w u
 
 empty :: (Monoid f, Eq f, Eq b, Monoid b) => Struct f b u -> Bool
 empty (Struct f b u) = f == mempty && b == mempty && IntMap.null u
+
+prettyStruct :: (Show f, Show b, Show u) => String -> Struct (IntMap f) (IntMap b) (IntMap u) -> [String]
+prettyStruct suffix (Struct f b u) =
+  map (\(var, val) -> "$F" <> suffix <> show var ++ " := " <> show val) (IntMap.toList f)
+    <> map (\(var, val) -> "$B" <> suffix <> show var ++ " := " <> show val) (IntMap.toList b)
+    <> concatMap (\(width, bindings) -> map (\(var, val) -> "$U" <> suffix <> toSubscript width <> show var ++ " := " <> show val) (IntMap.toList bindings)) (IntMap.toList u)
+  where
+    toSubscript :: Int -> String
+    toSubscript = map go . show
+      where
+        go c = case c of
+          '0' -> '₀'
+          '1' -> '₁'
+          '2' -> '₂'
+          '3' -> '₃'
+          '4' -> '₄'
+          '5' -> '₅'
+          '6' -> '₆'
+          '7' -> '₇'
+          '8' -> '₈'
+          '9' -> '₉'
+          _ -> c

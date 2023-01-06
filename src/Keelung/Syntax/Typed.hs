@@ -172,15 +172,28 @@ data Elaborated = Elaborated
 
 instance Show Elaborated where
   show (Elaborated expr comp) =
-    "{\n  expression: "
+    "{\n  Expression: \n    "
       <> showExpr
-      <> "\n  compuation state: \n"
-      <> indent (indent (show comp))
-      <> "\n}"
+      <> "\n"
+      <> showExprBindings (compExprBindings comp) (compExprBindingsI comp)
+      <> showAssertions (compAssertions comp)
+      <> "}"
     where
       showExpr = case expr of
         Array xs -> prettyList2 4 (toList xs)
         _ -> show expr
+
+      showExprBindings eb ebi =
+        if empty eb && empty ebi
+          then ""
+          else
+            "  Bindings of expressions: \n"
+              <> unlines (map ("    " <>) (prettyStruct "" eb ++ prettyStruct "I" ebi))
+              <> "\n"
+      showAssertions assertions =
+        if null assertions
+          then ""
+          else "  Assertions: \n" <> unlines (map (("    " <>) . show) assertions) <> "\n"
 
 instance Serialize Elaborated
 
@@ -220,19 +233,7 @@ data Computation = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr]
   }
-  deriving (Generic, NFData)
-
-instance Show Computation where
-  show (Computation _ eb ebi assertions) =
-    "{\n\n"
-      <> "  Bindings of expressions: \n"
-      <> show eb
-      <> "\n"
-      <> show ebi
-      <> "\n"
-      <> "  Assertions: \n"
-      <> prettyList2 8 assertions
-      <> "\n}"
+  deriving (Show, Generic, NFData)
 
 instance Serialize Computation
 
