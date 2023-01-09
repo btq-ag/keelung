@@ -3,7 +3,6 @@
 
 module Keelung.Syntax.Counters
   ( Counters (Counters),
-    SmallCounters (SmallCounters),
     VarType (..),
     VarSort (..),
     reindex,
@@ -39,6 +38,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Data.Struct ( Struct(..) )
 import Keelung.Syntax.BinRep (BinRep (..))
 
 ------------------------------------------------------------------------------
@@ -58,26 +58,7 @@ data VarSort = OfOutput | OfInput | OfIntermediate
 
 ------------------------------------------------------------------------------
 
-data SmallCounters = SmallCounters
-  { sizeF :: !Int, -- size of field element variables
-    sizeB :: !Int, -- size of Boolean variables
-    -- sizeUBinReps :: !(IntMap Int), -- size of binary representations of unsigned integers
-    sizeU :: !(IntMap Int) -- size of unsigned integer variables
-  }
-  deriving (Generic, NFData, Eq, Show)
-
-instance Serialize SmallCounters
-
-instance Semigroup SmallCounters where
-  SmallCounters sF1 sB1 sU1 <> SmallCounters sF2 sB2 sU2 =
-    SmallCounters
-      (sF1 + sF2)
-      (sB1 + sB2)
-      -- (IntMap.unionWith (+) sUBinReps1 sUBinReps2)
-      (IntMap.unionWith (+) sU1 sU2)
-
-instance Monoid SmallCounters where
-  mempty = SmallCounters 0 0 IntMap.empty
+type SmallCounters = Struct Int Int Int
 
 binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
@@ -86,7 +67,7 @@ uIntSize :: IntMap Int -> Int
 uIntSize = sum
 
 smallCounterSize :: SmallCounters -> Int
-smallCounterSize (SmallCounters f b u) =
+smallCounterSize (Struct f b u) =
   f + b + binRepSize u + uIntSize u
 
 --------------------------------------------------------------------------------
@@ -105,14 +86,18 @@ instance Serialize Counters
 instance Semigroup Counters where
   Counters cOut1 cIn1 cInt1 cInSeq1 cRed1 <> Counters cOut2 cIn2 cInt2 cInSeq2 cRed2 =
     Counters
-      (cOut1 <> cOut2)
-      (cIn1 <> cIn2)
-      (cInt1 <> cInt2)
+      (addSmallCounters cOut1 cOut2)
+      (addSmallCounters cIn1 cIn2)
+      (addSmallCounters cInt1 cInt2)
       (cInSeq1 <> cInSeq2)
       (cRed1 + cRed2)
+    where
+      addSmallCounters :: SmallCounters -> SmallCounters -> SmallCounters
+      addSmallCounters (Struct f1 b1 u1) (Struct f2 b2 u2) =
+        Struct (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
 
 instance Monoid Counters where
-  mempty = Counters mempty mempty mempty mempty 0
+  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty 0
 
 --------------------------------------------------------------------------------
 
@@ -125,7 +110,7 @@ getCount sort typ (Counters o i x _ _) =
     OfIntermediate -> go x
   where
     go :: SmallCounters -> Int
-    go (SmallCounters f b u) =
+    go (Struct f b u) =
       case typ of
         OfField -> f
         OfBoolean -> b
@@ -144,10 +129,10 @@ getCountBySort sort (Counters o i x _ _) =
 getCountByType :: VarType -> Counters -> Int
 getCountByType typ (Counters o i x _ _) =
   case typ of
-    OfField -> sizeF o + sizeF i + sizeF x
-    OfBoolean -> sizeB o + sizeB i + sizeB x
-    OfUIntBinRep _ -> binRepSize (sizeU o) + binRepSize (sizeU i) + binRepSize (sizeU x)
-    OfUInt _ -> uIntSize (sizeU o) + uIntSize (sizeU i) + uIntSize (sizeU x)
+    OfField -> structF o + structF i + structF x
+    OfBoolean -> structB o + structB i + structB x
+    OfUIntBinRep _ -> binRepSize (structU o) + binRepSize (structU i) + binRepSize (structU x)
+    OfUInt _ -> uIntSize (structU o) + uIntSize (structU i) + uIntSize (structU x)
 
 setReducedCount :: Int -> Counters -> Counters
 setReducedCount n (Counters o i x s _) = Counters o i x s n
@@ -167,12 +152,12 @@ addCount sort typ n (Counters o i x is r) =
     OfIntermediate -> Counters o i (adjustSmallCounters x) is r
   where
     adjustSmallCounters :: SmallCounters -> SmallCounters
-    adjustSmallCounters (SmallCounters f b u) =
+    adjustSmallCounters (Struct f b u) =
       case typ of
-        OfField -> SmallCounters (f + n) b u
-        OfBoolean -> SmallCounters f (b + n) u
+        OfField -> Struct (f + n) b u
+        OfBoolean -> Struct f (b + n) u
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
-        OfUInt w -> SmallCounters f b (IntMap.insertWith (+) w n u)
+        OfUInt w -> Struct f b (IntMap.insertWith (+) w n u)
 
     oldCount = getCount sort typ (Counters o i x is r)
 
@@ -201,12 +186,12 @@ offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) +
 
 offsetOfType :: SmallCounters -> VarType -> Int -> Int
 offsetOfType _ OfField index = index
-offsetOfType (SmallCounters f _ _) OfBoolean index = f + index
-offsetOfType (SmallCounters f b u) (OfUIntBinRep width) index =
+offsetOfType (Struct f _ _) OfBoolean index = f + index
+offsetOfType (Struct f b u) (OfUIntBinRep width) index =
   f + b
     + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
     + width * index
-offsetOfType (SmallCounters f b u) (OfUInt width) index = f + b + binRepSize u + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
+offsetOfType (Struct f b u) (OfUInt width) index = f + b + binRepSize u + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
 
 --------------------------------------------------------------------------------
 
@@ -216,7 +201,7 @@ getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort count
 getOutputBinRepRange :: Counters -> (Int, Int)
 getOutputBinRepRange counters =
   let start = offsetOfSort counters OfOutput + getCount OfOutput OfField counters + getCount OfOutput OfBoolean counters
-      size = binRepSize (sizeU (countOutput counters))
+      size = binRepSize (structU (countOutput counters))
    in (start, start + size)
 
 getInputVarRange :: Counters -> (Int, Int)
@@ -229,14 +214,14 @@ getInputVarRange counters =
 getBinRepConstraintSize :: Counters -> Int
 getBinRepConstraintSize (Counters o i _ _ _) = f o + f i
   where
-    f (SmallCounters _ _ u) = uIntSize u
+    f (Struct _ _ u) = uIntSize u
 
 getBinReps :: Counters -> [BinRep]
 getBinReps counters@(Counters o i x _ _) =
   fromSmallCounter OfOutput o ++ fromSmallCounter OfInput i ++ fromSmallCounter OfIntermediate x
   where
     fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-    fromSmallCounter sort (SmallCounters _ _ u) = concatMap (fromPair sort) (IntMap.toList u)
+    fromSmallCounter sort (Struct _ _ u) = concatMap (fromPair sort) (IntMap.toList u)
 
     fromPair :: VarSort -> (Width, Int) -> [BinRep]
     fromPair sort (width, count) =
@@ -252,7 +237,7 @@ getBinReps counters@(Counters o i x _ _) =
 getBooleanConstraintSize :: Counters -> Int
 getBooleanConstraintSize (Counters o i _ _ _) = f o + f i
   where
-    f (SmallCounters _ b u) = b + binRepSize u
+    f (Struct _ b u) = b + binRepSize u
 
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
@@ -264,7 +249,7 @@ getBooleanConstraintRanges counters@(Counters o i _ _ _) =
   mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfInput i]
   where
     booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
-    booleanVarRange sort (SmallCounters _ b u) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize u)
+    booleanVarRange sort (Struct _ b u) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize u)
 
     mergeSegments :: [(Int, Int)] -> [(Int, Int)]
     mergeSegments [] = []
