@@ -127,3 +127,4 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
             Kinded.ElemB -> return $ Boolean $ VarB addr''
             Kinded.ElemU w -> return $ UInt $ VarU w addr''
             Kinded.ElemArr _ len' -> readArray addr'' len'
+            Kinded.EmptyArr -> readArray addr'' 0

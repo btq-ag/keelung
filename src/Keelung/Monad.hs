@@ -225,9 +225,10 @@ inputUInt = VarUI <$> freshVarUI width
 -- | Converts a list of values to an 1D-array
 toArrayM :: Mutable t => [t] -> Comp (ArrM t)
 toArrayM xs = do
-  when (null xs) $ throwError EmptyArrayError
-  let kind = typeOf (head xs)
-  snd <$> allocArray kind xs
+  if null xs
+    then snd <$> allocArray EmptyArr xs
+    else let kind = typeOf (head xs)
+          in snd <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
 toArray :: [t] -> Arr t
@@ -327,6 +328,7 @@ instance Mutable ref => Mutable (ArrM ref) where
   typeOf ((ArrayRef elemType len _)) = ElemArr elemType len
 
   constructElement (ElemArr l k) elemAddr = ArrayRef l k elemAddr
+  constructElement EmptyArr elemAddr = ArrayRef EmptyArr 0 elemAddr
   constructElement _ _ = error "expecting element to be array"
 
   updateM (ArrayRef elemType _ addr) i expr = do

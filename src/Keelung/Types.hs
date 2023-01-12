@@ -42,6 +42,7 @@ data ElemType
   | ElemB -- Booleans
   | ElemU Width
   | ElemArr ElemType Int -- Arrays (with type of its elements and its size)
+  | EmptyArr -- Currently only empty arrays have this kind
   deriving (Show, Eq, Generic, NFData)
 
 instance Serialize ElemType
@@ -51,6 +52,9 @@ instance Semigroup ElemType where
     (ElemF, ElemF) -> ElemF
     (ElemB, ElemB) -> ElemB
     (ElemArr a' l, ElemArr b' _) -> ElemArr (a' <> b') l
+    (ElemArr a' l, EmptyArr) -> ElemArr a' l
+    (EmptyArr, ElemArr b' l) -> ElemArr b' l
+    (EmptyArr, EmptyArr) -> EmptyArr
     _ -> error "ElemType must be the same"
 
 --------------------------------------------------------------------------------
