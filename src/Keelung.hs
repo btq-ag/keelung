@@ -76,7 +76,7 @@ optOptimize :: Int -> String
 optOptimize i = "O" <> show i
 
 rtsoptProf :: [String]
-rtsoptProf = ["+RTS", "-p", "-RTS"]
+rtsoptProf = [ "-p" ]
 
 -- Memory size in GB for RTS options -M, -H and in MB for -A
 -- Try to increase if keelungc produces segmentation fault.

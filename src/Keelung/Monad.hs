@@ -248,34 +248,25 @@ fromArray (Arr xs) = toList xs
 --------------------------------------------------------------------------------
 
 inputList :: Proper t => Int -> Comp [t]
-inputList 0    = throwError EmptyArrayError
 inputList size = replicateM size input
 
 inputList2 :: Proper t => Int -> Int -> Comp [[t]]
-inputList2 0 _ = throwError EmptyArrayError
-inputList2 _ 0 = throwError EmptyArrayError
 inputList2 sizeM sizeN = replicateM sizeM (inputList sizeN)
 
 -- | Requests a 1D-array of fresh input variables
 inputs :: Proper t => Int -> Comp (Arr t)
-inputs 0 = throwError EmptyArrayError
 inputs size = do
   vars <- replicateM size input
   return $ toArray vars
 
 -- | Requests a 2D-array of fresh input variables
 inputs2 :: Proper t => Int -> Int -> Comp (Arr (Arr t))
-inputs2 0 _ = throwError EmptyArrayError
-inputs2 _ 0 = throwError EmptyArrayError
 inputs2 sizeM sizeN = do
   vars <- replicateM sizeM (inputs sizeN)
   return $ toArray vars
 
 -- | Requests a 3D-array of fresh input variables
 inputs3 :: Proper t => Int -> Int -> Int -> Comp (Arr (Arr (Arr t)))
-inputs3 0 _ _ = throwError EmptyArrayError
-inputs3 _ 0 _ = throwError EmptyArrayError
-inputs3 _ _ 0 = throwError EmptyArrayError
 inputs3 sizeM sizeN sizeO = do
   vars <- replicateM sizeM (inputs2 sizeN sizeO)
   return $ toArray vars

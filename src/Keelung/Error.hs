@@ -45,15 +45,13 @@ instance Serialize Error
 --------------------------------------------------------------------------------
 
 data ElabError
-  = EmptyArrayError
-  | IndexOutOfBoundsError Addr Int (IntMap Int)
+  = IndexOutOfBoundsError Addr Int (IntMap Int)
   | IndexOutOfBoundsError2 Int Int
   deriving (Eq, Generic, NFData)
 
 instance Serialize ElabError
 
 instance Show ElabError where
-  show EmptyArrayError = "Array size must not be 0"
   show (IndexOutOfBoundsError addr i array) =
     "Index " ++ show i ++ " out of bounds for array #"
       ++ show addr
