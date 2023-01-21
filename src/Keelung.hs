@@ -65,7 +65,7 @@ compileO2 = compileWithOpts 2 [] []
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborate prog)
-  let opts' = "protocol" : optOptimize level : opts <> [ "+RTS" ] <> rtsopts <> [ "-RTS" ]
+  let opts' = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
   case fieldType of
     GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
     BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
@@ -76,7 +76,7 @@ optOptimize :: Int -> String
 optOptimize i = "O" <> show i
 
 rtsoptProf :: [String]
-rtsoptProf = [ "-p" ]
+rtsoptProf = ["-p"]
 
 -- Memory size in GB for RTS options -M, -H and in MB for -A
 -- Try to increase if keelungc produces segmentation fault.
@@ -228,7 +228,6 @@ elaborate prog = encodeElaborated <$> elaborate' prog
             <*> ( Typed.Computation
                     counters
                     <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
-                    <*> pure mempty
                     <*> mapM encode assertions
                 )
 

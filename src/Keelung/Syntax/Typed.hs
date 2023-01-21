@@ -3,19 +3,13 @@
 
 module Keelung.Syntax.Typed where
 
-import Control.Arrow (left)
 import Control.DeepSeq (NFData)
-import Control.Monad.Except
-import Control.Monad.State
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.Struct
-import qualified Keelung.Data.Struct as Struct
-import Keelung.Error (ElabError)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 import Keelung.Types
@@ -175,7 +169,7 @@ instance Show Elaborated where
     "{\n  Expression: \n    "
       <> showExpr
       <> "\n"
-      <> showExprBindings (compExprBindings comp) (compExprBindingsI comp)
+      <> showExprBindings (compExprBindings comp)
       <> showAssertions (compAssertions comp)
       <> "}"
     where
@@ -183,12 +177,12 @@ instance Show Elaborated where
         Array xs -> prettyList2 4 (toList xs)
         _ -> show expr
 
-      showExprBindings eb ebi =
-        if empty eb && empty ebi
+      showExprBindings eb =
+        if empty eb
           then ""
           else
             "  Bindings of expressions: \n"
-              <> unlines (map ("    " <>) (prettyStruct "" eb ++ prettyStruct "I" ebi))
+              <> unlines (map ("    " <>) (prettyStruct "" eb))
               <> "\n"
       showAssertions assertions =
         if null assertions
@@ -229,69 +223,9 @@ data Computation = Computation
     compCounters :: !Counters,
     -- Bindings from variables to expressions
     compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
-    compExprBindingsI :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr]
   }
   deriving (Show, Generic, NFData)
 
 instance Serialize Computation
-
---------------------------------------------------------------------------------
-
-type Comp = StateT Computation (Except ElabError)
-
--- | How to run the 'Comp' monad
-runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
-runComp comp f = runExcept (runStateT f comp)
-
-evalComp :: Computation -> Comp a -> Either ElabError a
-evalComp comp f = runExcept (evalStateT f comp)
-
-modifyCounter :: (Counters -> Counters) -> Comp ()
-modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
-
-elaborate :: Comp Expr -> Either String Elaborated
-elaborate prog = do
-  (expr, comp') <- left show $ runComp (Computation mempty mempty mempty mempty) prog
-  return $ Elaborated expr comp'
-
--- | Allocate a fresh variable.
-allocVarF :: Comp Var
-allocVarF = do
-  counters <- gets compCounters
-  let index = getCount OfIntermediate OfField counters
-  modifyCounter $ addCount OfIntermediate OfField 1
-  return index
-
-allocVarB :: Comp Var
-allocVarB = do
-  counters <- gets compCounters
-  let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ addCount OfIntermediate OfBoolean 1
-  return index
-
-allocVarU :: Width -> Comp Var
-allocVarU width = do
-  counters <- gets compCounters
-  let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
-  return index
-
-assignF :: Var -> Field -> Comp ()
-assignF var expr = modify' $ \st -> st {compExprBindings = Struct.updateF (IntMap.insert var expr) (compExprBindings st)}
-
-assignFI :: Var -> Field -> Comp ()
-assignFI var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateF (IntMap.insert var expr) (compExprBindingsI st)}
-
-assignB :: Var -> Boolean -> Comp ()
-assignB var expr = modify' $ \st -> st {compExprBindings = Struct.updateB (IntMap.insert var expr) (compExprBindings st)}
-
-assignBI :: Var -> Boolean -> Comp ()
-assignBI var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateB (IntMap.insert var expr) (compExprBindingsI st)}
-
-assignU :: Width -> Var -> UInt -> Comp ()
-assignU width var expr = modify' $ \st -> st {compExprBindings = Struct.updateU width (IntMap.insert var expr) (compExprBindings st)}
-
-assignUI :: Width -> Var -> UInt -> Comp ()
-assignUI width var expr = modify' $ \st -> st {compExprBindingsI = Struct.updateU width (IntMap.insert var expr) (compExprBindingsI st)}

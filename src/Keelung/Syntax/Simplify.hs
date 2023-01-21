@@ -96,7 +96,7 @@ instance Encode t => Encode [t] where
   encode xs = Array . Array.listArray (0, length xs - 1) <$> mapM encode xs
 
 instance (Encode a, Encode b) => Encode (a, b) where
-  encode (a,b) = do
+  encode (a, b) = do
     a' <- encode a
     b' <- encode b
     return $ Array $ Array.listArray (0, 1) [a', b']

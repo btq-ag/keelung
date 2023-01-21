@@ -62,6 +62,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Traversable (mapAccumL)
 import GHC.TypeNats
+import Keelung.Data.Struct
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -69,7 +70,6 @@ import Keelung.Syntax.Simplify (encode', runHeapM)
 import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
-import Keelung.Data.Struct
 
 --------------------------------------------------------------------------------
 
@@ -227,8 +227,9 @@ toArrayM :: Mutable t => [t] -> Comp (ArrM t)
 toArrayM xs = do
   if null xs
     then snd <$> allocArray EmptyArr xs
-    else let kind = typeOf (head xs)
-          in snd <$> allocArray kind xs
+    else
+      let kind = typeOf (head xs)
+       in snd <$> allocArray kind xs
 
 -- | Immutable version of `toArray`
 toArray :: [t] -> Arr t
