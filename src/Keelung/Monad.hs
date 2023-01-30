@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Keelung.Monad
   ( Comp,
@@ -330,7 +331,7 @@ instance Mutable ref => Mutable (ArrM ref) where
 instance Mutable Field where
   alloc val = do
     var <- freshVarF
-    modify' $ \st -> st {compExprBindings = updateF (IntMap.insert var val) (compExprBindings st)}
+    assignF var val
     return (var, VarF var)
 
   typeOf _ = ElemF
@@ -346,7 +347,7 @@ instance Mutable Field where
 instance Mutable Boolean where
   alloc val = do
     var <- freshVarB
-    modify' $ \st -> st {compExprBindings = updateB (IntMap.insert var val) (compExprBindings st)}
+    assignB var val
     return (var, VarB var)
 
   typeOf _ = ElemB
@@ -365,9 +366,10 @@ instance KnownNat w => Mutable (UInt w) where
     var <- freshVarU width
     heap <- gets compHeap
     let encoded = runHeapM heap (encode' val)
-    modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var encoded) (compExprBindings st)}
+    assignU width var encoded
     return (var, VarU var)
 
+  typeOf :: KnownNat w => UInt w -> ElemType
   typeOf val = ElemU (widthOf val)
 
   updateM (ArrayRef _ _ addr) i val@(VarU n) = writeHeap addr (ElemU (widthOf val)) (i, n)
@@ -476,21 +478,27 @@ class Reusable t where
 
 instance Reusable Boolean where
   reuse val = do
-    xs <- toArrayM [val]
-    accessM xs 0
+    var <- freshVarB
+    assignB var val
+    return (VarB var)
 
 instance Reusable Field where
   reuse val = do
-    xs <- toArrayM [val]
-    accessM xs 0
+    var <- freshVarF
+    assignF var val
+    return (VarF var)
 
-instance Mutable t => Reusable (ArrM t) where
-  reuse val = do
-    xs <- toArrayM [val]
-    accessM xs 0
+instance (Reusable t, Mutable t) => Reusable (ArrM t) where
+  reuse = return
 
-instance Mutable t => Reusable (Arr t) where
-  reuse arr = thaw arr >>= reuse >>= freeze
+instance (Reusable t, Traversable f) => Reusable (f t) where
+  reuse = mapM reuse
 
-instance Mutable t => Reusable [t] where
-  reuse xs = toArrayM xs >>= reuse >>= fromArrayM
+assignF :: Var -> Field -> Comp ()
+assignF var expr = modify' $ \st -> st {compExprBindings = updateF (IntMap.insert var expr) (compExprBindings st)}
+
+assignB :: Var -> Boolean -> Comp ()
+assignB var expr = modify' $ \st -> st {compExprBindings = updateB (IntMap.insert var expr) (compExprBindings st)}
+
+assignU :: Width -> Var -> Typed.UInt -> Comp ()
+assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st)}
