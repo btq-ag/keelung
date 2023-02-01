@@ -88,7 +88,7 @@ data Computation = Computation
     compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Typed.UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
-    -- DivMod relations
+    -- DivMod relations: dividend = divisor * quotient + remainder
     compDivModRelsU :: IntMap (Typed.UInt, Typed.UInt, Typed.UInt, Typed.UInt)
   }
   deriving (Eq)
@@ -511,7 +511,7 @@ assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (
 -- Asserting DivMod relations
 --------------------------------------------------------------------------------
 
--- | TODO: Replace with methods in the `Integral` class
+-- | TODO: Replace this with methods from the `Integral` class
 performDivMod :: forall w. KnownNat w => UInt w -> UInt w -> Comp (UInt w, UInt w)
 performDivMod dividend divisor = do
   remainder <- freshVarU width
@@ -521,10 +521,11 @@ performDivMod dividend divisor = do
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
+-- | Assert that dividend = divisor * quotient + remainder
 assertDivMod :: forall w. KnownNat w => UInt w -> UInt w -> UInt w -> UInt w -> Comp ()
 assertDivMod dividend divisor quotient remainder = do
   heap <- gets compHeap
-  let encoded = runHeapM heap $ (,,,) <$> encode' remainder <*> encode' quotient <*> encode' divisor <*> encode' dividend
+  let encoded = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
   modify (\st -> st {compDivModRelsU = IntMap.insert width encoded (compDivModRelsU st)})
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))

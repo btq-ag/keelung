@@ -225,7 +225,7 @@ data Computation = Computation
     compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
-    -- DivMod relations 
+    -- DivMod relations: dividend = divisor * quotient + remainder
     compDivModRelsU :: IntMap (UInt, UInt, UInt, UInt)
   }
   deriving (Show, Generic, NFData)
