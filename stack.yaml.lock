@@ -5,30 +5,20 @@
 
 packages:
 - completed:
-    hackage: galois-field-1.0.2@sha256:1f7d31836da8553caf50682e9e0d7cb7edf2146bafb67bed1b6b68031278bbaf,4876
+    commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
+    git: https://github.com/btq-ag/galois-field.git
+    name: galois-field
     pantry-tree:
-      size: 1451
-      sha256: b0c9ff182961bc0d8972f43755fab68b0a7eed558a65872e21398698e66189aa
+      sha256: 0b9cd01ab0ed19b29bc34aed4157dbb05eef1dabb543b349c9720dbc743aca72
+      size: 4656
+    version: 1.0.4
   original:
-    hackage: galois-field-1.0.2@sha256:1f7d31836da8553caf50682e9e0d7cb7edf2146bafb67bed1b6b68031278bbaf,4876
-- completed:
-    hackage: poly-0.4.0.0@sha256:75c243113712745dab5d2f4a52643705e146473770af212f9e0ce3d87a83f2ed,2123
-    pantry-tree:
-      size: 1896
-      sha256: 06f435980848905d2bcf23b85782863b1608f7a78dbdaea42e33a2e865adf476
-  original:
-    hackage: poly-0.4.0.0@sha256:75c243113712745dab5d2f4a52643705e146473770af212f9e0ce3d87a83f2ed,2123
-- completed:
-    hackage: protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
-    pantry-tree:
-      size: 1438
-      sha256: f16b5dec82649b23d3530f1bbc8e4c9e7618d70706052fe8c8ac9c8d19970126
-  original:
-    hackage: protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
+    commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
+    git: https://github.com/btq-ag/galois-field.git
 snapshots:
 - completed:
-    size: 618884
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/7.yaml
-    sha256: 57d4ce67cc097fea2058446927987bc1f7408890e3a6df0da74e5e318f051c20
+    sha256: 8bcce0b4f5671ea04691477f5af759b497b8892f998768d6eb01c64c58d41d7c
+    size: 649329
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/7.yaml
   original:
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/7.yaml
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/7.yaml
