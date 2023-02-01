@@ -222,13 +222,14 @@ elaborate prog = encodeElaborated <$> elaborate' prog
   where
     encodeElaborated :: Encode t => Elaborated t -> Typed.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap eb assertions = comp
+      let Computation counters _addrSize _heap eb assertions divModRelsU = comp
        in Typed.Elaborated
             <$> encode expr
             <*> ( Typed.Computation
                     counters
                     <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
                     <*> mapM encode assertions
+                    <*> pure divModRelsU
                 )
 
 --------------------------------------------------------------------------------

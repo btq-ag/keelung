@@ -48,6 +48,8 @@ module Keelung.Monad
     mapI,
     reduce,
     reuse,
+    performDivMod,
+    assertDivMod,
   )
 where
 
@@ -84,15 +86,17 @@ data Computation = Computation
     -- Bindings to expressions
     compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Typed.UInt),
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Boolean]
+    compAssertions :: [Boolean],
+    -- DivMod relations
+    compDivModRelsU :: IntMap (Typed.UInt, Typed.UInt, Typed.UInt, Typed.UInt)
   }
   deriving (Eq)
 
 emptyComputation :: Computation
-emptyComputation = Computation mempty 0 mempty mempty mempty
+emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
-  show (Computation _ addrSize _ eb assertions) =
+  show (Computation _ addrSize _ eb assertions _divModRelsU) =
     "{\n" <> "  Address size: "
       <> show addrSize
       ++ "\n  Bindings to expressions: \n"
@@ -494,3 +498,25 @@ instance Mutable t => Reusable (Arr t) where
 
 instance Mutable t => Reusable [t] where
   reuse xs = toArrayM xs >>= reuse >>= fromArrayM
+
+--------------------------------------------------------------------------------
+-- Asserting DivMod relations
+--------------------------------------------------------------------------------
+
+-- | TODO: Replace with methods in the `Integral` class
+performDivMod :: forall w. KnownNat w => UInt w -> UInt w -> Comp (UInt w, UInt w)
+performDivMod dividend divisor = do
+  remainder <- freshVarU width
+  quotient <- freshVarU width
+  assertDivMod dividend divisor (VarU quotient) (VarU remainder)
+  return (VarU quotient, VarU remainder)
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))
+
+assertDivMod :: forall w. KnownNat w => UInt w -> UInt w -> UInt w -> UInt w -> Comp ()
+assertDivMod dividend divisor quotient remainder = do
+  heap <- gets compHeap
+  let encoded = runHeapM heap $ (,,,) <$> encode' remainder <*> encode' quotient <*> encode' divisor <*> encode' dividend
+  modify (\st -> st {compDivModRelsU = IntMap.insert width encoded (compDivModRelsU st)})
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))

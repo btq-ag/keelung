@@ -224,7 +224,9 @@ data Computation = Computation
     -- Bindings from variables to expressions
     compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
     -- Assertions are expressions that are expected to be true
-    compAssertions :: [Expr]
+    compAssertions :: [Expr],
+    -- DivMod relations 
+    compDivModRelsU :: IntMap (UInt, UInt, UInt, UInt)
   }
   deriving (Show, Generic, NFData)
 
