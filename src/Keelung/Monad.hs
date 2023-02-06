@@ -48,6 +48,7 @@ module Keelung.Monad
     assert,
     mapI,
     reduce,
+    Reusable,
     reuse,
   )
 where
@@ -67,7 +68,7 @@ import Keelung.Data.Struct
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Simplify (encode', runHeapM)
+import Keelung.Syntax.Simplify (Encode, encode, encode', runHeapM)
 import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
@@ -488,6 +489,17 @@ instance Reusable Field where
     assignF var val
     return (VarF var)
 
+instance (Reusable a, Reusable b) => Reusable (a, b) where
+  reuse (a, b) = do a' <- reuse a
+                    b' <- reuse b
+                    return (a', b')
+
+-- instance (Reusable a, Reusable b, Reusable c) => Reusable (a, b, c) where
+--   reuse (a, b, c) = do a' <- reuse a
+--                        b' <- reuse b
+--                        c' <- reuse c
+--                        return (a', b', c')
+
 instance (Reusable t, Mutable t) => Reusable (ArrM t) where
   reuse = return
 
@@ -502,3 +514,14 @@ assignB var expr = modify' $ \st -> st {compExprBindings = updateB (IntMap.inser
 
 assignU :: Width -> Var -> Typed.UInt -> Comp ()
 assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st)}
+
+--data T = A Field Boolean | B | C | VarT Var
+
+--instance Encode T where
+  --encode (A f b) = _
+  --encode B = _
+  --encode C = _
+  --encode (VarT v) = _
+
+--instance Reusable T where
+  --reuse t = _

@@ -134,12 +134,27 @@ instance Show UInt where
 
 --------------------------------------------------------------------------------
 
+type Encoding = ([Field], [Boolean], [UInt])
+
+emptyEncoding :: Encoding
+emptyEncoding = ([], [], [])
+
+addF :: Field -> Encoding -> Encoding
+addF f (xs, ys, zs) = (f : xs, ys, zs)
+
+addB :: Boolean -> Encoding -> Encoding
+addB b (xs, ys, zs) = (xs, b : ys, zs)
+
+addU :: UInt -> Encoding -> Encoding
+addU u (xs, ys, zs) = (xs, ys, u : zs)
+
 data Expr
   = Unit
   | Boolean Boolean
   | Field Field
   | UInt UInt
   | Array (Array Int Expr)
+  | Misc Encoding 
   deriving (Generic, Eq, NFData)
 
 instance Show Expr where
@@ -149,6 +164,7 @@ instance Show Expr where
     Field num -> showsPrec prec num
     UInt uint -> showsPrec prec uint
     Array xs -> showList (toList xs)
+    Misc xs -> showsPrec prec xs
 
 instance Serialize Expr
 

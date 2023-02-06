@@ -24,7 +24,8 @@ module Keelung
     b64,
     elaborate',
     elaborate,
-    Encode,
+    Encode(..),
+    Decode(..),
     GaloisField,
     keelungVersion,
   )

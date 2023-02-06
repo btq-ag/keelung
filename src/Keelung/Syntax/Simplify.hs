@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (Encode (..), runHeapM, encode') where
+module Keelung.Syntax.Simplify (Encode (..), Decode(..), runHeapM, encode') where
 
 import Control.Monad.Reader
 import qualified Data.Array.Unboxed as Array
@@ -13,6 +13,7 @@ import qualified Keelung.Syntax.Kinded as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
 import qualified Keelung.Types as Kinded
+import Data.Foldable
 
 --------------------------------------------------------------------------------
 
@@ -100,6 +101,34 @@ instance (Encode a, Encode b) => Encode (a, b) where
     a' <- encode a
     b' <- encode b
     return $ Array $ Array.listArray (0, 1) [a', b']
+    where
+      put :: Expr -> Encoding -> Encoding
+      put a vars@(fs, bs, us) =
+        case a of
+          Unit -> vars
+          (Field f) -> addF f vars
+          (Boolean b) -> addB b vars
+          (UInt u) -> addU u vars
+          (Array arr) -> foldl (flip put) vars arr
+          (Misc (fs', bs', us')) -> (fs' ++ fs, bs' ++ bs, us' ++ us)
+
+--------------------------------------------------------------------------------
+
+class Decode a where
+  decode :: Expr -> Maybe a
+
+instance Decode Field where
+  decode (Field f) = Just f
+  decode _ = Nothing
+
+instance Decode Boolean where
+  decode (Boolean b) = Just b
+  decode _ = Nothing
+
+instance Decode UInt where
+  decode (UInt u) = Just u
+  decode _ = Nothing
+
 
 --------------------------------------------------------------------------------
 
