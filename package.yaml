@@ -28,14 +28,9 @@ dependencies:
 - deepseq
 - directory
 - galois-field
-- groups
 - mtl
 - process
-- random
-- semirings
-- QuickCheck
 - vector
-- wl-pprint-text
 
 library:
   source-dirs: src

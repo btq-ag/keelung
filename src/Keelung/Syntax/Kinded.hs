@@ -21,7 +21,7 @@ module Keelung.Syntax.Kinded
 where
 
 import Data.Data
-import Data.Semiring (Ring (..), Semiring (..))
+-- import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
 
@@ -82,14 +82,14 @@ instance Num Field where
   signum = const (Integer 1)
   fromInteger = Integer
 
-instance Semiring Field where
-  plus = Add
-  times = Mul
-  zero = Integer 0
-  one = Integer 1
+-- instance Semiring Field where
+--   plus = Add
+--   times = Mul
+--   zero = Integer 0
+--   one = Integer 1
 
-instance Ring Field where
-  negate = id
+-- instance Ring Field where
+--   negate = id
 
 instance Fractional Field where
   fromRational = Rational
@@ -170,14 +170,14 @@ instance KnownNat w => Num (UInt w) where
       go :: forall width. KnownNat width => Integer -> UInt width
       go n = UInt (fromIntegral n)
 
-instance KnownNat w => Semiring (UInt w) where
-  plus = AddU
-  times = MulU
-  zero = 0
-  one = 1
+-- instance KnownNat w => Semiring (UInt w) where
+--   plus = AddU
+--   times = MulU
+--   zero = 0
+--   one = 1
 
-instance KnownNat w => Ring (UInt w) where
-  negate = id
+-- instance KnownNat w => Ring (UInt w) where
+--   negate = id
 
 -- instance Fractional Field where
 --   fromRational = Rational
