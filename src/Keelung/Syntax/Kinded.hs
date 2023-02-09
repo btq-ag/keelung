@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,7 +8,7 @@ module Keelung.Syntax.Kinded
     Boolean (..),
     UInt (..),
     widthOf,
-    Arr (..),
+    -- Arr (..),
     ArrM (..),
     Cmp (..),
     fieldToBool,
@@ -17,13 +16,11 @@ module Keelung.Syntax.Kinded
     true,
     false,
     neg,
-    has,
+    -- has,
   )
 where
 
-import Data.Array.Unboxed (Array)
 import Data.Data
-import Data.Foldable (toList)
 import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
@@ -253,11 +250,11 @@ instance Show Boolean where
 
 --------------------------------------------------------------------------------
 
-newtype Arr t = Arr (Array Int t)
-  deriving (Eq, Functor, Foldable, Traversable)
+-- newtype Arr t = Arr (Array Int t)
+--   deriving (Eq, Functor, Foldable, Traversable)
 
-instance Show t => Show (Arr t) where
-  showsPrec _prec (Arr arr) = showList (toList arr)
+-- instance Show t => Show (Arr t) where
+--   showsPrec _prec (Arr arr) = showList (toList arr)
 
 data ArrM t = ArrayRef ElemType Int Addr
   deriving (Eq)
@@ -302,5 +299,5 @@ instance KnownNat w => Cmp (UInt w) where
 neg :: Boolean -> Boolean
 neg x = true `Xor` x
 
-has :: Arr Field -> Field -> Boolean
-has arr n = foldl (\b a -> b `Or` (a `eq` n)) false arr
+-- has :: Arr Field -> Field -> Boolean
+-- has arr n = foldl (\b a -> b `Or` (a `eq` n)) false arr

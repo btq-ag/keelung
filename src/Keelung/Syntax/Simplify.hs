@@ -84,9 +84,9 @@ instance Encode () where
   encode expr = case expr of
     () -> return Unit
 
-instance Encode t => Encode (Kinded.Arr t) where
-  encode expr = case expr of
-    Kinded.Arr xs -> Array <$> mapM encode xs
+-- instance Encode t => Encode (Kinded.Arr t) where
+--   encode expr = case expr of
+--     Kinded.Arr xs -> Array <$> mapM encode xs
 
 instance Encode t => Encode (Kinded.ArrM t) where
   encode expr = case expr of

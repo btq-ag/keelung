@@ -43,20 +43,16 @@ tempConvert = do
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
 
-terminationProblem :: Comp (Arr (Arr Boolean))
-terminationProblem = return $ go "A"
+terminationProblem :: Comp [[Boolean]]
+terminationProblem = return $ map fromChar "A"
   where
     -- Construct a W8 from a Word8
-    fromWord8 :: Word8 -> Arr Boolean
-    fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
+    fromWord8 :: Word8 -> [Boolean]
+    fromWord8 word = Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- Construct a W8 from a Char
-    fromChar :: Char -> Arr Boolean
+    fromChar :: Char -> [Boolean]
     fromChar = fromWord8 . toEnum . fromEnum
-
-    -- Construct an array of W8s from a String
-    go :: String -> Arr (Arr Boolean)
-    go xs = toArray (map fromChar xs)
 
 -- |
 main :: IO ()
@@ -64,16 +60,16 @@ main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
   where
 
     -- | `fromWord8` implemented with immutable arrays
-    fromWord8' :: Word8 -> Arr Boolean
-    fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
+    fromWord8' :: Word8 -> [Boolean]
+    fromWord8' word = Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- | `fromChar` implemented with immutable arrays
-    fromChar' :: Char -> Arr Boolean
+    fromChar' :: Char -> [Boolean]
     fromChar' = fromWord8' . toEnum . fromEnum
 
     -- | `fromString` implemented with immutable arrays
-    fromString' :: String -> Arr (Arr Boolean)
-    fromString' = toArray . map fromChar'
+    fromString' :: String -> [[Boolean]]
+    fromString' = map fromChar'
 
     string :: Int -> String
     string n = concat $ replicate n "Hello world"
@@ -100,11 +96,11 @@ loop3 n m = do
   forM_ [0 .. n - 1] $ \i -> do
     -- for each term of signature
     forM_ [0 .. m - 1] $ \j -> do
-      let x = access2 xs (i, j)
-      let x' = access2 squares (i, j)
+      let x = xs !! i !! j
+      let x' = squares !! i !! j
       assert ((x' :: Field) `eq` (x * x))
 
-uint :: Comp (Arr Boolean)
+uint :: Comp [Boolean]
 uint = do
   x <- inputUInt @4
-  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
+  return [x !!! 0, x !!! 1, x !!! 2, x !!! 3]

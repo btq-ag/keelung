@@ -42,7 +42,7 @@ instance Ord BinRep where
 --    1. their bitwidth
 --    2. their corresponding variable
 newtype BinReps = BinReps {unBinReps :: IntMap (IntMap BinRep)}
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic)
 
 instance Serialize BinReps
 

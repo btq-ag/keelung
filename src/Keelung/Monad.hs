@@ -14,9 +14,9 @@ module Keelung.Monad
     -- * Array
     Mutable (updateM),
     toArrayM,
-    toArray,
-    toArray',
-    fromArray,
+    -- toArray,
+    -- toArray',
+    -- fromArray,
     fromArrayM,
     freeze,
     freeze2,
@@ -28,9 +28,9 @@ module Keelung.Monad
     accessM,
     accessM2,
     accessM3,
-    access,
-    access2,
-    access3,
+    -- access,
+    -- access2,
+    -- access3,
 
     -- * Inputs
     input,
@@ -56,9 +56,6 @@ where
 
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
-import Data.Array ((!))
-import Data.Array.Unboxed (Array)
-import qualified Data.Array.Unboxed as IArray
 import Data.Data (Proxy (..))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
@@ -236,20 +233,19 @@ toArrayM xs = do
       let kind = typeOf (head xs)
        in snd <$> allocArray kind xs
 
--- | Immutable version of `toArray`
-toArray :: [t] -> Arr t
-toArray xs = Arr $ IArray.listArray (0, length xs - 1) xs
+-- toArray :: [t] -> Arr t
+-- toArray xs = Arr $ IArray.listArray (0, length xs - 1) xs
 
 -- | Immutable version of `toArray`
-toArray' :: Array Int t -> Arr t
-toArray' = Arr
+-- toArray' :: Array Int t -> Arr t
+-- toArray' = Arr
 
 -- | Convert an array into a list of expressions
 fromArrayM :: Mutable t => ArrM t -> Comp [t]
 fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
 
-fromArray :: Arr t -> [t]
-fromArray (Arr xs) = toList xs
+-- fromArray :: Arr t -> [t]
+-- fromArray (Arr xs) = toList xs
 
 --------------------------------------------------------------------------------
 
@@ -260,47 +256,41 @@ inputList2 :: Proper t => Int -> Int -> Comp [[t]]
 inputList2 sizeM sizeN = replicateM sizeM (inputList sizeN)
 
 -- | Requests a 1D-array of fresh input variables
-inputs :: Proper t => Int -> Comp (Arr t)
-inputs size = do
-  vars <- replicateM size input
-  return $ toArray vars
+inputs :: Proper t => Int -> Comp [t]
+inputs size = replicateM size input
 
 -- | Requests a 2D-array of fresh input variables
-inputs2 :: Proper t => Int -> Int -> Comp (Arr (Arr t))
-inputs2 sizeM sizeN = do
-  vars <- replicateM sizeM (inputs sizeN)
-  return $ toArray vars
+inputs2 :: Proper t => Int -> Int -> Comp [[t]]
+inputs2 sizeM sizeN = replicateM sizeM (inputs sizeN)
 
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: Proper t => Int -> Int -> Int -> Comp (Arr (Arr (Arr t)))
-inputs3 sizeM sizeN sizeO = do
-  vars <- replicateM sizeM (inputs2 sizeN sizeO)
-  return $ toArray vars
+inputs3 :: Proper t => Int -> Int -> Int -> Comp [[[t]]]
+inputs3 sizeM sizeN sizeO = replicateM sizeM (inputs2 sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
 -- | Convert a mutable array to an immutable array
-freeze :: Mutable t => ArrM t -> Comp (Arr t)
-freeze xs = toArray <$> fromArrayM xs
+freeze :: Mutable t => ArrM t -> Comp [t]
+freeze = fromArrayM
 
-freeze2 :: Mutable t => ArrM (ArrM t) -> Comp (Arr (Arr t))
+freeze2 :: Mutable t => ArrM (ArrM t) -> Comp [[t]]
 freeze2 xs = do
   xs' <- fromArrayM xs
-  toArray <$> mapM freeze xs'
+  mapM freeze xs'
 
-freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp (Arr (Arr (Arr t)))
+freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp [[[t]]]
 freeze3 xs = do
   xs' <- fromArrayM xs
-  toArray <$> mapM freeze2 xs'
+  mapM freeze2 xs'
 
 -- | Convert an immutable array to a mutable array
-thaw :: Mutable t => Arr t -> Comp (ArrM t)
+thaw :: Mutable t => [t] -> Comp (ArrM t)
 thaw = toArrayM . toList
 
-thaw2 :: Mutable t => Arr (Arr t) -> Comp (ArrM (ArrM t))
+thaw2 :: Mutable t => [[t]] -> Comp (ArrM (ArrM t))
 thaw2 xs = mapM thaw (toList xs) >>= toArrayM
 
-thaw3 :: Mutable t => Arr (Arr (Arr t)) -> Comp (ArrM (ArrM (ArrM t)))
+thaw3 :: Mutable t => [[[t]]] -> Comp (ArrM (ArrM (ArrM t)))
 thaw3 xs = mapM thaw2 (toList xs) >>= toArrayM
 
 --------------------------------------------------------------------------------
@@ -396,19 +386,19 @@ accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
 accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
 
-access :: Arr t -> Int -> t
-access (Arr xs) i =
-  if i < length xs
-    then xs Data.Array.! i
-    else error $ show $ IndexOutOfBoundsError2 (length xs) i
+-- access :: Arr t -> Int -> t
+-- access (Arr xs) i =
+--   if i < length xs
+--     then xs Data.Array.! i
+--     else error $ show $ IndexOutOfBoundsError2 (length xs) i
 
--- | Access an element from a 2-D array
-access2 :: Arr (Arr t) -> (Int, Int) -> t
-access2 addr (i, j) = access (access addr i) j
+-- -- | Access an element from a 2-D array
+-- access2 :: Arr (Arr t) -> (Int, Int) -> t
+-- access2 addr (i, j) = access (access addr i) j
 
--- | Access an element from a 3-D array
-access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
-access3 addr (i, j, k) = access (access (access addr i) j) k
+-- -- | Access an element from a 3-D array
+-- access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
+-- access3 addr (i, j, k) = access (access (access addr i) j) k
 
 --------------------------------------------------------------------------------
 

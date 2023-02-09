@@ -12,21 +12,20 @@ import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
 
--- |
 main :: IO ()
 main = evaluate $ rnf $ elaborate (return $ fromString' (string 200000))
   where
     -- `fromWord8` implemented with immutable arrays
-    fromWord8' :: Word8 -> Arr Boolean
-    fromWord8' word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
+    fromWord8' :: Word8 -> [Boolean]
+    fromWord8' word = Prelude.map (Boolean . testBit word) [0 .. 7]
 
     -- `fromChar` implemented with immutable arrays
-    fromChar' :: Char -> Arr Boolean
+    fromChar' :: Char -> [Boolean]
     fromChar' = fromWord8' . toEnum . fromEnum
 
     -- `fromString` implemented with immutable arrays
-    fromString' :: String -> Arr (Arr Boolean)
-    fromString' = toArray . map fromChar'
+    fromString' :: String -> [[Boolean]]
+    fromString' = map fromChar'
 
     string :: Int -> String
     string n = concat $ replicate n "Hello world"
