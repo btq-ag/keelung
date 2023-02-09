@@ -11,8 +11,7 @@ import GHC.TypeLits (KnownNat)
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax qualified as Kinded
 import Keelung.Syntax.Encode.Syntax
-import Keelung.Types (Addr, Heap)
-import Keelung.Types qualified as Kinded
+import Keelung.Heap
 
 --------------------------------------------------------------------------------
 
@@ -84,9 +83,9 @@ instance Encode () where
   encode expr = case expr of
     () -> return Unit
 
-instance Encode t => Encode (Kinded.ArrM t) where
+instance Encode t => Encode (ArrM t) where
   encode expr = case expr of
-    Kinded.ArrayRef _ len addr -> readArray addr len
+    ArrayRef _ len addr -> readArray addr len
 
 instance Encode t => Encode [t] where
   encode xs = Array . Array.listArray (0, length xs - 1) <$> mapM encode xs
@@ -119,8 +118,8 @@ readArray addr len = Array <$> mapM (readHeap addr) indices
         Just (elemType, array) -> case IntMap.lookup i array of
           Nothing -> error "HeapM: index ouf of bounds"
           Just addr'' -> case elemType of
-            Kinded.ElemF -> return $ Field $ VarF addr''
-            Kinded.ElemB -> return $ Boolean $ VarB addr''
-            Kinded.ElemU w -> return $ UInt $ VarU w addr''
-            Kinded.ElemArr _ len' -> readArray addr'' len'
-            Kinded.EmptyArr -> readArray addr'' 0
+            ElemF -> return $ Field $ VarF addr''
+            ElemB -> return $ Boolean $ VarB addr''
+            ElemU w -> return $ UInt $ VarU w addr''
+            ElemArr _ len' -> readArray addr'' len'
+            EmptyArr -> readArray addr'' 0

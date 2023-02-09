@@ -8,7 +8,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Types (Addr)
+import Keelung.Heap (Addr)
 
 --------------------------------------------------------------------------------
 

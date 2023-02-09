@@ -64,7 +64,7 @@ import Keelung.Syntax
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode (encode', runHeapM)
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
-import Keelung.Types
+import Keelung.Heap
 import Prelude hiding (product, sum)
 
 --------------------------------------------------------------------------------

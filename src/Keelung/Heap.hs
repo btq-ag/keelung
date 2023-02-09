@@ -1,12 +1,11 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Types
-  ( Var,
-    Addr,
-    Width,
+module Keelung.Heap
+  ( Addr,
     Heap,
     ElemType (..),
+    ArrM (..),
   )
 where
 
@@ -14,17 +13,15 @@ import Control.DeepSeq (NFData)
 import Data.IntMap (IntMap)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-
---------------------------------------------------------------------------------
-
--- | A "Variable" is just a integer.
-type Var = Int
+import Keelung.Syntax (Width)
 
 -- | An "Address" is also just a integer.
 type Addr = Int
 
--- | Bit width
-type Width = Int
+--------------------------------------------------------------------------------
+
+data ArrM t = ArrayRef ElemType Int Addr
+  deriving (Eq)
 
 --------------------------------------------------------------------------------
 

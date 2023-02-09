@@ -33,13 +33,13 @@ library
       Keelung.Data.Struct
       Keelung.Error
       Keelung.Field
+      Keelung.Heap
       Keelung.Monad
       Keelung.Prof
       Keelung.Syntax
       Keelung.Syntax.Bits
       Keelung.Syntax.Encode
       Keelung.Syntax.Encode.Syntax
-      Keelung.Types
   other-modules:
       Keelung.Data.BinRep
       Keelung.Syntax.Counters

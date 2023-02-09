@@ -8,7 +8,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Types (Width)
+import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
 

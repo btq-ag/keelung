@@ -35,7 +35,7 @@ import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
-import Keelung.Types (Var)
+import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import Prelude qualified
 

@@ -6,7 +6,7 @@ module Keelung.Data.BinRep where
 import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Types (Var)
+import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
 

@@ -11,7 +11,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
-import Keelung.Types
+import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
 

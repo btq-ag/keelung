@@ -9,18 +9,18 @@ module Keelung.Syntax
     UInt (..),
     widthOf,
     -- Arr (..),
-    ArrM (..),
     Cmp (..),
     fieldToBool,
     uintToBool,
     true,
     false,
+    Var,
+    Width,
   )
 where
 
 import Data.Data
 import GHC.TypeNats
-import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -245,11 +245,6 @@ instance Show Boolean where
 
 --------------------------------------------------------------------------------
 
-data ArrM t = ArrayRef ElemType Int Addr
-  deriving (Eq)
-
---------------------------------------------------------------------------------
-
 -- | For converting from field elements to Booleans
 fieldToBool :: Field -> Boolean
 fieldToBool x = IfB (x `EqF` 0) false true
@@ -287,3 +282,11 @@ instance Cmp Field where
 instance KnownNat w => Cmp (UInt w) where
   eq = EqU
   neq x y = Not (x `eq` y)
+
+--------------------------------------------------------------------------------
+
+-- | A "Variable" is just a synonym for an 'Int'
+type Var = Int
+
+-- | Bit width
+type Width = Int
