@@ -8,26 +8,7 @@ module Keelung.Monad
   ( Comp,
     runComp,
     Computation (..),
-    emptyComputation,
     Elaborated (..),
-
-    -- * Array
-    Mutable (updateM),
-    toArrayM,
-    -- toArray,
-    -- toArray',
-    -- fromArray,
-    fromArrayM,
-    freeze,
-    freeze2,
-    freeze3,
-    thaw,
-    thaw2,
-    thaw3,
-    lengthOf,
-    accessM,
-    accessM2,
-    accessM3,
 
     -- * Inputs
     input,
@@ -40,6 +21,21 @@ module Keelung.Monad
     inputVec,
     inputVec2,
     inputVec3,
+
+    -- * Mutable Array
+    Mutable (updateM),
+    toArrayM,
+    fromArrayM,
+    lengthOf,
+    freeze,
+    freeze2,
+    freeze3,
+    thaw,
+    thaw2,
+    thaw3,
+    accessM,
+    accessM2,
+    accessM3,
 
     -- * Statements
     cond,
@@ -66,7 +62,7 @@ import Keelung.Data.Struct
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Simplify (encode', runHeapM)
+import Keelung.Syntax.Encode (encode', runHeapM)
 import Keelung.Syntax.Typed qualified as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
@@ -89,9 +85,6 @@ data Computation = Computation
     compDivModRelsU :: IntMap (Typed.UInt, Typed.UInt, Typed.UInt, Typed.UInt)
   }
   deriving (Eq)
-
-emptyComputation :: Computation
-emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
   show (Computation _ addrSize _ eb assertions _divModRelsU) =
@@ -189,7 +182,7 @@ class Proper t where
 instance Proper Field where
   input = inputField
 
-  -- | Specialized implementation for Field
+  -- \| Specialized implementation for Field
   inputList size = do
     start <- freshInputVar OfField size
     return $ map VarFI [start .. start + size - 1]
@@ -199,7 +192,7 @@ instance Proper Field where
 instance Proper Boolean where
   input = inputBool
 
-  -- | Specialized implementation for Boolean
+  -- \| Specialized implementation for Boolean
   inputList size = do
     start <- freshInputVar OfBoolean size
     return $ map VarBI [start .. start + size - 1]
@@ -209,7 +202,7 @@ instance Proper Boolean where
 instance KnownNat w => Proper (UInt w) where
   input = inputUInt
 
-  -- | Specialized implementation for UInt
+  -- \| Specialized implementation for UInt
   inputList size = do
     start <- freshInputVar (OfUInt width) size
     return $ map VarUI [start .. start + size - 1]

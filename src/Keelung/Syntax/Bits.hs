@@ -4,9 +4,6 @@
 -- | Like `Data.Bits` but with `Boolean` instead of `Bool`
 module Keelung.Syntax.Bits where
 
--- import qualified Data.Bits
--- import Data.Field.Galois
-
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
 
@@ -90,31 +87,3 @@ instance KnownNat w => Bits (UInt w) where
   shift expr i = ShLU (widthOf expr) i expr
   (!!!) = BitU
   complement = NotU
-
--- testBit :: a -> Int -> Boolean
--- testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then true else false
-
--- -- | All instances of Galois fields are also instances of `Bits`
--- --   `bitSize` will have to be calculated at runtime every time though,
--- --   It's recommended to declare specialized instances for each Galois fields
--- instance {-# OVERLAPPABLE #-} (GaloisField a, Integral a) => Bits a where
---   bitSize x = go 0 (order x)
---     where
---       go i n = if n == 0 then i else go (i + 1) (Data.Bits.unsafeRotateR n 1)
-
--- -- | Specialized instance for `B64`
--- instance {-# INCOHERENT #-} Bits B64 where
---   bitSize = const 64
-
--- -- | Specialized instance for `GF181`
--- instance {-# INCOHERENT #-} Bits GF181 where
---   bitSize = const 181
-
--- -- | Specialized instance for `BN128`
--- instance {-# INCOHERENT #-} Bits BN128 where
---   bitSize = const 254
-
--- --------------------------------------------------------------------------------
-
--- toBits :: (GaloisField a, Integral a) => a -> [Boolean]
--- toBits x = map (testBit x) [0 .. bitSize x - 1]

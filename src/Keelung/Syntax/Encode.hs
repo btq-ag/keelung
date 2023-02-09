@@ -2,17 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Simplify (Encode (..), runHeapM, encode') where
+module Keelung.Syntax.Encode (Encode (..), runHeapM, encode') where
 
 import Control.Monad.Reader
-import qualified Data.Array.Unboxed as Array
-import qualified Data.IntMap as IntMap
+import Data.Array.Unboxed qualified as Array
+import Data.IntMap qualified as IntMap
 import GHC.TypeLits (KnownNat)
 import Keelung.Syntax.Kinded (widthOf)
-import qualified Keelung.Syntax.Kinded as Kinded
+import Keelung.Syntax.Kinded qualified as Kinded
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap)
-import qualified Keelung.Types as Kinded
+import Keelung.Types qualified as Kinded
 
 --------------------------------------------------------------------------------
 
@@ -83,10 +83,6 @@ instance KnownNat w => Encode (Kinded.UInt w) where
 instance Encode () where
   encode expr = case expr of
     () -> return Unit
-
--- instance Encode t => Encode (Kinded.Arr t) where
---   encode expr = case expr of
---     Kinded.Arr xs -> Array <$> mapM encode xs
 
 instance Encode t => Encode (Kinded.ArrM t) where
   encode expr = case expr of

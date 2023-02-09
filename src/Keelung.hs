@@ -32,10 +32,10 @@ where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import qualified Data.ByteString.Char8 as BS
+import Data.ByteString.Char8 qualified as BS
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
-import qualified Data.Serialize as Serialize
+import Data.Serialize qualified as Serialize
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Error
@@ -43,12 +43,12 @@ import Keelung.Field
 import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Bits
-import Keelung.Syntax.Simplify
-import qualified Keelung.Syntax.Typed as Typed
-import qualified System.Directory as Path
-import qualified System.IO.Error as IO
-import qualified System.Info
-import qualified System.Process as Process
+import Keelung.Syntax.Encode
+import Keelung.Syntax.Typed qualified as Typed
+import System.Directory qualified as Path
+import System.IO.Error qualified as IO
+import System.Info qualified
+import System.Process qualified as Process
 import Text.Read (readMaybe)
 
 -- | Compile a program to a 'R1CS' constraint system.
@@ -213,7 +213,7 @@ bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 -- | Elaborate a program to the Kinded Syntax
 elaborate' :: Comp t -> Either Error (Elaborated t)
 elaborate' prog = do
-  (expr, comp') <- left ElabError $ runComp emptyComputation prog
+  (expr, comp') <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty) prog
   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
