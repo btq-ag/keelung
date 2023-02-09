@@ -47,6 +47,8 @@ library
       Paths_keelung
   hs-source-dirs:
       src
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array
@@ -68,6 +70,8 @@ executable tutorial
       Paths_keelung
   hs-source-dirs:
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array

@@ -1,21 +1,20 @@
 {-# LANGUAGE DataKinds #-}
--- {-# LANGUAGE RebindableSyntax #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <$>" #-}
 {-# HLINT ignore "Redundant return" #-}
 {-# LANGUAGE TypeApplications #-}
+-- {-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Main where
 
 -- import Control.Monad (forM_)
 
+import Control.DeepSeq (NFData (rnf))
+import Control.Exception (evaluate)
 import Control.Monad (forM_)
 import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
-import Control.DeepSeq (NFData(rnf))
-import Control.Exception (evaluate)
 
 -- import Control.Monad
 
@@ -54,20 +53,18 @@ terminationProblem = return $ map fromChar "A"
     fromChar :: Char -> [Boolean]
     fromChar = fromWord8 . toEnum . fromEnum
 
--- |
 main :: IO ()
 main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
   where
-
-    -- | `fromWord8` implemented with immutable arrays
+    -- \| `fromWord8` implemented with immutable arrays
     fromWord8' :: Word8 -> [Boolean]
     fromWord8' word = Prelude.map (Boolean . testBit word) [0 .. 7]
 
-    -- | `fromChar` implemented with immutable arrays
+    -- \| `fromChar` implemented with immutable arrays
     fromChar' :: Char -> [Boolean]
     fromChar' = fromWord8' . toEnum . fromEnum
 
-    -- | `fromString` implemented with immutable arrays
+    -- \| `fromString` implemented with immutable arrays
     fromString' :: String -> [[Boolean]]
     fromString' = map fromChar'
 
@@ -89,9 +86,9 @@ assertSquare = do
 
 loop3 :: Int -> Int -> Comp ()
 loop3 n m = do
-  xs <- inputs2 n m
+  xs <- inputList2 n m
   -- expecting square of signatures as input
-  squares <- inputs2 n m
+  squares <- inputList2 n m
   -- for each signature
   forM_ [0 .. n - 1] $ \i -> do
     -- for each term of signature

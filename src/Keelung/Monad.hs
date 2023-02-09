@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Keelung.Monad
   ( Comp,
@@ -28,9 +28,6 @@ module Keelung.Monad
     accessM,
     accessM2,
     accessM3,
-    -- access,
-    -- access2,
-    -- access3,
 
     -- * Inputs
     input,
@@ -39,9 +36,10 @@ module Keelung.Monad
     inputUInt,
     inputList,
     inputList2,
-    inputs,
-    inputs2,
-    inputs3,
+    inputList3,
+    inputVec,
+    inputVec2,
+    inputVec3,
 
     -- * Statements
     cond,
@@ -59,15 +57,17 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Traversable (mapAccumL)
+import Data.Vector (Vector)
+import Data.Vector qualified as Vec
 import GHC.TypeNats
 import Keelung.Data.Struct
 import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Simplify (encode', runHeapM)
-import qualified Keelung.Syntax.Typed as Typed
+import Keelung.Syntax.Typed qualified as Typed
 import Keelung.Types
 import Prelude hiding (product, sum)
 
@@ -95,7 +95,8 @@ emptyComputation = Computation mempty 0 mempty mempty mempty mempty
 
 instance Show Computation where
   show (Computation _ addrSize _ eb assertions _divModRelsU) =
-    "{\n" <> "  Address size: "
+    "{\n"
+      <> "  Address size: "
       <> show addrSize
       ++ "\n  Bindings to expressions: \n"
       ++ show eb
@@ -163,60 +164,71 @@ freshVarU width = do
   return index
 
 -- | Allocate a fresh input variable.
-freshVarFI :: Comp Var
-freshVarFI = do
+freshInputVar :: VarType -> Int -> Comp Var
+freshInputVar vt n = do
   counters <- gets compCounters
-  let index = getCount OfInput OfField counters
-  modifyCounter $ addCount OfInput OfField 1
-  return index
-
-freshVarBI :: Comp Var
-freshVarBI = do
-  counters <- gets compCounters
-  let index = getCount OfInput OfBoolean counters
-  modifyCounter $ addCount OfInput OfBoolean 1
-  return index
-
-freshVarUI :: Int -> Comp Var
-freshVarUI width = do
-  counters <- gets compCounters
-  let index = getCount OfInput (OfUInt width) counters
-  modifyCounter $ addCount OfInput (OfUInt width) 1
+  let index = getCount OfInput vt counters
+  modifyCounter $ addCount OfInput vt n
   return index
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for operations on base types
 class Proper t where
-  -- | Request a fresh input
+  -- | Request a single fresh input
   input :: Comp t
+
+  -- | Request a list of fresh inputs
+  --   default implementation simply applies `replicateM` on `input`
+  inputList :: Int -> Comp [t]
+  inputList size = replicateM size input
 
   -- | Conditional clause
   cond :: Boolean -> t -> t -> t
 
 instance Proper Field where
   input = inputField
+
+  -- | Specialized implementation for Field
+  inputList size = do
+    start <- freshInputVar OfField size
+    return $ map VarFI [start .. start + size - 1]
+
   cond = IfF
 
 instance Proper Boolean where
   input = inputBool
+
+  -- | Specialized implementation for Boolean
+  inputList size = do
+    start <- freshInputVar OfBoolean size
+    return $ map VarBI [start .. start + size - 1]
+
   cond = IfB
 
 instance KnownNat w => Proper (UInt w) where
   input = inputUInt
+
+  -- | Specialized implementation for UInt
+  inputList size = do
+    start <- freshInputVar (OfUInt width) size
+    return $ map VarUI [start .. start + size - 1]
+    where
+      width = fromIntegral (natVal (Proxy :: Proxy w))
+
   cond = IfU
 
--- | Requests a fresh Num input variable
+-- | Requests a fresh Field input variable
 inputField :: Comp Field
-inputField = VarFI <$> freshVarFI
+inputField = VarFI <$> freshInputVar OfField 1
 
--- | Requests a fresh Bool input variable
+-- | Requests a fresh Boolean input variable
 inputBool :: Comp Boolean
-inputBool = VarBI <$> freshVarBI
+inputBool = VarBI <$> freshInputVar OfBoolean 1
 
--- | Requests a fresh Unsigned integer input variable of some bit width
+-- | Requests a fresh UInt input variable of some bit width
 inputUInt :: forall w. KnownNat w => Comp (UInt w)
-inputUInt = VarUI <$> freshVarUI width
+inputUInt = VarUI <$> freshInputVar (OfUInt width) 1
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
@@ -233,39 +245,33 @@ toArrayM xs = do
       let kind = typeOf (head xs)
        in snd <$> allocArray kind xs
 
--- toArray :: [t] -> Arr t
--- toArray xs = Arr $ IArray.listArray (0, length xs - 1) xs
-
--- | Immutable version of `toArray`
--- toArray' :: Array Int t -> Arr t
--- toArray' = Arr
-
 -- | Convert an array into a list of expressions
 fromArrayM :: Mutable t => ArrM t -> Comp [t]
 fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
 
--- fromArray :: Arr t -> [t]
--- fromArray (Arr xs) = toList xs
-
 --------------------------------------------------------------------------------
 
-inputList :: Proper t => Int -> Comp [t]
-inputList size = replicateM size input
-
+-- | Requests a 2D-array of fresh input variables
 inputList2 :: Proper t => Int -> Int -> Comp [[t]]
 inputList2 sizeM sizeN = replicateM sizeM (inputList sizeN)
 
--- | Requests a 1D-array of fresh input variables
-inputs :: Proper t => Int -> Comp [t]
-inputs size = replicateM size input
-
--- | Requests a 2D-array of fresh input variables
-inputs2 :: Proper t => Int -> Int -> Comp [[t]]
-inputs2 sizeM sizeN = replicateM sizeM (inputs sizeN)
-
 -- | Requests a 3D-array of fresh input variables
-inputs3 :: Proper t => Int -> Int -> Int -> Comp [[[t]]]
-inputs3 sizeM sizeN sizeO = replicateM sizeM (inputs2 sizeN sizeO)
+inputList3 :: Proper t => Int -> Int -> Int -> Comp [[[t]]]
+inputList3 sizeM sizeN sizeO = replicateM sizeM (inputList2 sizeN sizeO)
+
+--------------------------------------------------------------------------------
+
+-- | Vector version of 'inputs'
+inputVec :: Proper t => Int -> Comp (Vector t)
+inputVec size = Vec.fromList <$> inputList size
+
+-- | Vector version of 'inputs2'
+inputVec2 :: Proper t => Int -> Int -> Comp (Vector (Vector t))
+inputVec2 sizeM sizeN = Vec.fromList <$> replicateM sizeM (inputVec sizeN)
+
+-- | Vector version of 'inputs3'
+inputVec3 :: Proper t => Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
+inputVec3 sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
@@ -385,20 +391,6 @@ accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 -- | Access an element from a 3-D array
 accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
 accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
-
--- access :: Arr t -> Int -> t
--- access (Arr xs) i =
---   if i < length xs
---     then xs Data.Array.! i
---     else error $ show $ IndexOutOfBoundsError2 (length xs) i
-
--- -- | Access an element from a 2-D array
--- access2 :: Arr (Arr t) -> (Int, Int) -> t
--- access2 addr (i, j) = access (access addr i) j
-
--- -- | Access an element from a 3-D array
--- access3 :: Arr (Arr (Arr t)) -> (Int, Int, Int) -> t
--- access3 addr (i, j, k) = access (access (access addr i) j) k
 
 --------------------------------------------------------------------------------
 
