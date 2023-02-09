@@ -15,32 +15,37 @@ module Keelung.Syntax
     uintToBool,
     true,
     false,
-    neg,
-    -- has,
   )
 where
 
 import Data.Data
--- import Data.Semiring (Ring (..), Semiring (..))
 import GHC.TypeNats
 import Keelung.Types
 
 --------------------------------------------------------------------------------
 
--- | Field elements
+-- | Field elements.
+--   The choice of the underlying field is left to be decided during the compilation.
 data Field
-  = Integer Integer -- Integers
-  | Rational Rational -- Rationals
-  | VarF Var -- Variables
-  | VarFI Var -- Input Variables
-  | -- Arithmetic operators on field elements
+  = -- | Integral values
+    Integer Integer
+  | -- | Rational values
+    Rational Rational
+  | -- | Field element variables
+    VarF Var
+  | -- | Field element input variables
+    VarFI Var
+  | -- | Addition
     Add Field Field
-  | Sub Field Field
-  | Mul Field Field
-  | Div Field Field
-  | -- Conditionals
+  | -- | Subtraction
+    Sub Field Field
+  | -- | Multiplication
+    Mul Field Field
+  | -- | Division (without remainders)
+    Div Field Field
+  | -- | Conditional that returns a Field element
     IfF Boolean Field Field
-  | -- Conversion between types
+  | -- | Conversion from Booleans to Field elements
     BtoF Boolean
 
 instance Eq Field where
@@ -54,9 +59,6 @@ instance Eq Field where
   Div x1 x2 == Div y1 y2 = x1 == y1 && x2 == y2
   IfF x1 x2 x3 == IfF y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
   BtoF x == BtoF y = x == y
-  -- FromU x == FromU y = case sameNat x y of
-  --   Just Refl -> x == y
-  --   Nothing -> False
   _ == _ = False
 
 instance Show Field where
@@ -82,40 +84,42 @@ instance Num Field where
   signum = const (Integer 1)
   fromInteger = Integer
 
--- instance Semiring Field where
---   plus = Add
---   times = Mul
---   zero = Integer 0
---   one = Integer 1
-
--- instance Ring Field where
---   negate = id
-
 instance Fractional Field where
   fromRational = Rational
   (/) = Div
 
 --------------------------------------------------------------------------------
 
--- | Unsigned Integers
+-- | Unsigned Integers.
+--   The bit width is annotated by a type-level natural that is known at compile time.
 data UInt (w :: Nat)
-  = UInt Integer -- Integers
-  | VarU Var -- Unsigned Integer Variables
-  | VarUI Var -- Input Unsigned Integer Variables
-  -- Numeric operators on unsigned integers
-  | AddU (UInt w) (UInt w)
-  | SubU (UInt w) (UInt w)
-  | MulU (UInt w) (UInt w)
-  | -- Bitwise operators on unsigned integers
+  = -- | Unsigned integers values
+    UInt Integer
+  | -- | Unsigned integer variables
+    VarU Var
+  | -- | Unsigned integer input variables
+    VarUI Var
+  | -- | Addition
+    AddU (UInt w) (UInt w)
+  | -- | Subtraction
+    SubU (UInt w) (UInt w)
+  | -- | Multiplication
+    MulU (UInt w) (UInt w)
+  | -- | Bitwise conjunction
     AndU (UInt w) (UInt w)
-  | OrU (UInt w) (UInt w)
-  | XorU (UInt w) (UInt w)
-  | NotU (UInt w)
-  | RoLU Width Int (UInt w)
-  | ShLU Width Int (UInt w)
-  | -- Conditionals
+  | -- | Bitwise disjunction
+    OrU (UInt w) (UInt w)
+  | -- | Bitwise exclusive disjunction
+    XorU (UInt w) (UInt w)
+  | -- | Bitwise complement
+    NotU (UInt w)
+  | -- | Rotate left
+    RoLU Width Int (UInt w)
+  | -- | Shift left
+    ShLU Width Int (UInt w)
+  | -- | Conditional that returns an unsigned integer
     IfU Boolean (UInt w) (UInt w)
-  | -- Conversion between types
+  | -- | Conversion from Booleans to Unsigned integers
     BtoU Boolean
   deriving (Eq)
 
@@ -164,24 +168,7 @@ instance KnownNat w => Num (UInt w) where
   -- law of `signum`: abs x * signum x == x
   signum _ = UInt 1
 
-  fromInteger = go
-    where
-      -- width = natVal (Proxy :: Proxy w)
-      go :: forall width. KnownNat width => Integer -> UInt width
-      go n = UInt (fromIntegral n)
-
--- instance KnownNat w => Semiring (UInt w) where
---   plus = AddU
---   times = MulU
---   zero = 0
---   one = 1
-
--- instance KnownNat w => Ring (UInt w) where
---   negate = id
-
--- instance Fractional Field where
---   fromRational = Rational
---   (/) = Div
+  fromInteger n = UInt (fromIntegral n)
 
 --------------------------------------------------------------------------------
 
@@ -196,21 +183,29 @@ instance KnownNat w => HasWidth (UInt w) where
 
 -- | Booleans
 data Boolean
-  = Boolean Bool
-  | VarB Var -- Boolean Variables
-  | VarBI Var -- Input Boolean Variables
-  | -- Operators on Booleans
+  = -- | Boolean values
+    Boolean Bool
+  | -- | Boolean variables
+    VarB Var
+  | -- | Boolean input variables
+    VarBI Var
+  | -- | Conjunction
     And Boolean Boolean
-  | Or Boolean Boolean
-  | Xor Boolean Boolean
-  | Not Boolean
-  | -- Equalities
+  | -- | Disjunction
+    Or Boolean Boolean
+  | -- | Exclusive disjunction
+    Xor Boolean Boolean
+  | -- | Complement
+    Not Boolean
+  | -- | Equality on Booleans
     EqB Boolean Boolean
-  | EqF Field Field
-  | forall w. KnownNat w => EqU (UInt w) (UInt w)
-  | -- Conditionals
+  | -- | Equality on Field elements
+    EqF Field Field
+  | -- | Equality on Unsigned integers
+    forall w. KnownNat w => EqU (UInt w) (UInt w)
+  | -- | Conditional that returns a Boolean
     IfB Boolean Boolean Boolean
-  | -- Bit tests on other types
+  | -- | Bit test on Unsigned integers
     forall w. KnownNat w => BitU (UInt w) Int
 
 instance Eq Boolean where
@@ -250,38 +245,35 @@ instance Show Boolean where
 
 --------------------------------------------------------------------------------
 
--- newtype Arr t = Arr (Array Int t)
---   deriving (Eq, Functor, Foldable, Traversable)
-
--- instance Show t => Show (Arr t) where
---   showsPrec _prec (Arr arr) = showList (toList arr)
-
 data ArrM t = ArrayRef ElemType Int Addr
   deriving (Eq)
 
 --------------------------------------------------------------------------------
 
--- | For converting field elements to Booleans
+-- | For converting from field elements to Booleans
 fieldToBool :: Field -> Boolean
 fieldToBool x = IfB (x `EqF` 0) false true
 
--- | For converting unsigned integers to Booleans
+-- | For converting from unsigned integers to Booleans
 uintToBool :: KnownNat w => UInt w -> Boolean
 uintToBool x = IfB (x `EqU` 0) false true
 
--- | Smart constructor for 'True'
+-- | Smart constructor for 'Boolean True'
 true :: Boolean
 true = Boolean True
 
--- | Smart constructor for 'False'
+-- | Smart constructor for 'Boolean False'
 false :: Boolean
 false = Boolean False
 
--- | Helper function for negating a boolean expression
--- complement :: Boolean -> Boolean
--- complement x = true `Xor` x
+--------------------------------------------------------------------------------
+
+-- | Typeclass for comparing values
 class Cmp a where
+  -- | Equality
   eq :: a -> a -> Boolean
+
+  -- | Inequality
   neq :: a -> a -> Boolean
 
 instance Cmp Boolean where
@@ -295,9 +287,3 @@ instance Cmp Field where
 instance KnownNat w => Cmp (UInt w) where
   eq = EqU
   neq x y = Not (x `eq` y)
-
-neg :: Boolean -> Boolean
-neg x = true `Xor` x
-
--- has :: Arr Field -> Field -> Boolean
--- has arr n = foldl (\b a -> b `Or` (a `eq` n)) false arr
