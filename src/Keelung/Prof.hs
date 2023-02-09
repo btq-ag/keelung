@@ -1,11 +1,12 @@
-module Keelung.Prof (
-    compileProf,
-    compileProfWithOpts
-) where
+module Keelung.Prof
+  ( compileProf,
+    compileProfWithOpts,
+  )
+where
 
 import Keelung
-import Keelung.Error
 import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Error
 
 compileProf :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileProf = compileProfWithOpts 1 [] []

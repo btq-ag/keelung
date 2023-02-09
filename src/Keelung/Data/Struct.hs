@@ -5,7 +5,7 @@ module Keelung.Data.Struct where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Syntax (Width)

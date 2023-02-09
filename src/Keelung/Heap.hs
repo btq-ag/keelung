@@ -6,6 +6,7 @@ module Keelung.Heap
     Heap,
     ElemType (..),
     ArrM (..),
+    lengthOf,
   )
 where
 
@@ -15,13 +16,18 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Syntax (Width)
 
--- | An "Address" is also just a integer.
-type Addr = Int
+-- | A mutable array
+data ArrM t = ArrayRef ElemType Int Addr
+  deriving (Eq)
+
+-- | Length of a mutable array
+lengthOf :: ArrM t -> Int
+lengthOf ((ArrayRef _ len _)) = len
 
 --------------------------------------------------------------------------------
 
-data ArrM t = ArrayRef ElemType Int Addr
-  deriving (Eq)
+-- | An "Address" is also just a integer.
+type Addr = Int
 
 --------------------------------------------------------------------------------
 

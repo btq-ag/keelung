@@ -10,8 +10,8 @@ import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Syntax.Counters
 import Keelung.Syntax (Var)
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 

@@ -6,9 +6,9 @@
 
 module Keelung.Monad
   ( Comp,
-    runComp,
     Computation (..),
     Elaborated (..),
+    elaborate,
 
     -- * Inputs
     input,
@@ -26,7 +26,6 @@ module Keelung.Monad
     Mutable (updateM),
     toArrayM,
     fromArrayM,
-    lengthOf,
     freeze,
     freeze2,
     freeze3,
@@ -38,16 +37,17 @@ module Keelung.Monad
     accessM3,
 
     -- * Statements
+    Reusable (..),
     cond,
     assert,
     mapI,
     reduce,
-    reuse,
     performDivMod,
     assertDivMod,
   )
 where
 
+import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
@@ -57,15 +57,14 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Traversable (mapAccumL)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vec
-import GHC.TypeNats
+import GHC.TypeNats (KnownNat, natVal)
 import Keelung.Data.Struct
 import Keelung.Error
+import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode (encode', runHeapM)
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
-import Keelung.Heap
-import Prelude hiding (product, sum)
 
 --------------------------------------------------------------------------------
 
@@ -125,6 +124,12 @@ instance Show t => Show (Elaborated t) where
 
 -- | The type of a Keelung program
 type Comp = StateT Computation (Except ElabError)
+
+-- | Elaborates a Keelung program
+elaborate :: Comp t -> Either Error (Elaborated t)
+elaborate prog = do
+  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty) prog
+  return $ Elaborated expr comp
 
 -- | How to run the 'Comp' monad
 runComp :: Computation -> Comp a -> Either ElabError (a, Computation)
@@ -227,10 +232,6 @@ inputUInt :: forall w. KnownNat w => Comp (UInt w)
 inputUInt = VarUI <$> freshInputVar (OfUInt width) 1
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
-
---------------------------------------------------------------------------------
--- Array & Input Array
---------------------------------------------------------------------------------
 
 -- | Converts a list of values to an 1D-array
 toArrayM :: Mutable t => [t] -> Comp (ArrM t)
@@ -441,10 +442,6 @@ reduce a xs f = foldM f a xs
 -- | Map with index, basically 'mapi' in OCaml.
 mapI :: Traversable f => (Int -> a -> b) -> f a -> f b
 mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
-
--- | Length of a mutable array
-lengthOf :: ArrM t -> Int
-lengthOf ((ArrayRef _ len _)) = len
 
 --------------------------------------------------------------------------------
 

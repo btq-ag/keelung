@@ -4,7 +4,8 @@ module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
     module Keelung.Monad,
-    module Keelung.Syntax.Bits,
+    module Keelung.Heap,
+    module Keelung.Data.Bits,
     run,
     compile,
     compileO0,
@@ -22,27 +23,26 @@ module Keelung
     gf181,
     bn128,
     b64,
-    elaborate',
-    elaborate,
+    elaborateAndEncode,
     Encode,
     GaloisField,
     keelungVersion,
   )
 where
 
-import Control.Arrow (left)
 import Control.Monad.Except
 import Data.ByteString.Char8 qualified as BS
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import Data.Serialize qualified as Serialize
 import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Data.Bits
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Error
 import Keelung.Field
+import Keelung.Heap
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Syntax.Bits
 import Keelung.Syntax.Encode
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
@@ -50,6 +50,8 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+
+--------------------------------------------------------------------------------
 
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
@@ -64,7 +66,7 @@ compileO2 = compileWithOpts 2 [] []
 -- The first argument speficies an optimization level.
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
-  elab <- liftEither (elaborate prog)
+  elab <- liftEither (elaborateAndEncode prog)
   let opts' = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
   case fieldType of
     GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
@@ -157,7 +159,7 @@ verify fieldType prog inputs' = do
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuit fieldType prog = do
-  elab <- liftEither (elaborate prog)
+  elab <- liftEither (elaborateAndEncode prog)
   case fieldType of
     GF181 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS GF181))
     BN128 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS BN128))
@@ -166,7 +168,7 @@ genCircuit fieldType prog = do
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> M [n]
 genWitness_ fieldType prog xs = do
-  elab <- liftEither (elaborate prog)
+  elab <- liftEither (elaborateAndEncode prog)
   wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
 
 genParameters :: M ()
@@ -179,7 +181,7 @@ genWitness fieldType prog xs = runM (genWitness_ fieldType prog xs) >>= printErr
 
 interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
 interpret_ fieldType prog xs = runM $ do
-  elab <- liftEither (elaborate prog)
+  elab <- liftEither (elaborateAndEncode prog)
   wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
 
 printErrorInstead :: Show e => Either e [a] -> IO [a]
@@ -210,15 +212,9 @@ bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program to the Kinded Syntax
-elaborate' :: Comp t -> Either Error (Elaborated t)
-elaborate' prog = do
-  (expr, comp') <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty) prog
-  return $ Elaborated expr comp'
-
 -- | Elaborate a program and convert it to the Typed Syntax
-elaborate :: Encode t => Comp t -> Either Error Encoding.Elaborated
-elaborate prog = encodeElaborated <$> elaborate' prog
+elaborateAndEncode :: Encode t => Comp t -> Either Error Encoding.Elaborated
+elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where
     encodeElaborated :: Encode t => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do

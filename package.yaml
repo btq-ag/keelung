@@ -35,9 +35,8 @@ dependencies:
 library:
   source-dirs: src
 
-  other-modules:
-    - Keelung.Data.BinRep
-    - Keelung.Syntax.Counters
+  # other-modules:
+  #   - Keelung.Data.BinRep
 
 default-extensions:
   - ImportQualifiedPost

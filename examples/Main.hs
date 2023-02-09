@@ -54,7 +54,7 @@ terminationProblem = return $ map fromChar "A"
     fromChar = fromWord8 . toEnum . fromEnum
 
 main :: IO ()
-main = evaluate $ rnf $ elaborate (return $ fromString' (string 400000))
+main = evaluate $ rnf $ elaborateAndEncode (return $ fromString' (string 400000))
   where
     -- \| `fromWord8` implemented with immutable arrays
     fromWord8' :: Word8 -> [Boolean]

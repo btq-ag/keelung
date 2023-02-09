@@ -38,8 +38,8 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.BinRep (BinRep (..))
+import Keelung.Data.Struct (Struct (..))
 
 ------------------------------------------------------------------------------
 

@@ -8,10 +8,10 @@ import Control.Monad.Reader
 import Data.Array.Unboxed qualified as Array
 import Data.IntMap qualified as IntMap
 import GHC.TypeLits (KnownNat)
+import Keelung.Heap
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax qualified as Kinded
 import Keelung.Syntax.Encode.Syntax
-import Keelung.Heap
 
 --------------------------------------------------------------------------------
 

@@ -11,8 +11,8 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.Struct
 import Keelung.Field (FieldType)
-import Keelung.Syntax.Counters
 import Keelung.Syntax (Var, Width)
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 

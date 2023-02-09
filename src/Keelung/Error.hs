@@ -5,7 +5,7 @@ module Keelung.Error where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Heap (Addr)
@@ -53,7 +53,9 @@ instance Serialize ElabError
 
 instance Show ElabError where
   show (IndexOutOfBoundsError addr i array) =
-    "Index " ++ show i ++ " out of bounds for array #"
+    "Index "
+      ++ show i
+      ++ " out of bounds for array #"
       ++ show addr
       ++ " of length "
       ++ show (IntMap.size array)

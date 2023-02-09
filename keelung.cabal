@@ -28,6 +28,8 @@ library
       Keelung
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
+      Keelung.Data.BinRep
+      Keelung.Data.Bits
       Keelung.Data.N
       Keelung.Data.Polynomial
       Keelung.Data.Struct
@@ -37,12 +39,11 @@ library
       Keelung.Monad
       Keelung.Prof
       Keelung.Syntax
-      Keelung.Syntax.Bits
+      Keelung.Syntax.Counters
       Keelung.Syntax.Encode
       Keelung.Syntax.Encode.Syntax
   other-modules:
-      Keelung.Data.BinRep
-      Keelung.Syntax.Counters
+      Paths_keelung
   hs-source-dirs:
       src
   default-extensions:

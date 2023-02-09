@@ -2,7 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Like `Data.Bits` but with `Boolean` instead of `Bool`
-module Keelung.Syntax.Bits where
+module Keelung.Data.Bits where
 
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax

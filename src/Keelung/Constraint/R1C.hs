@@ -6,12 +6,12 @@ module Keelung.Constraint.R1C where
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.Polynomial (Poly)
-import qualified Keelung.Data.Polynomial as Poly
+import Keelung.Data.Polynomial qualified as Poly
 
 --------------------------------------------------------------------------------
 
@@ -89,7 +89,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (R1C n) where
 satisfy :: GaloisField a => R1C a -> IntMap a -> Bool
 satisfy constraint assignment
   | R1C aV bV cV <- constraint =
-    evaluate aV assignment * evaluate bV assignment == evaluate cV assignment
+      evaluate aV assignment * evaluate bV assignment == evaluate cV assignment
   where
     evaluate :: GaloisField a => Either a (Poly a) -> IntMap a -> a
     evaluate (Left x) _ = x
