@@ -2,9 +2,9 @@ name:                keelung
 version:             0.1.0.0
 github:              "btq-ag/keelung"
 license:             BSD3
-author:              "Ting-GIan LUA"
+author:              " BTQ AG"
 maintainer:          "ty.lai@btq.li"
-copyright:           "2022 BTQ AG"
+copyright:           "2023 BTQ AG"
 
 extra-source-files:
 - README.md
@@ -60,31 +60,3 @@ executables:
       - -with-rtsopts=-N
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
-
-benchmarks:
-  profile:
-    main:                Main.hs
-    source-dirs:        
-      - benchmarks/
-    dependencies:
-    - keelung
-
-    ghc-options:
-      - -Wall
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-      - -Werror=incomplete-patterns
-      - -fno-warn-orphans
-
-
-tests:
-  keelung-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - keelung

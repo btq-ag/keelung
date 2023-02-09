@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -9,9 +9,9 @@ version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
 homepage:       https://github.com/btq-ag/keelung#readme
 bug-reports:    https://github.com/btq-ag/keelung/issues
-author:         Ting-GIan LUA
+author:          BTQ AG
 maintainer:     ty.lai@btq.li
-copyright:      2022 BTQ AG
+copyright:      2023 BTQ AG
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -73,62 +73,6 @@ executable tutorial
       Paths_keelung
   hs-source-dirs:
       examples/
-  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
-  build-depends:
-      QuickCheck
-    , array
-    , base >=4.7 && <5
-    , bytestring
-    , cereal
-    , containers
-    , deepseq
-    , directory
-    , galois-field
-    , groups
-    , keelung
-    , mtl
-    , process
-    , random
-    , semirings
-    , vector
-    , wl-pprint-text
-  default-language: Haskell2010
-
-test-suite keelung-test
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Paths_keelung
-  hs-source-dirs:
-      test
-  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      QuickCheck
-    , array
-    , base >=4.7 && <5
-    , bytestring
-    , cereal
-    , containers
-    , deepseq
-    , directory
-    , galois-field
-    , groups
-    , keelung
-    , mtl
-    , process
-    , random
-    , semirings
-    , vector
-    , wl-pprint-text
-  default-language: Haskell2010
-
-benchmark profile
-  type: exitcode-stdio-1.0
-  main-is: Main.hs
-  other-modules:
-      Paths_keelung
-  hs-source-dirs:
-      benchmarks/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       QuickCheck
