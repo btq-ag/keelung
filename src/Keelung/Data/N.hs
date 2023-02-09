@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module Keelung.Field.N where
+module Keelung.Data.N where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField (..))

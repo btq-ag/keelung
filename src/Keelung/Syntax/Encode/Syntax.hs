@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Syntax.Typed where
+module Keelung.Syntax.Encode.Syntax where
 
 import Control.DeepSeq (NFData)
 import Data.Array.Unboxed (Array)
@@ -189,31 +189,16 @@ instance Show Elaborated where
           then ""
           else "  Assertions: \n" <> unlines (map (("    " <>) . show) assertions) <> "\n"
 
+      prettyList2 :: Show a => Int -> [a] -> String
+      prettyList2 n list = case list of
+        [] -> "[]"
+        [x] -> "[" <> show x <> "]"
+        (x : xs) ->
+          unlines $
+            map (replicate n ' ' <>) $
+              "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
+
 instance Serialize Elaborated
-
--- | Prettify list of stuff
-prettyList :: Show a => [a] -> [String]
-prettyList [] = ["[]"]
-prettyList [x] = ["[" <> show x <> "]"]
-prettyList (x : xs) = "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
-
-prettyList2 :: Show a => Int -> [a] -> String
-prettyList2 n list = case list of
-  [] -> "[]"
-  [x] -> "[" <> show x <> "]"
-  (x : xs) ->
-    unlines $
-      map (replicate n ' ' <>) $
-        "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
-
-prettyList3 :: Int -> [String] -> String
-prettyList3 n list = case list of
-  [] -> ""
-  [x] -> "[" <> x <> "]\n"
-  (x : xs) ->
-    unlines $
-      map (replicate n ' ' <>) $
-        "" : "[ " <> x : map (", " <>) xs <> ["]\n"]
 
 --------------------------------------------------------------------------------
 

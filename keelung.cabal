@@ -26,25 +26,23 @@ source-repository head
 library
   exposed-modules:
       Keelung
-      Keelung.Constraint.Polynomial
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
+      Keelung.Data.N
+      Keelung.Data.Polynomial
       Keelung.Data.Struct
       Keelung.Error
       Keelung.Field
-      Keelung.Field.N
       Keelung.Monad
       Keelung.Prof
       Keelung.Syntax
-      Keelung.Syntax.BinRep
       Keelung.Syntax.Bits
-      Keelung.Syntax.Counters
       Keelung.Syntax.Encode
-      Keelung.Syntax.Kinded
-      Keelung.Syntax.Typed
+      Keelung.Syntax.Encode.Syntax
       Keelung.Types
   other-modules:
-      Paths_keelung
+      Keelung.Data.BinRep
+      Keelung.Syntax.Counters
   hs-source-dirs:
       src
   default-extensions:

@@ -33,13 +33,13 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Data.Struct ( Struct(..) )
-import Keelung.Syntax.BinRep (BinRep (..))
+import Keelung.Data.Struct (Struct (..))
+import Keelung.Data.BinRep (BinRep (..))
 
 ------------------------------------------------------------------------------
 
@@ -188,7 +188,8 @@ offsetOfType :: SmallCounters -> VarType -> Int -> Int
 offsetOfType _ OfField index = index
 offsetOfType (Struct f _ _) OfBoolean index = f + index
 offsetOfType (Struct f b u) (OfUIntBinRep width) index =
-  f + b
+  f
+    + b
     + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
     + width * index
 offsetOfType (Struct f b u) (OfUInt width) index = f + b + binRepSize u + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
@@ -280,7 +281,9 @@ prettyVariables counters@(Counters o i _ _ _) =
    in if totalSize == 0
         then ""
         else
-          "  Variables (" <> show totalSize <> "):\n\n"
+          "  Variables ("
+            <> show totalSize
+            <> "):\n\n"
             <> ouputVars
             <> inputVars
             <> "\n"
@@ -308,7 +311,9 @@ prettyConstraints counters cs =
       if ordinaryConstraintSize == 0
         then ""
         else
-          "    Ordinary constriants (" <> show ordinaryConstraintSize <> "):\n\n"
+          "    Ordinary constriants ("
+            <> show ordinaryConstraintSize
+            <> "):\n\n"
             <> unlines (map (\x -> "      " <> show x) cs)
             <> "\n"
 
@@ -317,7 +322,9 @@ prettyConstraints counters cs =
       if booleanConstraintSize == 0
         then ""
         else
-          "    Boolean constriants (" <> show booleanConstraintSize <> "):\n\n"
+          "    Boolean constriants ("
+            <> show booleanConstraintSize
+            <> "):\n\n"
             <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
             <> "\n"
 
@@ -326,7 +333,9 @@ prettyConstraints counters cs =
       if totalBinRepConstraintSize == 0
         then ""
         else
-          "    Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
+          "    Binary representation constriants ("
+            <> show totalBinRepConstraintSize
+            <> "):\n\n"
             <> unlines (map ("      " <>) (prettyBinRepConstraints counters))
             <> "\n"
 

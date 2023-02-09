@@ -63,7 +63,7 @@ import Keelung.Error
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode (encode', runHeapM)
-import Keelung.Syntax.Typed qualified as Typed
+import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import Keelung.Types
 import Prelude hiding (product, sum)
 
@@ -78,11 +78,11 @@ data Computation = Computation
     -- Heap for arrays
     compHeap :: Heap,
     -- Bindings to expressions
-    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Typed.UInt),
+    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Encoding.UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
     -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap (Typed.UInt, Typed.UInt, Typed.UInt, Typed.UInt)
+    compDivModRelsU :: IntMap (Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)
   }
   deriving (Eq)
 
@@ -117,6 +117,9 @@ instance Show t => Show (Elaborated t) where
       ++ "\n  compuation state: \n"
       ++ indent (indent (show comp))
       ++ "\n}"
+    where
+      indent :: String -> String
+      indent = unlines . map ("  " <>) . lines
 
 --------------------------------------------------------------------------------
 
@@ -479,7 +482,7 @@ assignF var expr = modify' $ \st -> st {compExprBindings = updateF (IntMap.inser
 assignB :: Var -> Boolean -> Comp ()
 assignB var expr = modify' $ \st -> st {compExprBindings = updateB (IntMap.insert var expr) (compExprBindings st)}
 
-assignU :: Width -> Var -> Typed.UInt -> Comp ()
+assignU :: Width -> Var -> Encoding.UInt -> Comp ()
 assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st)}
 
 --------------------------------------------------------------------------------

@@ -44,7 +44,7 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Bits
 import Keelung.Syntax.Encode
-import Keelung.Syntax.Typed qualified as Typed
+import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
 import System.IO.Error qualified as IO
 import System.Info qualified
@@ -217,15 +217,15 @@ elaborate' prog = do
   return $ Elaborated expr comp'
 
 -- | Elaborate a program and convert it to the Typed Syntax
-elaborate :: Encode t => Comp t -> Either Error Typed.Elaborated
+elaborate :: Encode t => Comp t -> Either Error Encoding.Elaborated
 elaborate prog = encodeElaborated <$> elaborate' prog
   where
-    encodeElaborated :: Encode t => Elaborated t -> Typed.Elaborated
+    encodeElaborated :: Encode t => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
       let Computation counters _addrSize _heap eb assertions divModRelsU = comp
-       in Typed.Elaborated
+       in Encoding.Elaborated
             <$> encode expr
-            <*> ( Typed.Computation
+            <*> ( Encoding.Computation
                     counters
                     <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
                     <*> mapM encode assertions

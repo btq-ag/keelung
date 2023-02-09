@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Constraint.Polynomial
+module Keelung.Data.Polynomial
   ( Poly,
     buildEither,
     buildEither',
@@ -29,15 +29,15 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector
+import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
 import Keelung.Types (Var)
 import Prelude hiding (negate)
-import qualified Prelude
+import Prelude qualified
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -67,12 +67,14 @@ instance (Ord n, Num n) => Ord (Poly n) where
 instance (Show n, Ord n, Eq n, Num n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 =
-      if firstSign == " + "
-        then concat restOfTerms
-        else "- " ++ concat restOfTerms
+        if firstSign == " + "
+          then concat restOfTerms
+          else "- " ++ concat restOfTerms
     | otherwise = concat (show n : termStrings)
     where
-      (firstSign : restOfTerms) = termStrings
+      (firstSign, restOfTerms) = case concatMap printTerm $ IntMap.toList xs of
+        [] -> error "[ panic ] Empty PolyG"
+        (x' : xs') -> (x', xs')
 
       termStrings = concatMap printTerm $ IntMap.toList xs
       -- return a pair of the sign ("+" or "-") and the string representation

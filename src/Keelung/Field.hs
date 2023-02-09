@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Field
   ( B64,
@@ -12,15 +12,15 @@ module Keelung.Field
     -- AcceptedField(..),
     realizeAs,
     normalize,
-    module Keelung.Field.N,
+    module Keelung.Data.N,
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Field.Galois (Binary, Prime)
 import Data.Serialize (Serialize (..))
-import GHC.Generics ( Generic )
-import Keelung.Field.N
-import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
+import Keelung.Data.N
 
 --------------------------------------------------------------------------------
 

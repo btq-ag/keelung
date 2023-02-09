@@ -7,9 +7,9 @@ module Keelung.Constraint.R1CS where
 import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Syntax.BinRep (BinRep (..))
+import Keelung.Data.BinRep (BinRep (..))
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
 import Keelung.Types
 

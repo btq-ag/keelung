@@ -10,8 +10,8 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Data.Polynomial (Poly)
+import qualified Keelung.Data.Polynomial as Poly
 
 --------------------------------------------------------------------------------
 

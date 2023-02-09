@@ -7,7 +7,6 @@ module Keelung.Types
     Width,
     Heap,
     ElemType (..),
-    indent,
   )
 where
 
@@ -56,9 +55,3 @@ instance Semigroup ElemType where
     (EmptyArr, ElemArr b' l) -> ElemArr b' l
     (EmptyArr, EmptyArr) -> EmptyArr
     _ -> error "ElemType must be the same"
-
---------------------------------------------------------------------------------
-
--- | Handy function for prettifying stuff
-indent :: String -> String
-indent = unlines . map ("  " <>) . lines
