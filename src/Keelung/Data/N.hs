@@ -5,9 +5,15 @@
 module Keelung.Data.N where
 
 import Control.DeepSeq (NFData)
+import Data.Euclidean (Euclidean, Field, GcdDomain)
 import Data.Field.Galois (GaloisField (..))
+import Data.Group (Group)
+import Data.Semiring (Ring, Semiring)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import System.Random (Random)
+import Test.QuickCheck (Arbitrary)
+import Text.PrettyPrint.Leijen.Text (Pretty)
 
 --------------------------------------------------------------------------------
 
@@ -20,19 +26,29 @@ instance Serialize a => Serialize (N a)
 
 deriving instance Bounded n => Bounded (N n)
 
--- deriving instance Field n => Field (N n)
+deriving instance Group n => Group (N n)
+
+deriving instance Field n => Field (N n)
 
 deriving instance Monoid n => Monoid (N n)
 
 deriving instance Semigroup n => Semigroup (N n)
 
--- deriving instance Euclidean n => Euclidean (N n)
+deriving instance Euclidean n => Euclidean (N n)
 
--- deriving instance Ring n => Ring (N n)
+deriving instance Ring n => Ring (N n)
 
--- deriving instance GcdDomain n => GcdDomain (N n)
+deriving instance GcdDomain n => GcdDomain (N n)
 
--- deriving instance Semiring n => Semiring (N n)
+deriving instance Semiring n => Semiring (N n)
+
+deriving instance Arbitrary n => Arbitrary (N n)
+
+deriving instance Pretty n => Pretty (N n)
+
+deriving instance Random n => Random (N n)
+
+deriving instance (GaloisField n, Integral n) => GaloisField (N n)
 
 deriving instance Fractional n => Fractional (N n)
 
