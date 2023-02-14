@@ -2,7 +2,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Module for converting Kinded syntax to Typed syntax
-module Keelung.Syntax.Encode (Encode (..), runHeapM, encode') where
+module Keelung.Syntax.Encode
+  ( Encode (..),
+    runHeapM,
+    encode',
+    Expr(..),
+  )
+where
 
 import Control.Monad.Reader
 import Data.Array.Unboxed qualified as Array
