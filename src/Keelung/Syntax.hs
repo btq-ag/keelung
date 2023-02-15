@@ -14,6 +14,7 @@ module Keelung.Syntax
     uintToBool,
     true,
     false,
+    setBit,
     Var,
     Width,
   )
@@ -263,6 +264,10 @@ true = Boolean True
 -- | Smart constructor for 'Boolean False'
 false :: Boolean
 false = Boolean False
+
+-- | Set the i-th bit of a Unsigned integer with a Boolean
+setBit :: KnownNat w => UInt w -> Int -> Boolean -> UInt w
+setBit = SetU
 
 --------------------------------------------------------------------------------
 

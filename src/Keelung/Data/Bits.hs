@@ -4,10 +4,10 @@
 -- | Like `Data.Bits` but with `Boolean` instead of `Bool`
 module Keelung.Data.Bits where
 
+import Data.Bits qualified as Bits
+import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
-import Data.Word (Word8, Word64, Word32, Word16)
-import qualified Data.Bits as Bits
 
 class Bits a where
   -- {-# MINIMAL bitWidth #-}
@@ -86,7 +86,6 @@ instance KnownNat w => Bits (UInt w) where
   (!!!) = BitU
   complement = NotU
 
-
 -- | Make 'Word8' an instance of 'Bits'
 instance Bits Word8 where
   (.&.) = (Bits..&.)
@@ -126,4 +125,3 @@ instance Bits Word64 where
   shift = Bits.shift
   x !!! i = Boolean (Bits.testBit x i)
   complement = Bits.complement
-
