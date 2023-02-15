@@ -6,6 +6,8 @@ module Keelung.Data.Bits where
 
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
+import Data.Word (Word8, Word64, Word32, Word16)
+import qualified Data.Bits as Bits
 
 class Bits a where
   -- {-# MINIMAL bitWidth #-}
@@ -26,7 +28,7 @@ class Bits a where
 
   infixl 6 .^.
 
-  -- | Rotates left, extends less significant bits with 0
+  -- | Rotates left by @i@ bits if @i@ is positive, or right by @-i@ bits otherwise.
   rotate :: a -> Int -> a
 
   infixl 8 `rotate`
@@ -54,16 +56,12 @@ shiftR :: Bits a => a -> Int -> a
 shiftR x i = shiftR x (-i)
 
 -- | Infix version of 'shiftR'.
---
--- @since 4.17
 (.>>.) :: (Bits a) => a -> Int -> a
 (.>>.) = shiftR
 
 infixl 8 .>>.
 
 -- | Infix version of 'shiftL'.
---
--- @since 4.17
 (.<<.) :: (Bits a) => a -> Int -> a
 (.<<.) = shiftL
 
@@ -87,3 +85,45 @@ instance KnownNat w => Bits (UInt w) where
   shift expr i = ShLU (widthOf expr) i expr
   (!!!) = BitU
   complement = NotU
+
+
+-- | Make 'Word8' an instance of 'Bits'
+instance Bits Word8 where
+  (.&.) = (Bits..&.)
+  (.|.) = (Bits..|.)
+  (.^.) = Bits.xor
+  rotate = Bits.rotate
+  shift = Bits.shift
+  x !!! i = Boolean (Bits.testBit x i)
+  complement = Bits.complement
+
+-- | Make 'Word16' an instance of 'Bits'
+instance Bits Word16 where
+  (.&.) = (Bits..&.)
+  (.|.) = (Bits..|.)
+  (.^.) = Bits.xor
+  rotate = Bits.rotate
+  shift = Bits.shift
+  x !!! i = Boolean (Bits.testBit x i)
+  complement = Bits.complement
+
+-- | Make 'Word32' an instance of 'Bits'
+instance Bits Word32 where
+  (.&.) = (Bits..&.)
+  (.|.) = (Bits..|.)
+  (.^.) = Bits.xor
+  rotate = Bits.rotate
+  shift = Bits.shift
+  x !!! i = Boolean (Bits.testBit x i)
+  complement = Bits.complement
+
+-- | Make 'Word64' an instance of 'Bits'
+instance Bits Word64 where
+  (.&.) = (Bits..&.)
+  (.|.) = (Bits..|.)
+  (.^.) = Bits.xor
+  rotate = Bits.rotate
+  shift = Bits.shift
+  x !!! i = Boolean (Bits.testBit x i)
+  complement = Bits.complement
+
