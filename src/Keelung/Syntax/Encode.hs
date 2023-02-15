@@ -6,7 +6,7 @@ module Keelung.Syntax.Encode
   ( Encode (..),
     runHeapM,
     encode',
-    Expr(..),
+    Expr (..),
   )
 where
 
@@ -68,6 +68,7 @@ instance KnownNat w => Encode' (Kinded.UInt w) UInt where
     Kinded.IfU p x y -> IfU (widthOf expr) <$> encode' p <*> encode' x <*> encode' y
     Kinded.RoLU w i x -> RoLU w i <$> encode' x
     Kinded.ShLU w i x -> ShLU w i <$> encode' x
+    Kinded.SetU x i b -> SetU (widthOf expr) <$> encode' x <*> pure i <*> encode' b
     Kinded.BtoU n -> BtoU (widthOf expr) <$> encode' n
 
 --------------------------------------------------------------------------------

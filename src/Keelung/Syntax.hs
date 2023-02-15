@@ -117,6 +117,8 @@ data UInt (w :: Nat)
     RoLU Width Int (UInt w)
   | -- | Shift left
     ShLU Width Int (UInt w)
+  | -- | Bit set and return the result
+    SetU (UInt w) Int Boolean
   | -- | Conditional that returns an unsigned integer
     IfU Boolean (UInt w) (UInt w)
   | -- | Conversion from Booleans to Unsigned integers
@@ -137,6 +139,7 @@ instance KnownNat w => Show (UInt w) where
     NotU x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    SetU x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU x -> showString "B→U " . showsPrec prec x
     where
