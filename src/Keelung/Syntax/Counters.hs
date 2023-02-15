@@ -14,7 +14,8 @@ module Keelung.Syntax.Counters
     -- for constraint generation
     getOutputVarRange,
     getOutputBinRepRange,
-    getInputVarRange,
+    getPublicInputVarRange,
+    getPrivateInputVarRange,
     getBinRepConstraintSize,
     getBinReps,
     getBooleanConstraintSize,
@@ -54,7 +55,7 @@ data VarType = OfField | OfBoolean | OfUIntBinRep Width | OfUInt Width
 instance Serialize VarType
 
 -- | "Sorts" of variables.
-data VarSort = OfOutput | OfInput | OfIntermediate
+data VarSort = OfOutput | OfPublicInput | OfPrivateInput | OfIntermediate
 
 ------------------------------------------------------------------------------
 
@@ -74,7 +75,8 @@ smallCounterSize (Struct f b u) =
 
 data Counters = Counters
   { countOutput :: !SmallCounters, -- counters for output variables
-    countInput :: !SmallCounters, -- counters for input variables
+    countPublicInput :: !SmallCounters, -- counters for input variables
+    countPrivateInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
     countInputSequence :: !(Seq (VarType, Int)), -- Sequence of input variables
     countReducedVarHack :: !Int -- HACK, keep track of the number of variables reduced after renumbering
@@ -84,10 +86,11 @@ data Counters = Counters
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cOut1 cIn1 cInt1 cInSeq1 cRed1 <> Counters cOut2 cIn2 cInt2 cInSeq2 cRed2 =
+  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cInSeq1 cRed1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cInSeq2 cRed2 =
     Counters
       (addSmallCounters cOut1 cOut2)
-      (addSmallCounters cIn1 cIn2)
+      (addSmallCounters cPubIn1 cPubIn2)
+      (addSmallCounters cPrivIn1 cPrivIn2)
       (addSmallCounters cInt1 cInt2)
       (cInSeq1 <> cInSeq2)
       (cRed1 + cRed2)
@@ -97,16 +100,17 @@ instance Semigroup Counters where
         Struct (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
 
 instance Monoid Counters where
-  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty 0
+  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty 0
 
 --------------------------------------------------------------------------------
 
 -- | Get the current count for a variable of the given type and sort.
 getCount :: VarSort -> VarType -> Counters -> Int
-getCount sort typ (Counters o i x _ _) =
+getCount sort typ (Counters o i1 i2 x _ _) =
   case sort of
     OfOutput -> go o
-    OfInput -> go i
+    OfPublicInput -> go i1
+    OfPrivateInput -> go i2
     OfIntermediate -> go x
   where
     go :: SmallCounters -> Int
@@ -119,37 +123,39 @@ getCount sort typ (Counters o i x _ _) =
 
 -- | Get the current count for a variable group of the given sort.
 getCountBySort :: VarSort -> Counters -> Int
-getCountBySort sort (Counters o i x _ _) =
+getCountBySort sort (Counters o i1 i2 x _ _) =
   case sort of
     OfOutput -> smallCounterSize o
-    OfInput -> smallCounterSize i
+    OfPublicInput -> smallCounterSize i1
+    OfPrivateInput -> smallCounterSize i2
     OfIntermediate -> smallCounterSize x
 
 -- | Get the current count for a variable group of the given type.
 getCountByType :: VarType -> Counters -> Int
-getCountByType typ (Counters o i x _ _) =
+getCountByType typ (Counters o i1 i2 x _ _) =
   case typ of
-    OfField -> structF o + structF i + structF x
-    OfBoolean -> structB o + structB i + structB x
-    OfUIntBinRep _ -> binRepSize (structU o) + binRepSize (structU i) + binRepSize (structU x)
-    OfUInt _ -> uIntSize (structU o) + uIntSize (structU i) + uIntSize (structU x)
+    OfField -> structF o + structF i1 + structF i2 + structF x
+    OfBoolean -> structB o + structB i1 + structB i2 + structB x
+    OfUIntBinRep _ -> binRepSize (structU o) + binRepSize (structU i1) + binRepSize (structU i2) + binRepSize (structU x)
+    OfUInt _ -> uIntSize (structU o) + uIntSize (structU i1) + uIntSize (structU i2) + uIntSize (structU x)
 
 setReducedCount :: Int -> Counters -> Counters
-setReducedCount n (Counters o i x s _) = Counters o i x s n
+setReducedCount n (Counters o i1 i2 x s _) = Counters o i1 i2 x s n
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i x _ reduced) =
+getTotalCount (Counters o i1 i2 x _ reduced) =
   -- 'countReducedVarHack' should only have effect on intermediate variables
-  (smallCounterSize o + smallCounterSize i) + (0 `max` (smallCounterSize x - reduced))
+  (smallCounterSize o + smallCounterSize i1 + smallCounterSize i2) + (0 `max` (smallCounterSize x - reduced))
 
 -- | Set the current count for a variable of the given type and sort.
 addCount :: VarSort -> VarType -> Int -> Counters -> Counters
-addCount sort typ n (Counters o i x is r) =
+addCount sort typ n (Counters o i1 i2 x is r) =
   case sort of
-    OfOutput -> Counters (adjustSmallCounters o) i x is r
-    OfInput -> Counters o (adjustSmallCounters i) x (is <> newInputSequence) r
-    OfIntermediate -> Counters o i (adjustSmallCounters x) is r
+    OfOutput -> Counters (adjustSmallCounters o) i1 i2 x is r
+    OfPublicInput -> Counters o (adjustSmallCounters i1) i2 x (is <> newInputSequence) r
+    OfPrivateInput -> Counters o i1 (adjustSmallCounters i2) x (is <> newInputSequence) r
+    OfIntermediate -> Counters o i1 i2 (adjustSmallCounters x) is r
   where
     adjustSmallCounters :: SmallCounters -> SmallCounters
     adjustSmallCounters (Struct f b u) =
@@ -159,7 +165,7 @@ addCount sort typ n (Counters o i x is r) =
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
         OfUInt w -> Struct f b (IntMap.insertWith (+) w n u)
 
-    oldCount = getCount sort typ (Counters o i x is r)
+    oldCount = getCount sort typ (Counters o i1 i2 x is r)
 
     newInputSequence :: Seq (VarType, Int)
     newInputSequence = Seq.fromList [(typ, index) | index <- [oldCount .. oldCount + n - 1]]
@@ -176,13 +182,15 @@ reindex counters sort typ index = offsetOfSort counters sort + offsetOfType (cho
   where
     choose :: VarSort -> Counters -> SmallCounters
     choose OfOutput = countOutput
-    choose OfInput = countInput
+    choose OfPublicInput = countPublicInput
+    choose OfPrivateInput = countPrivateInput
     choose OfIntermediate = countIntermediate
 
 offsetOfSort :: Counters -> VarSort -> Int
 offsetOfSort _ OfOutput = 0
-offsetOfSort counters OfInput = smallCounterSize (countOutput counters)
-offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countInput counters)
+offsetOfSort counters OfPublicInput = smallCounterSize (countOutput counters)
+offsetOfSort counters OfPrivateInput = smallCounterSize (countOutput counters) + smallCounterSize (countPublicInput counters)
+offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countPublicInput counters) + smallCounterSize (countPrivateInput counters)
 
 offsetOfType :: SmallCounters -> VarType -> Int -> Int
 offsetOfType _ OfField index = index
@@ -197,7 +205,7 @@ offsetOfType (Struct f b u) (OfUInt width) index = f + b + binRepSize u + IntMap
 --------------------------------------------------------------------------------
 
 getOutputVarRange :: Counters -> (Int, Int)
-getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort counters OfInput)
+getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort counters OfPublicInput)
 
 getOutputBinRepRange :: Counters -> (Int, Int)
 getOutputBinRepRange counters =
@@ -205,21 +213,27 @@ getOutputBinRepRange counters =
       size = binRepSize (structU (countOutput counters))
    in (start, start + size)
 
-getInputVarRange :: Counters -> (Int, Int)
-getInputVarRange counters =
-  let inputOffset = offsetOfSort counters OfInput
-      inputSize = getCountBySort OfInput counters
+getPublicInputVarRange :: Counters -> (Int, Int)
+getPublicInputVarRange counters =
+  let inputOffset = offsetOfSort counters OfPublicInput
+      inputSize = getCountBySort OfPublicInput counters
+   in (inputOffset, inputOffset + inputSize)
+
+getPrivateInputVarRange :: Counters -> (Int, Int)
+getPrivateInputVarRange counters =
+  let inputOffset = offsetOfSort counters OfPrivateInput
+      inputSize = getCountBySort OfPrivateInput counters
    in (inputOffset, inputOffset + inputSize)
 
 -- | Generate one BinRep constraint for each UInt input & output variable
 getBinRepConstraintSize :: Counters -> Int
-getBinRepConstraintSize (Counters o i _ _ _) = f o + f i
+getBinRepConstraintSize (Counters o i1 i2 _ _ _) = f o + f i1 + f i2
   where
     f (Struct _ _ u) = uIntSize u
 
 getBinReps :: Counters -> [BinRep]
-getBinReps counters@(Counters o i x _ _) =
-  fromSmallCounter OfOutput o ++ fromSmallCounter OfInput i ++ fromSmallCounter OfIntermediate x
+getBinReps counters@(Counters o i1 i2 x _ _) =
+  fromSmallCounter OfOutput o ++ fromSmallCounter OfPublicInput i1 ++ fromSmallCounter OfPrivateInput i2 ++ fromSmallCounter OfIntermediate x
   where
     fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
     fromSmallCounter sort (Struct _ _ u) = concatMap (fromPair sort) (IntMap.toList u)
@@ -236,7 +250,7 @@ getBinReps counters@(Counters o i x _ _) =
 --    3. Boolean input variables
 --    4. UInt BinReps input variables
 getBooleanConstraintSize :: Counters -> Int
-getBooleanConstraintSize (Counters o i _ _ _) = f o + f i
+getBooleanConstraintSize (Counters o i1 i2 _ _ _) = f o + f i1 + f i2
   where
     f (Struct _ b u) = b + binRepSize u
 
@@ -246,8 +260,8 @@ getBooleanConstraintSize (Counters o i _ _ _) = f o + f i
 --    3. Boolean input variables
 --    4. UInt BinReps input variables
 getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters@(Counters o i _ _ _) =
-  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfInput i]
+getBooleanConstraintRanges counters@(Counters o i1 i2 _ _ _) =
+  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfPublicInput i1, booleanVarRange OfPrivateInput i2]
   where
     booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
     booleanVarRange sort (Struct _ b u) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize u)
@@ -265,27 +279,33 @@ getBooleanConstraintRanges counters@(Counters o i _ _ _) =
 --------------------------------------------------------------------------------
 
 prettyVariables :: Counters -> String
-prettyVariables counters@(Counters o i _ _ _) =
-  let inputOffset = offsetOfSort counters OfInput
-      outputOffset = offsetOfSort counters OfOutput
+prettyVariables counters@(Counters o i1 i2 _ _ _) =
+  let publicInputOffset  = offsetOfSort counters OfPublicInput
+      privateInputOffset = offsetOfSort counters OfPrivateInput
+      outputOffset       = offsetOfSort counters OfOutput
       totalSize = getTotalCount counters
 
-      inputVars = case smallCounterSize o of
+      outputVars = case smallCounterSize o of
         0 -> ""
         1 -> "    Output variable : $" <> show outputOffset <> "\n"
         n -> "    Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
-      ouputVars = case smallCounterSize i of
+      publicInputVars = case smallCounterSize i1 of
         0 -> ""
-        1 -> "    Input  variable : $" <> show inputOffset <> "\n"
-        n -> "    Input  variables: $" <> show inputOffset <> " ... $" <> show (inputOffset + n - 1) <> "\n"
+        1 -> "    Public Input variable : $" <> show publicInputOffset <> "\n"
+        n -> "    Public Input variables: $" <> show publicInputOffset <> " ... $" <> show (publicInputOffset + n - 1) <> "\n"
+      privateInputVars = case smallCounterSize i2 of
+        0 -> ""
+        1 -> "    Private Input variable : $" <> show privateInputOffset <> "\n"
+        n -> "    Private Input variables: $" <> show privateInputOffset <> " ... $" <> show (privateInputOffset + n - 1) <> "\n"
    in if totalSize == 0
         then ""
         else
           "  Variables ("
             <> show totalSize
             <> "):\n\n"
-            <> ouputVars
-            <> inputVars
+            <> outputVars
+            <> publicInputVars
+            <> privateInputVars
             <> "\n"
 
 prettyConstraints :: Show constraint => Counters -> [constraint] -> String

@@ -20,6 +20,7 @@ data Boolean
   = ValB Bool
   | VarB Var
   | VarBI Var
+  | VarBP Var
   | AndB Boolean Boolean
   | OrB Boolean Boolean
   | XorB Boolean Boolean
@@ -38,6 +39,7 @@ instance Show Boolean where
     ValB n -> shows n
     VarB var -> showString "$B" . shows var
     VarBI var -> showString "$BI" . shows var
+    VarBP var -> showString "$BP" . shows var
     AndB x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrB x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorB x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
@@ -55,6 +57,7 @@ data Field
   | ValFR Rational
   | VarF Var
   | VarFI Var
+  | VarFP Var
   | AddF Field Field
   | SubF Field Field
   | MulF Field Field
@@ -71,6 +74,7 @@ instance Show Field where
     ValFR n -> shows n
     VarF var -> showString "$F" . shows var
     VarFI var -> showString "$FI" . shows var
+    VarFP var -> showString "$FP" . shows var
     AddF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -84,6 +88,7 @@ data UInt
   = ValU Width Integer
   | VarU Width Var
   | VarUI Width Var
+  | VarUP Width Var
   | AddU Width UInt UInt
   | SubU Width UInt UInt
   | MulU Width UInt UInt
@@ -105,6 +110,7 @@ instance Show UInt where
     ValU _ n -> shows n
     VarU w var -> showString "$U" . showString (toSubscript w) . shows var
     VarUI w var -> showString "$UI" . showString (toSubscript w) . shows var
+    VarUP w var -> showString "$UP" . showString (toSubscript w) . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y

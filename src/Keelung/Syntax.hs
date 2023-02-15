@@ -34,8 +34,10 @@ data Field
     Rational Rational
   | -- | Field element variables
     VarF Var
-  | -- | Field element input variables
+  | -- | Field element public input variables
     VarFI Var
+  | -- | Field element private input variables
+    VarFP Var
   | -- | Addition
     Add Field Field
   | -- | Subtraction
@@ -68,6 +70,7 @@ instance Show Field where
     Rational n -> showsPrec prec n
     VarF ref -> showString "$F" . shows ref
     VarFI ref -> showString "$FI" . shows ref
+    VarFP ref -> showString "$FP" . shows ref
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -98,8 +101,10 @@ data UInt (w :: Nat)
     UInt Integer
   | -- | Unsigned integer variables
     VarU Var
-  | -- | Unsigned integer input variables
+  | -- | Unsigned integer public input variables
     VarUI Var
+  | -- | Unsigned integer private input variables
+    VarUP Var
   | -- | Addition
     AddU (UInt w) (UInt w)
   | -- | Subtraction
@@ -131,6 +136,7 @@ instance KnownNat w => Show (UInt w) where
     UInt n -> showsPrec prec n
     VarU var -> showString "$U" . showString (toSubscript width) . shows var
     VarUI var -> showString "$UI" . showString (toSubscript width) . shows var
+    VarUP var -> showString "$UP" . showString (toSubscript width) . shows var
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -191,8 +197,10 @@ data Boolean
     Boolean Bool
   | -- | Boolean variables
     VarB Var
-  | -- | Boolean input variables
+  | -- | Boolean public input variables
     VarBI Var
+  | -- | Boolean private input variables
+    VarBP Var
   | -- | Conjunction
     And Boolean Boolean
   | -- | Disjunction
@@ -237,6 +245,7 @@ instance Show Boolean where
     Boolean b -> showsPrec prec b
     VarB ref -> showString "$B" . shows ref
     VarBI ref -> showString "$BI" . shows ref
+    VarBP ref -> showString "$BP" . shows ref
     BitU n i -> showsPrec prec n . showString "[" . shows i . showString "]"
     EqF x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     And x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y

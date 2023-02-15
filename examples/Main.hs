@@ -21,21 +21,21 @@ import Keelung
 -- | Outputs the given field element
 echo :: Comp Field
 echo = do
-  x <- input -- request for an input and bind it to 'x'
+  x <- input Public -- request for an input and bind it to 'x'
   return x -- return 'x'
 
 -- | A program that expects 2 inputs and returns no output
 useless :: Comp ()
 useless = do
-  _x <- inputField -- request for an input and bind it to 'x'
-  _y <- inputBool -- request for an input and bind it to 'y'
+  _x <- inputField Public -- request for an input and bind it to 'x'
+  _y <- inputBool Public -- request for an input and bind it to 'y'
   return () -- return nothing
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
 tempConvert :: Comp Field
 tempConvert = do
-  toFahrenheit <- input
-  degree <- input
+  toFahrenheit <- input Public
+  degree <- input Public
   return $
     cond
       toFahrenheit
@@ -73,22 +73,22 @@ main = evaluate $ rnf $ elaborateAndEncode (return $ fromString' (string 400000)
 
 assertToBe42 :: Comp ()
 assertToBe42 = do
-  x <- inputField
+  x <- inputField Public
   assert (x `eq` 42)
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output
 assertSquare :: Comp ()
 assertSquare = do
-  x <- inputField
-  y <- inputField
+  x <- inputField Public
+  y <- inputField Public
   assert ((x * x) `eq` y)
 
 loop3 :: Int -> Int -> Comp ()
 loop3 n m = do
-  xs <- inputList2 n m
+  xs <- inputList2 Public n m
   -- expecting square of signatures as input
-  squares <- inputList2 n m
+  squares <- inputList2 Public n m
   -- for each signature
   forM_ [0 .. n - 1] $ \i -> do
     -- for each term of signature
@@ -99,5 +99,5 @@ loop3 n m = do
 
 uint :: Comp [Boolean]
 uint = do
-  x <- inputUInt @4
+  x <- inputUInt @4 Public
   return [x !!! 0, x !!! 1, x !!! 2, x !!! 3]

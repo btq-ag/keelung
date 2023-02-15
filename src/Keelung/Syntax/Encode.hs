@@ -30,6 +30,7 @@ instance Encode' Kinded.Boolean Boolean where
     Kinded.Boolean b -> return $ ValB b
     Kinded.VarB var -> return $ VarB var
     Kinded.VarBI var -> return $ VarBI var
+    Kinded.VarBP var -> return $ VarBP var
     Kinded.And x y -> AndB <$> encode' x <*> encode' y
     Kinded.Or x y -> OrB <$> encode' x <*> encode' y
     Kinded.Xor x y -> XorB <$> encode' x <*> encode' y
@@ -46,6 +47,7 @@ instance Encode' Kinded.Field Field where
     Kinded.Rational n -> return $ ValFR n
     Kinded.VarF var -> return $ VarF var
     Kinded.VarFI var -> return $ VarFI var
+    Kinded.VarFP var -> return $ VarFP var
     Kinded.Add x y -> AddF <$> encode' x <*> encode' y
     Kinded.Sub x y -> SubF <$> encode' x <*> encode' y
     Kinded.Mul x y -> MulF <$> encode' x <*> encode' y
@@ -58,6 +60,7 @@ instance KnownNat w => Encode' (Kinded.UInt w) UInt where
     Kinded.UInt n -> return $ ValU (widthOf expr) n
     Kinded.VarU var -> return $ VarU (widthOf expr) var
     Kinded.VarUI var -> return $ VarUI (widthOf expr) var
+    Kinded.VarUP var -> return $ VarUP (widthOf expr) var
     Kinded.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
     Kinded.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
     Kinded.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
