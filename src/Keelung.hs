@@ -289,7 +289,7 @@ readKeelungVersion cmd args = do
 
 checkKeelungVersion :: (Int, Int, Int) -> M ()
 checkKeelungVersion (major, minor, patch) = do
-  if major == 0 && minor >= 8 && minor < 9 && patch >= 2
+  if major == 0 && minor >= 8 && minor < 9 && patch >= 3
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
@@ -313,7 +313,7 @@ checkCmd cmd =
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 8, 2)
+keelungVersion_ = (0, 8, 3)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String

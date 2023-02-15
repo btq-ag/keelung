@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung
-version:        0.1.0.0
+version:        0.8.3.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
 homepage:       https://github.com/btq-ag/keelung#readme
 bug-reports:    https://github.com/btq-ag/keelung/issues
