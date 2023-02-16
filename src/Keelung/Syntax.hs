@@ -8,10 +8,7 @@ module Keelung.Syntax
     Boolean (..),
     UInt (..),
     widthOf,
-    -- Arr (..),
     Cmp (..),
-    fieldToBool,
-    uintToBool,
     true,
     false,
     setBit,
@@ -248,14 +245,6 @@ instance Show Boolean where
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
-
--- | For converting from field elements to Booleans
-fieldToBool :: Field -> Boolean
-fieldToBool x = IfB (x `EqF` 0) false true
-
--- | For converting from unsigned integers to Booleans
-uintToBool :: KnownNat w => UInt w -> Boolean
-uintToBool x = IfB (x `EqU` 0) false true
 
 -- | Smart constructor for 'Boolean True'
 true :: Boolean
