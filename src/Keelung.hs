@@ -89,11 +89,11 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 --------------------------------------------------------------------------------
 
 -- | Generate a proof
-generate_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error (FilePath, String))
-generate_ fieldType prog inputs' = runM $ do
+generate_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
+generate_ fieldType prog publicInput privateInput = runM $ do
   exists <- checkCmd "instrument_aurora_snark_proof"
   _ <- genCircuit fieldType prog
-  _ <- genWitness_ fieldType prog inputs'
+  _ <- genWitness_ fieldType prog publicInput privateInput
   proofPath <- lift $ Path.makeAbsolute "proof"
   genParameters
   if exists
@@ -115,20 +115,20 @@ generate_ fieldType prog inputs' = runM $ do
       return (proofPath, msg)
     else throwError CannotLocateProver
 
-generate :: Encode t => FieldType -> Comp t -> [Integer] -> IO ()
-generate fieldType prog inputs' = do
-  result <- generate_ fieldType prog inputs'
+generate :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+generate fieldType prog publicInput privateInput = do
+  result <- generate_ fieldType prog publicInput privateInput
   case result of
     Left err -> print err
     Right (_, msg) -> putStr msg
 
 -- | Generate and verify a proof
-verify_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error String)
-verify_ fieldType prog inputs' = runM $ do
-  (proofPath, _) <- liftEitherT $ generate_ fieldType prog inputs'
+verify_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error String)
+verify_ fieldType prog publicInput privateInput = runM $ do
+  (proofPath, _) <- liftEitherT $ generate_ fieldType prog publicInput privateInput
   exists <- checkCmd "instrument_aurora_snark_verify"
   _ <- genCircuit fieldType prog
-  _ <- genWitness_ fieldType prog inputs'
+  _ <- genWitness_ fieldType prog publicInput privateInput
   genParameters
   if exists
     then lift $ do
@@ -149,9 +149,9 @@ verify_ fieldType prog inputs' = runM $ do
       return msg
     else throwError CannotLocateVerifier
 
-verify :: Encode t => FieldType -> Comp t -> [Integer] -> IO ()
-verify fieldType prog inputs' = do
-  result <- verify_ fieldType prog inputs'
+verify :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+verify fieldType prog publicInput privateInput = do
+  result <- verify_ fieldType prog publicInput privateInput
   case result of
     Left err -> print err
     Right msg -> putStr msg
@@ -166,23 +166,23 @@ genCircuit fieldType prog = do
     B64 -> convertFieldElement (wrapper ["protocol", "toJSON"] (fieldType, elab) :: M (R1CS B64))
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
-genWitness_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> M [n]
-genWitness_ fieldType prog xs = do
+genWitness_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> M [n]
+genWitness_ fieldType prog publicInput privateInput = do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger xs)
+  wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
 
 genParameters :: M ()
 genParameters = lift $ BS.writeFile "parameter.json" "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
 
-genWitness :: Encode t => FieldType -> Comp t -> [Integer] -> IO [Integer]
-genWitness fieldType prog xs = runM (genWitness_ fieldType prog xs) >>= printErrorInstead
+genWitness :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+genWitness fieldType prog publicInput privateInput = runM (genWitness_ fieldType prog publicInput privateInput) >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
-interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> IO (Either Error [n])
-interpret_ fieldType prog xs = runM $ do
+interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error [n])
+interpret_ fieldType prog publicInput privateInput = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger xs)
+  wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
 
 printErrorInstead :: Show e => Either e [a] -> IO [a]
 printErrorInstead (Left err) = do
@@ -190,25 +190,25 @@ printErrorInstead (Left err) = do
   return []
 printErrorInstead (Right values) = return values
 
--- | Interpret a program with private and public inputs
+-- | Interpret a program with public and private inputs
 run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
-run prog private public = interpret_ GF181 prog (private ++ public) >>= printErrorInstead
+run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
 
 -- | Interpret a program with inputs
-interpret :: Encode t => FieldType -> Comp t -> [Integer] -> IO [Integer]
-interpret fieldType prog xs = interpret_ fieldType prog xs >>= printErrorInstead
+interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Encode t => Comp t -> [GF181] -> IO [N GF181]
-gf181 prog xs = map N <$> (interpret_ GF181 prog xs >>= printErrorInstead)
+gf181 :: Encode t => Comp t -> [GF181] -> [GF181] -> IO [N GF181]
+gf181 prog publicInput privateInput = map N <$> (interpret_ GF181 prog publicInput privateInput >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Encode t => Comp t -> [B64] -> IO [N B64]
-b64 prog xs = map N <$> (interpret_ B64 prog xs >>= printErrorInstead)
+b64 :: Encode t => Comp t -> [B64] -> [B64] -> IO [N B64]
+b64 prog publicInput privateInput = map N <$> (interpret_ B64 prog publicInput privateInput >>= printErrorInstead)
 
 -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Encode t => Comp t -> [BN128] -> IO [N BN128]
-bn128 prog xs = map N <$> (interpret_ BN128 prog xs >>= printErrorInstead)
+bn128 :: Encode t => Comp t -> [BN128] -> [BN128] -> IO [N BN128]
+bn128 prog publicInput privateInput = map N <$> (interpret_ BN128 prog publicInput privateInput >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
