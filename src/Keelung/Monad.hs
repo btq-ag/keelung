@@ -11,12 +11,11 @@ module Keelung.Monad
     elaborate,
 
     -- * Inputs
+    Proper(..),
     InputAccess(..),
-    input,
     inputField,
     inputBool,
     inputUInt,
-    inputList,
     inputList2,
     inputList3,
     inputVec,
