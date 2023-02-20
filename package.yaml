@@ -1,9 +1,9 @@
 name: keelung
-version: 0.8.3.0
+version: 0.8.4.0
 github: "btq-ag/keelung"
-license: BSD3
-author: " BTQ AG"
-maintainer: "ty.lai@btq.li"
+license: Apache-2.0
+author: "BTQ AG"
+maintainer: "BTQ AG"
 copyright: "2023 BTQ AG"
 
 extra-source-files:
@@ -11,8 +11,8 @@ extra-source-files:
   - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis: DSL for creating zero-knowledge proofs
+category: Cryptography
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
@@ -39,10 +39,6 @@ dependencies:
 
 library:
   source-dirs: src
-
-  # other-modules:
-  #   - Keelung.Data.BinRep
-
 default-extensions:
   - ImportQualifiedPost
 
@@ -50,19 +46,3 @@ ghc-options:
   - -Wall
   - -Werror=incomplete-patterns
   - -fno-warn-orphans
-
-executables:
-  tutorial:
-    main: Main.hs
-    source-dirs:
-      - examples/
-    dependencies:
-      - keelung
-
-    ghc-options:
-      - -Wall
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-      - -Werror=incomplete-patterns
-      - -fno-warn-orphans

@@ -5,14 +5,16 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung
-version:        0.8.3.0
+version:        0.8.4.0
+synopsis:       DSL for creating zero-knowledge proofs
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
+category:       Cryptography
 homepage:       https://github.com/btq-ag/keelung#readme
 bug-reports:    https://github.com/btq-ag/keelung/issues
-author:          BTQ AG
-maintainer:     ty.lai@btq.li
+author:         BTQ AG
+maintainer:     BTQ AG
 copyright:      2023 BTQ AG
-license:        BSD3
+license:        Apache-2.0
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -60,35 +62,6 @@ library
     , directory
     , galois-field
     , groups
-    , mtl
-    , process
-    , random
-    , semirings
-    , vector
-    , wl-pprint-text
-  default-language: Haskell2010
-
-executable tutorial
-  main-is: Main.hs
-  other-modules:
-      Paths_keelung
-  hs-source-dirs:
-      examples/
-  default-extensions:
-      ImportQualifiedPost
-  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
-  build-depends:
-      QuickCheck
-    , array
-    , base >=4.7 && <5
-    , bytestring
-    , cereal
-    , containers
-    , deepseq
-    , directory
-    , galois-field
-    , groups
-    , keelung
     , mtl
     , process
     , random
