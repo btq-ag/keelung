@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Syntax.Counters
-  ( Counters (Counters),
+  ( Counters (..),
     VarType (..),
     VarSort (..),
     reindex,
