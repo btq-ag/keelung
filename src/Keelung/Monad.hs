@@ -15,6 +15,9 @@ module Keelung.Monad
 
     -- * Inputs
     Proper (..),
+    freshVarField,
+    freshVarBool,
+    freshVarUInt,
     InputAccess (..),
     inputField,
     inputBool,
@@ -150,7 +153,9 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 
 data InputAccess = Public | Private
 
--- | Allocate a fresh Field variable.
+-- | Allocate a fresh 'Field' variable.
+--
+--   @since 0.8.4.0
 freshVarF :: Comp Var
 freshVarF = do
   counters <- gets compCounters
@@ -158,6 +163,9 @@ freshVarF = do
   modifyCounter $ addCount OfIntermediate OfField 1
   return index
 
+-- | Allocate a fresh 'Boolean' variable.
+--
+--   @since 0.8.4.0
 freshVarB :: Comp Var
 freshVarB = do
   counters <- gets compCounters
@@ -165,6 +173,9 @@ freshVarB = do
   modifyCounter $ addCount OfIntermediate OfBoolean 1
   return index
 
+-- | Allocate a fresh 'UInt' variable.
+--
+--   @since 0.8.4.0
 freshVarU :: Width -> Comp Var
 freshVarU width = do
   counters <- gets compCounters
@@ -190,15 +201,24 @@ freshInputVar acc vt n = do
 
 -- | Typeclass for operations on base types
 class Proper t where
-  -- | Request a single fresh input
+  -- | Request a fresh input variable
+  --
+  --   @since 0.1.0.0
   input :: InputAccess -> Comp t
 
-  -- | Request a list of fresh inputs
+  -- | Request a fresh variable
+  --
+  --   @since 0.8.4.0
+  freshVar :: Comp t
+
+  -- | Request a list of fresh input variables
   --   default implementation simply applies `replicateM` on `input`
   inputList :: InputAccess -> Int -> Comp [t]
   inputList acc size = replicateM size $ input acc
 
   -- | Conditional clause
+  --
+  --   @since 0.1.0.0
   cond :: Boolean -> t -> t -> t
 
 instance Proper Field where
@@ -211,6 +231,8 @@ instance Proper Field where
       Public -> map VarFI [start .. start + size - 1]
       Private -> map VarFP [start .. start + size - 1]
 
+  freshVar = VarF <$> freshVarF
+
   cond = IfF
 
 instance Proper Boolean where
@@ -222,6 +244,8 @@ instance Proper Boolean where
     return $ case acc of
       Public -> map VarBI [start .. start + size - 1]
       Private -> map VarBP [start .. start + size - 1]
+
+  freshVar = VarB <$> freshVarB
 
   cond = IfB
 
@@ -237,25 +261,41 @@ instance KnownNat w => Proper (UInt w) where
     where
       width = fromIntegral (natVal (Proxy :: Proxy w))
 
+  freshVar = VarU <$> freshVarU width
+    where
+      width = fromIntegral (natVal (Proxy :: Proxy w))
+
   cond = IfU
 
--- | Requests a fresh Field input variable
+-- | Requests a fresh 'Field' input variable
 inputField :: InputAccess -> Comp Field
 inputField Public = VarFI <$> freshInputVar Public OfField 1
 inputField Private = VarFP <$> freshInputVar Private OfField 1
 
--- | Requests a fresh Boolean input variable
+-- | Requests a fresh 'Boolean' input variable
 inputBool :: InputAccess -> Comp Boolean
 inputBool Public = VarBI <$> freshInputVar Public OfBoolean 1
 inputBool Private = VarBP <$> freshInputVar Private OfBoolean 1
 
--- | Requests a fresh UInt input variable of some bit width
+-- | Requests a fresh 'UInt' input variable of some bit width
 inputUInt :: forall w. KnownNat w => InputAccess -> Comp (UInt w)
 inputUInt acc = case acc of
   Public -> VarUI <$> freshInputVar acc (OfUInt width) 1
   Private -> VarUP <$> freshInputVar acc (OfUInt width) 1
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
+
+-- | Requests a fresh 'Field' variable
+freshVarField :: Comp Field
+freshVarField = freshVar
+
+-- | Requests a fresh 'Boolean' variable
+freshVarBool :: Comp Boolean
+freshVarBool = freshVar
+
+-- | Requests a fresh 'UInt' variable of some bit width
+freshVarUInt :: KnownNat w => Comp (UInt w)
+freshVarUInt = freshVar
 
 --------------------------------------------------------------------------------
 
@@ -579,6 +619,7 @@ performDivMod dividend divisor = do
 --   @
 -- assertEven :: UInt 32 -> Comp (UInt 32)
 -- assertEven dividend = do
+--     quotient <- freshVarUInt
 --     assertDivMod dividend 2 quotient 0
 --     return quotient
 --   @
