@@ -5,14 +5,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Keelung.Monad
-  ( Comp,
-    Computation (..),
-    Elaborated (..),
-    elaborate,
+  ( -- * Monad
+    Comp,
+
+    -- * Statements
+    assert,
+    performDivMod,
+    assertDivMod,
 
     -- * Inputs
-    Proper(..),
-    InputAccess(..),
+    Proper (..),
+    InputAccess (..),
     inputField,
     inputBool,
     inputUInt,
@@ -21,6 +24,13 @@ module Keelung.Monad
     inputVec,
     inputVec2,
     inputVec3,
+
+    -- * Reuse of expressions
+    Reusable (..),
+
+    -- * Combinators
+    mapI,
+    reduce,
 
     -- * Mutable Array
     Mutable (updateM),
@@ -36,14 +46,10 @@ module Keelung.Monad
     accessM2,
     accessM3,
 
-    -- * Statements
-    Reusable (..),
-    cond,
-    assert,
-    mapI,
-    reduce,
-    performDivMod,
-    assertDivMod,
+    -- * Types
+    Computation (..),
+    Elaborated (..),
+    elaborate,
   )
 where
 
@@ -171,12 +177,14 @@ freshInputVar :: InputAccess -> VarType -> Int -> Comp Var
 freshInputVar acc vt n = do
   counters <- gets compCounters
   case acc of
-    Public -> do let index = getCount OfPublicInput vt counters
-                 modifyCounter $ addCount OfPublicInput vt n
-                 return index
-    Private -> do let index = getCount OfPrivateInput vt counters
-                  modifyCounter $ addCount OfPrivateInput vt n
-                  return index
+    Public -> do
+      let index = getCount OfPublicInput vt counters
+      modifyCounter $ addCount OfPublicInput vt n
+      return index
+    Private -> do
+      let index = getCount OfPrivateInput vt counters
+      modifyCounter $ addCount OfPrivateInput vt n
+      return index
 
 --------------------------------------------------------------------------------
 
@@ -200,7 +208,7 @@ instance Proper Field where
   inputList acc size = do
     start <- freshInputVar acc OfField size
     return $ case acc of
-      Public  -> map VarFI [start .. start + size - 1]
+      Public -> map VarFI [start .. start + size - 1]
       Private -> map VarFP [start .. start + size - 1]
 
   cond = IfF
@@ -212,7 +220,7 @@ instance Proper Boolean where
   inputList acc size = do
     start <- freshInputVar acc OfBoolean size
     return $ case acc of
-      Public  -> map VarBI [start .. start + size - 1]
+      Public -> map VarBI [start .. start + size - 1]
       Private -> map VarBP [start .. start + size - 1]
 
   cond = IfB
@@ -224,7 +232,7 @@ instance KnownNat w => Proper (UInt w) where
   inputList acc size = do
     start <- freshInputVar acc (OfUInt width) size
     return $ case acc of
-      Public  -> map VarUI [start .. start + size - 1]
+      Public -> map VarUI [start .. start + size - 1]
       Private -> map VarUP [start .. start + size - 1]
     where
       width = fromIntegral (natVal (Proxy :: Proxy w))
@@ -233,34 +241,21 @@ instance KnownNat w => Proper (UInt w) where
 
 -- | Requests a fresh Field input variable
 inputField :: InputAccess -> Comp Field
-inputField Public  = VarFI <$> freshInputVar Public OfField 1
+inputField Public = VarFI <$> freshInputVar Public OfField 1
 inputField Private = VarFP <$> freshInputVar Private OfField 1
 
 -- | Requests a fresh Boolean input variable
 inputBool :: InputAccess -> Comp Boolean
-inputBool Public  = VarBI <$> freshInputVar Public OfBoolean 1
+inputBool Public = VarBI <$> freshInputVar Public OfBoolean 1
 inputBool Private = VarBP <$> freshInputVar Private OfBoolean 1
 
 -- | Requests a fresh UInt input variable of some bit width
 inputUInt :: forall w. KnownNat w => InputAccess -> Comp (UInt w)
 inputUInt acc = case acc of
-  Public  -> VarUI <$> freshInputVar acc (OfUInt width) 1
+  Public -> VarUI <$> freshInputVar acc (OfUInt width) 1
   Private -> VarUP <$> freshInputVar acc (OfUInt width) 1
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
-
--- | Converts a list of values to an 1D-array
-toArrayM :: Mutable t => [t] -> Comp (ArrM t)
-toArrayM xs = do
-  if null xs
-    then snd <$> allocArray EmptyArr xs
-    else
-      let kind = typeOf (head xs)
-       in snd <$> allocArray kind xs
-
--- | Convert an array into a list of expressions
-fromArrayM :: Mutable t => ArrM t -> Comp [t]
-fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
 
 --------------------------------------------------------------------------------
 
@@ -393,7 +388,20 @@ instance KnownNat w => Mutable (UInt w) where
   constructElement (ElemU _) elemAddr = VarU elemAddr
   constructElement _ _ = error "expecting element to be of UInt"
 
--- -- | Access an element from a 1-D array
+-- | Converts a list of values to an 1D-array
+toArrayM :: Mutable t => [t] -> Comp (ArrM t)
+toArrayM xs = do
+  if null xs
+    then snd <$> allocArray EmptyArr xs
+    else
+      let kind = typeOf (head xs)
+       in snd <$> allocArray kind xs
+
+-- | Convert an array into a list of expressions
+fromArrayM :: Mutable t => ArrM t -> Comp [t]
+fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
+
+-- | Access an element from a 1-D array
 accessM :: Mutable t => ArrM t -> Int -> Comp t
 accessM ((ArrayRef _ _ addr)) i = readHeap (addr, i)
 
@@ -461,7 +469,24 @@ mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 
 --------------------------------------------------------------------------------
 
--- | Assert that the given expression is true
+-- | Assert that the given expression evaluates to 'true'.
+--
+--   Assertions play a central role in Keelung, as Keelung is all about constraints between variables.
+--
+--   /Example/
+--
+--   Consider the following program that takes two inputs and asserts that the second input is the square of the first:
+--
+--   @
+-- square :: Comp ()
+-- square = do
+--     x <- input
+--     y <- input
+--     -- assert that 'y' is the square of 'x'
+--     assert (y `eq` (x * x))
+--   @
+--
+--   @since 0.1.0.0
 assert :: Boolean -> Comp ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}
 
@@ -483,6 +508,14 @@ instance Reusable Field where
     assignF var val
     return (VarF var)
 
+instance KnownNat w => Reusable (UInt w) where
+  reuse val = do
+    var <- freshVarU (widthOf val)
+    heap <- gets compHeap
+    let encoded = runHeapM heap (encode' val)
+    assignU (widthOf val) var encoded
+    return (VarU var)
+
 instance (Reusable t, Mutable t) => Reusable (ArrM t) where
   reuse = return
 
@@ -502,8 +535,31 @@ assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (
 -- Asserting DivMod relations
 --------------------------------------------------------------------------------
 
--- | TODO: Replace this with methods from the `Integral` class
-performDivMod :: forall w. KnownNat w => UInt w -> UInt w -> Comp (UInt w, UInt w)
+-- | Computes the quotient and remainder of two 'UInt' arguments: the dividend and the divisor.
+--
+--   Note that because 'performDivMod' is a statement, it can only be executed in the 'Comp' context, as shown in the example below:
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input
+--     divisor <- input
+--     (quotient, remainder) <- performDivMod dividend divisor
+--     return quotient
+--   @
+--
+--   @since 0.8.3.0
+performDivMod ::
+  forall w.
+  KnownNat w =>
+  -- | The dividend
+  UInt w ->
+  -- | The devisor
+  UInt w ->
+  -- | The quotient and remainder
+  Comp (UInt w, UInt w)
 performDivMod dividend divisor = do
   remainder <- freshVarU width
   quotient <- freshVarU width
@@ -512,8 +568,34 @@ performDivMod dividend divisor = do
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
--- | Assert that dividend = divisor * quotient + remainder
-assertDivMod :: forall w. KnownNat w => UInt w -> UInt w -> UInt w -> UInt w -> Comp ()
+-- | Instead of computing the quotient and remainder from the dividend and divisor with 'performDivMod',
+--   we can enforce a relation between the dividend, divisor, quotient, and remainder in Keelung.
+--
+--   For example, we can enforce the dividend to be an even number and obtain the quotient at
+--   the same time, as shown below:
+--
+--   /Example/
+--
+--   @
+-- assertEven :: UInt 32 -> Comp (UInt 32)
+-- assertEven dividend = do
+--     assertDivMod dividend 2 quotient 0
+--     return quotient
+--   @
+--
+--   @since 0.8.3.0
+assertDivMod ::
+  forall w.
+  KnownNat w =>
+  -- | The dividend
+  UInt w ->
+  -- | The divisor
+  UInt w ->
+  -- | The quotient
+  UInt w ->
+  -- | The remainder
+  UInt w ->
+  Comp ()
 assertDivMod dividend divisor quotient remainder = do
   heap <- gets compHeap
   let encoded = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
