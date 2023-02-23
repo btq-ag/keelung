@@ -48,6 +48,7 @@ module Keelung.Monad
     accessM,
     accessM2,
     accessM3,
+    lengthOf,
 
     -- * Types
     Computation (..),
@@ -60,7 +61,6 @@ import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
-import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Traversable (mapAccumL)
@@ -339,13 +339,13 @@ freeze3 xs = do
 
 -- | Convert an immutable array to a mutable array
 thaw :: Mutable t => [t] -> Comp (ArrM t)
-thaw = toArrayM . toList
+thaw = toArrayM
 
 thaw2 :: Mutable t => [[t]] -> Comp (ArrM (ArrM t))
-thaw2 xs = mapM thaw (toList xs) >>= toArrayM
+thaw2 xs = mapM thaw xs >>= toArrayM
 
 thaw3 :: Mutable t => [[[t]]] -> Comp (ArrM (ArrM (ArrM t)))
-thaw3 xs = mapM thaw2 (toList xs) >>= toArrayM
+thaw3 xs = mapM thaw2 xs >>= toArrayM
 
 --------------------------------------------------------------------------------
 
