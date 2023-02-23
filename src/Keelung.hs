@@ -3,6 +3,7 @@
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
+    module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
     run,
