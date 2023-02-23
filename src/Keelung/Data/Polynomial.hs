@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | Polynomials over a field for use in constraint systems
 module Keelung.Data.Polynomial
   ( Poly,
     buildEither,
@@ -40,9 +41,9 @@ import Prelude hiding (negate)
 import Prelude qualified
 
 -- | A Poly is a polynomial of the form @c + c₀x₀ + c₁x₁ ... cₙxₙ = 0@
--- 
+--
 --   Invariances:
--- 
+--
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)

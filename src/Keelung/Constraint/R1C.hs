@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | Rank-1 Constraint
 module Keelung.Constraint.R1C (R1C (..), satisfy, freeVars) where
 
 import Control.DeepSeq (NFData)

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_HADDOCK hide #-}
 
+-- | Mutable arrays in Keelung
 module Keelung.Heap
   ( Addr,
     Heap,
@@ -41,11 +42,16 @@ type Heap =
 
 -- | Type of elements of a array
 data ElemType
-  = ElemF -- Field elements
-  | ElemB -- Booleans
-  | ElemU Width
-  | ElemArr ElemType Int -- Arrays (with type of its elements and its size)
-  | EmptyArr -- Currently only empty arrays have this kind
+  = -- | Field elements
+    ElemF
+  | -- | Booleans
+    ElemB
+  | -- | Unsigned integers
+    ElemU Width
+  | -- | Arrays (with type of its elements and its size)
+    ElemArr ElemType Int
+  | -- | For empty arrays
+    EmptyArr
   deriving (Show, Eq, Generic, NFData)
 
 instance Serialize ElemType

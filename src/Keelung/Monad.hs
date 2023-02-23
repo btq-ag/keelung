@@ -4,6 +4,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Monad and statements for building Keelung programs
 module Keelung.Monad
   ( -- * Monad
     Comp,
@@ -318,15 +319,15 @@ inputList3 acc sizeM sizeN sizeO = replicateM sizeM (inputList2 acc sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
--- | Vector version of 'inputs'
+-- | Vector version of 'inputList'
 inputVec :: Proper t => InputAccess -> Int -> Comp (Vector t)
 inputVec acc size = Vec.fromList <$> inputList acc size
 
--- | Vector version of 'inputs2'
+-- | Vector version of 'inputList2'
 inputVec2 :: Proper t => InputAccess -> Int -> Int -> Comp (Vector (Vector t))
 inputVec2 acc sizeM sizeN = Vec.fromList <$> replicateM sizeM (inputVec acc sizeN)
 
--- | Vector version of 'inputs3'
+-- | Vector version of 'inputList3'
 inputVec3 :: Proper t => InputAccess -> Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
 inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 acc sizeN sizeO)
 
@@ -502,7 +503,7 @@ readHeapArray addr = do
 reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
 reduce a xs f = foldM f a xs
 
--- | Map with index, basically 'mapi' in OCaml.
+-- | Map with index, basically @mapi@ in OCaml.
 mapI :: Traversable f => (Int -> a -> b) -> f a -> f b
 mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 
@@ -521,7 +522,7 @@ mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 -- square = do
 --     x <- input
 --     y <- input
---     -- assert that 'y' is the square of 'x'
+--     -- assert that \'y\' is the square of \'x\'
 --     assert (y `eq` (x * x))
 --   @
 --

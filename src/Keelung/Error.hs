@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | Errors of Keelung
 module Keelung.Error where
 
 import Control.DeepSeq (NFData)

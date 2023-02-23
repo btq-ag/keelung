@@ -9,6 +9,7 @@ import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeNats (KnownNat)
 import Keelung.Syntax
 
+-- | Bitwise operations on Keelung values
 class Bits a where
   -- {-# MINIMAL bitWidth #-}
   -- bitWidth :: a -> Int
@@ -49,9 +50,11 @@ class Bits a where
   -- | Reverse all the bits in the argument
   complement :: a -> a
 
+-- | Synonym for 'shift'
 shiftL :: Bits a => a -> Int -> a
 shiftL = shift
 
+-- | Opposite of 'shiftL'
 shiftR :: Bits a => a -> Int -> a
 shiftR x i = shiftR x (-i)
 

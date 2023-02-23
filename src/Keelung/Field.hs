@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 
+-- | Field types provided by the compiler
 module Keelung.Field
   ( B64,
     GF181,

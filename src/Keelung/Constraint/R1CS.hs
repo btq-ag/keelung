@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | Constraint system for rank-1 constraints
 module Keelung.Constraint.R1CS (R1CS (..), toR1Cs, CNEQ (..)) where
 
 import Control.DeepSeq (NFData)
@@ -70,7 +71,7 @@ toR1Cs (R1CS ordinaryConstraints counters _) =
 --------------------------------------------------------------------------------
 
 -- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
--- 
+--
 -- The encoding for constraint @x != y = out@ and some @m@ is:
 --
 --  > (x - y) * m = out
@@ -83,8 +84,12 @@ data CNEQ n
       -- ^ @y@: could be a variable or a constant
       Var
       -- ^ @m@: a constant
-  deriving (
-            Generic, Eq, NFData, Functor)
+  deriving
+    ( Generic,
+      Eq,
+      NFData,
+      Functor
+    )
 
 instance Serialize n => Serialize (CNEQ n)
 

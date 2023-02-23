@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Syntax of the Keelung language
 module Keelung.Syntax
   ( Field (..),
     Boolean (..),

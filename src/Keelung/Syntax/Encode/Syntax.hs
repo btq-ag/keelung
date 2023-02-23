@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | Module for encoding Keelung programs
 module Keelung.Syntax.Encode.Syntax where
 
 import Control.DeepSeq (NFData)

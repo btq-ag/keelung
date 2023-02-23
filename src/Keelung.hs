@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
@@ -11,15 +12,14 @@ module Keelung
     compileO0,
     compileO2,
     compileWithOpts,
-    optOptimize,
     rtsoptProf,
     rtsoptMemory,
     generate,
     verify,
     genCircuit,
     genWitness,
+    genInputs,
     interpret,
-    interpret_,
     gf181,
     bn128,
     b64,
@@ -33,8 +33,10 @@ where
 import Control.Monad.Except
 import Data.ByteString.Char8 qualified as BS
 import Data.Field.Galois (GaloisField)
+import Data.List (intercalate)
 import Data.Serialize (Serialize)
 import Data.Serialize qualified as Serialize
+import Data.String (IsString (fromString))
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Bits
 import Keelung.Data.Struct (Struct (..))
@@ -50,8 +52,6 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
-import Data.List (intercalate)
-import Data.String (IsString(fromString))
 
 --------------------------------------------------------------------------------
 
@@ -59,13 +59,15 @@ import Data.String (IsString(fromString))
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile = compileWithOpts 1 [] []
 
+-- | Compile a program to a 'R1CS' constraint system with optimization level 0.
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 = compileWithOpts 0 [] []
 
+-- | Compile a program to a 'R1CS' constraint system with optimization level 2.
 compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO2 = compileWithOpts 2 [] []
 
--- The first argument speficies an optimization level.
+-- | Compile a program to a 'R1CS' constraint system with optimization level and RTS options as arguments.
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
@@ -74,14 +76,15 @@ compileWithOpts level opts rtsopts fieldType prog = runM $ do
     GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
     BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
     B64 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS B64))
+  where
+    optOptimize :: Int -> String
+    optOptimize i = "O" <> show i
 
--- Common options
-optOptimize :: Int -> String
-optOptimize i = "O" <> show i
-
+-- | Default RTS options for profiling
 rtsoptProf :: [String]
 rtsoptProf = ["-p"]
 
+-- | Helper function for compiling RTS options
 -- Memory size in GB for RTS options -M, -H and in MB for -A
 -- Try to increase if keelungc produces segmentation fault.
 -- https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html
@@ -114,6 +117,7 @@ generate_ fieldType prog publicInput privateInput = runM $ do
       return (proofPath, msg)
     else throwError CannotLocateProver
 
+-- | Generate a proof
 generate :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 generate fieldType prog publicInput privateInput = do
   result <- generate_ fieldType prog publicInput privateInput
@@ -141,6 +145,7 @@ verify_ = runM $ do
       Process.readProcess "instrument_aurora_snark_verify" arguments mempty
     else throwError CannotLocateVerifier
 
+-- | Verify a proof
 verify :: IO ()
 verify = do
   result <- verify_
@@ -163,12 +168,15 @@ genWitness_ fieldType prog publicInput privateInput = do
   elab <- liftEither (elaborateAndEncode prog)
   wrapper ["protocol", "genWitness"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
 
+-- | Generate parameters for a program and write them to parameter.json.
 genParameters :: M ()
 genParameters = lift $ BS.writeFile "parameter.json" "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
 
+-- | For generating witness.jsonl
 genWitness :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 genWitness fieldType prog publicInput privateInput = runM (genWitness_ fieldType prog publicInput privateInput) >>= printErrorInstead
 
+-- | For generating inputs.jsonl
 genInputs :: (Integral n) => [n] -> M ()
 genInputs inputs = do
   let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show . toInteger) inputs
@@ -323,12 +331,12 @@ type M = ExceptT Error IO
 runM :: M a -> IO (Either Error a)
 runM = runExceptT
 
-liftEitherT :: IO (Either Error a) -> M a
-liftEitherT f = do
-  result <- lift f
-  case result of
-    Left err -> throwError err
-    Right x -> return x
+-- liftEitherT :: IO (Either Error a) -> M a
+-- liftEitherT f = do
+--   result <- lift f
+--   case result of
+--     Left err -> throwError err
+--     Right x -> return x
 
 -- | Handle 'IO' Exceptions in the 'M' Monad
 catchIOError :: Error -> IO a -> M a
