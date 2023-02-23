@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Keelung.Data.BinRep where
 

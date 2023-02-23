@@ -9,7 +9,6 @@ module Keelung.Field
     GF181,
     BN128,
     FieldType (..),
-    -- AcceptedField(..),
     realizeAs,
     normalize,
     module Keelung.Data.N,
@@ -51,19 +50,6 @@ data FieldType
   | GF181 -- Prime field of order 181
   | BN128 -- Barreto-Naehrig
   deriving (Generic, Eq, Show, NFData)
-
--- | Typeclass for reflecting the field type
--- class AcceptedField n where
---   encodeFieldType :: forall proxy. proxy n -> FieldType
-
--- instance AcceptedField B64 where
---   encodeFieldType = const B64
-
--- instance AcceptedField GF181 where
---   encodeFieldType = const GF181
-
--- instance AcceptedField BN128 where
---   encodeFieldType = const BN128
 
 -- | Restore the field type from an Integer
 realizeAs :: Num n => FieldType -> Integer -> n

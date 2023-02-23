@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Constraint.R1C where
+module Keelung.Constraint.R1C (R1C (..), satisfy, freeVars) where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)

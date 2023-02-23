@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Keelung.Syntax.Counters
   ( Counters (..),
@@ -286,9 +287,9 @@ getBooleanConstraintRanges counters@(Counters o i1 i2 _ _ _ _) =
 
 prettyVariables :: Counters -> String
 prettyVariables counters@(Counters o i1 i2 _ _ _ _) =
-  let publicInputOffset  = offsetOfSort counters OfPublicInput
+  let publicInputOffset = offsetOfSort counters OfPublicInput
       privateInputOffset = offsetOfSort counters OfPrivateInput
-      outputOffset       = offsetOfSort counters OfOutput
+      outputOffset = offsetOfSort counters OfOutput
       totalSize = getTotalCount counters
 
       outputVars = case smallCounterSize o of

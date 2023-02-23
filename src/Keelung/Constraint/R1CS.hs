@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Constraint.R1CS where
+module Keelung.Constraint.R1CS (R1CS (..), toR1Cs, CNEQ (..)) where
 
 import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
@@ -21,7 +21,7 @@ data R1CS n = R1CS
     r1csConstraints :: [R1C n],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
-    -- | For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
+    -- | For restoring CNQZ constraints during R1CS / ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n]
   }
   deriving (Generic, Eq, NFData, Functor)

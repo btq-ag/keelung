@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 module Keelung.Prof
   ( compileProf,
     compileProfWithOpts,

@@ -36,6 +36,7 @@ module Keelung.Monad
     reduce,
 
     -- * Mutable Array
+    ArrM,
     Mutable,
     toArrayM,
     fromArrayM,

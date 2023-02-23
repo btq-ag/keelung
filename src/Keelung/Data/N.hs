@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Keelung.Data.N where
 
