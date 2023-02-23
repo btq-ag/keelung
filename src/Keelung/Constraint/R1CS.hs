@@ -21,7 +21,7 @@ data R1CS n = R1CS
     r1csConstraints :: [R1C n],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
-    -- | For restoring CNQZ constraints during R1CS / ConstraintSystem conversion
+    -- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
     r1csCNEQs :: [CNEQ n]
   }
   deriving (Generic, Eq, NFData, Functor)
@@ -35,7 +35,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
       <> prettyVariables counters
       <> "}"
 
--- | Return R1Cs from a R1CS, includes:
+-- | Returns 'R1C's from a 'R1CS', including:
 --   1. ordinary constraints
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
@@ -69,18 +69,22 @@ toR1Cs (R1CS ordinaryConstraints counters _) =
 
 --------------------------------------------------------------------------------
 
--- For restoring CNQZ constraints during R1CS <-> ConstraintSystem conversion
-
--- Constraint 'x != y = out'
--- The encoding is, for some 'm':
---  1. (x - y) * m = out
---  2. (x - y) * (1 - out) = 0
+-- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
+-- 
+-- The encoding for constraint @x != y = out@ and some @m@ is:
+--
+--  > (x - y) * m = out
+--  > (x - y) * (1 - out) = 0
 data CNEQ n
   = CNEQ
-      (Either Var n) -- 'x' could be a variable or a constant
-      (Either Var n) -- 'y' could be a variable or a constant
-      Var -- m
-  deriving (Generic, Eq, NFData, Functor)
+      (Either Var n)
+      -- ^ @x@: could be a variable or a constant
+      (Either Var n)
+      -- ^ @y@: could be a variable or a constant
+      Var
+      -- ^ @m@: a constant
+  deriving (
+            Generic, Eq, NFData, Functor)
 
 instance Serialize n => Serialize (CNEQ n)
 

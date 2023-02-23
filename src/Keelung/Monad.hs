@@ -153,7 +153,14 @@ modifyCounter f = modify (\comp -> comp {compCounters = f (compCounters comp)})
 -- Variable & Input Variable
 --------------------------------------------------------------------------------
 
-data InputAccess = Public | Private
+-- | Modifier for input variables
+--
+--   @since 0.8.4.0
+data InputAccess
+  = -- | For public input variables, visible to the prover and the verifier
+    Public
+  | -- | For private input variables, visible to the prover only
+    Private
 
 -- | Allocate a fresh 'Field' variable.
 --
@@ -329,11 +336,13 @@ inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 a
 freeze :: Mutable t => ArrM t -> Comp [t]
 freeze = fromArrayM
 
+-- | Convert a mutable 2D-array to a list of lists
 freeze2 :: Mutable t => ArrM (ArrM t) -> Comp [[t]]
 freeze2 xs = do
   xs' <- fromArrayM xs
   mapM freeze xs'
 
+-- | Convert a mutable 3D-array to a list of lists of lists
 freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp [[[t]]]
 freeze3 xs = do
   xs' <- fromArrayM xs
@@ -343,9 +352,11 @@ freeze3 xs = do
 thaw :: Mutable t => [t] -> Comp (ArrM t)
 thaw = toArrayM
 
+-- | Convert a list of lists to a mutable 2D-array
 thaw2 :: Mutable t => [[t]] -> Comp (ArrM (ArrM t))
 thaw2 xs = mapM thaw xs >>= toArrayM
 
+-- | Convert a list of lists of lists to a mutable 3D-array
 thaw3 :: Mutable t => [[[t]]] -> Comp (ArrM (ArrM (ArrM t)))
 thaw3 xs = mapM thaw2 xs >>= toArrayM
 

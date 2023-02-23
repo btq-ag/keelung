@@ -211,7 +211,7 @@ bn128 prog publicInput privateInput = map N <$> (interpret_ BN128 prog publicInp
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program and convert it to the Typed Syntax
+-- | Elaborate a program and encode it
 elaborateAndEncode :: Encode t => Comp t -> Either Error Encoding.Elaborated
 elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where

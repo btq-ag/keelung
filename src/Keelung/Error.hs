@@ -12,6 +12,7 @@ import Keelung.Heap (Addr)
 
 --------------------------------------------------------------------------------
 
+-- | Errors that can occur when running commands
 data Error
   = DecodeError String -- Cannot decode the output from the Keelung compiler
   | CannotLocateKeelungC -- Cannot locate the Keelung compiler
@@ -44,9 +45,8 @@ instance Serialize Error
 
 --------------------------------------------------------------------------------
 
-data ElabError
-  = IndexOutOfBoundsError Addr Int (IntMap Int)
-  | IndexOutOfBoundsError2 Int Int
+-- | Errors that can occur during elaboration
+data ElabError = IndexOutOfBoundsError Addr Int (IntMap Int)
   deriving (Eq, Generic, NFData)
 
 instance Serialize ElabError
@@ -59,5 +59,3 @@ instance Show ElabError where
       ++ show addr
       ++ " of length "
       ++ show (IntMap.size array)
-  show (IndexOutOfBoundsError2 len index) =
-    "Index " ++ show index ++ " out of bounds for array of length " ++ show len

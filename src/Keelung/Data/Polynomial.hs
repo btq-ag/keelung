@@ -39,8 +39,10 @@ import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import Prelude qualified
 
--- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
+-- | A Poly is a polynomial of the form @c + c₀x₀ + c₁x₁ ... cₙxₙ = 0@
+-- 
 --   Invariances:
+-- 
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)
@@ -48,7 +50,7 @@ data Poly n = Poly !n !(IntMap n)
 
 instance Serialize n => Serialize (Poly n)
 
--- 2 Poly's are the same, if they have the same coefficients and variables
+-- | Two polynomials are the same, if they have the same coefficients and variables
 -- or one is the negation of the other
 instance (Eq n, Num n) => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
@@ -141,7 +143,7 @@ mergeCoeffs xs ys = IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys
 constant :: Poly n -> n
 constant (Poly c _) = c
 
--- | View pattern for Poly
+-- | View pattern for 'Poly'
 view :: Poly n -> (n, IntMap n)
 view (Poly c xs) = (c, xs)
 
@@ -178,7 +180,7 @@ substWithPoly (Poly c xs) var (Poly d ys) =
       buildMaybe (c + d) xs'
     else return $ Poly c xs
 
--- | Substitute variables in a Poly with a vector of values.
+-- | Substitute variables in a 'Poly' with a 'Vector' of values.
 substWithVector :: (Num n, Eq n) => Poly n -> Vector (Maybe n) -> Either n (Poly n)
 substWithVector (Poly c xs) bindings =
   let (c', xs') =
@@ -193,7 +195,7 @@ substWithVector (Poly c xs) bindings =
           xs
    in buildEither' c' xs'
 
--- | Substitute variables in a Poly with an IntMap of values.
+-- | Substitute variables in a 'Poly' with an 'IntMap' of values.
 substWithIntMap :: (Num n, Eq n) => Poly n -> IntMap n -> Either n (Poly n)
 substWithIntMap (Poly c xs) bindings =
   let (c', xs') =

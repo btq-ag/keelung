@@ -7,7 +7,7 @@ module Keelung.Syntax
   ( Field (..),
     Boolean (..),
     UInt (..),
-    widthOf,
+    HasWidth (..),
     Cmp (..),
     true,
     false,
@@ -181,6 +181,7 @@ instance KnownNat w => Num (UInt w) where
 
 -- | Typeclass for deriving the bit width of an expression
 class HasWidth a where
+  -- | Derive the bit width of an expression
   widthOf :: a -> Int
 
 instance KnownNat w => HasWidth (UInt w) where

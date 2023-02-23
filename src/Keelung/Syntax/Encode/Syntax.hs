@@ -16,20 +16,34 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
+-- | Booleans
 data Boolean
-  = ValB Bool
-  | VarB Var
-  | VarBI Var
-  | VarBP Var
-  | AndB Boolean Boolean
-  | OrB Boolean Boolean
-  | XorB Boolean Boolean
-  | NotB Boolean
-  | IfB Boolean Boolean Boolean
-  | EqB Boolean Boolean
-  | EqF Field Field
-  | EqU Width UInt UInt
-  | BitU Width UInt Int
+  = -- | Boolean values
+    ValB Bool
+  | -- | Boolean variables
+    VarB Var
+  | -- | Boolean public input variables
+    VarBI Var
+  | -- | Boolean private input variables
+    VarBP Var
+  | -- | Conjunction
+    AndB Boolean Boolean
+  | -- | Disjunction
+    OrB Boolean Boolean
+  | -- | Exclusive disjunction
+    XorB Boolean Boolean
+  | -- | Complement
+    NotB Boolean
+  | -- | Conditional that returns a Boolean
+    IfB Boolean Boolean Boolean
+  | -- | Equality on Booleans
+    EqB Boolean Boolean
+  | -- | Equality on Field elements
+    EqF Field Field
+  | -- | Equality on Unsigned integers
+    EqU Width UInt UInt
+  | -- | Bit test on Unsigned integers
+    BitU Width UInt Int
   deriving (Generic, Eq, NFData)
 
 instance Serialize Boolean
@@ -52,18 +66,30 @@ instance Show Boolean where
 
 --------------------------------------------------------------------------------
 
+-- | Field elements
 data Field
-  = ValF Integer
-  | ValFR Rational
-  | VarF Var
-  | VarFI Var
-  | VarFP Var
-  | AddF Field Field
-  | SubF Field Field
-  | MulF Field Field
-  | DivF Field Field
-  | IfF Boolean Field Field
-  | BtoF Boolean
+  = -- | Integral values
+    ValF Integer
+  | -- | Rational values
+    ValFR Rational
+  | -- | Field element variables
+    VarF Var
+  | -- | Field element public input variables
+    VarFI Var
+  | -- | Field element private input variables
+    VarFP Var
+  | -- | Addition
+    AddF Field Field
+  | -- | Subtraction
+    SubF Field Field
+  | -- | Multiplication
+    MulF Field Field
+  | -- |  Division (without remainders)
+    DivF Field Field
+  | -- | Conditional that returns a Field element
+    IfF Boolean Field Field
+  | -- | Conversion from Boolean to Field element
+    BtoF Boolean
   deriving (Generic, Eq, NFData)
 
 instance Serialize Field
@@ -84,23 +110,40 @@ instance Show Field where
 
 --------------------------------------------------------------------------------
 
+-- | Unsigned Integers
 data UInt
-  = ValU Width Integer
-  | VarU Width Var
-  | VarUI Width Var
-  | VarUP Width Var
-  | AddU Width UInt UInt
-  | SubU Width UInt UInt
-  | MulU Width UInt UInt
-  | AndU Width UInt UInt
-  | OrU Width UInt UInt
-  | XorU Width UInt UInt
-  | NotU Width UInt
-  | RoLU Width Int UInt
-  | ShLU Width Int UInt
-  | SetU Width UInt Int Boolean
-  | IfU Width Boolean UInt UInt
-  | BtoU Width Boolean
+  = -- | Unsigned integers values
+    ValU Width Integer
+  | -- | Unsigned integer variables
+    VarU Width Var
+  | -- | Unsigned integer public input variables
+    VarUI Width Var
+  | -- | Unsigned integer private input variables
+    VarUP Width Var
+  | -- | Addition
+    AddU Width UInt UInt
+  | -- | Subtraction
+    SubU Width UInt UInt
+  | -- | Multiplication
+    MulU Width UInt UInt
+  | -- | Bitwise conjunction
+    AndU Width UInt UInt
+  | -- | Bitwise disjunction
+    OrU Width UInt UInt
+  | -- | Bitwise exclusive disjunction
+    XorU Width UInt UInt
+  | -- | Bitwise complement
+    NotU Width UInt
+  | -- | Rotate left
+    RoLU Width Int UInt
+  | -- | Shift left
+    ShLU Width Int UInt
+  | -- | Set bit and return the result
+    SetU Width UInt Int Boolean
+  | -- | Conditional that returns an Unsigned integer
+    IfU Width Boolean UInt UInt
+  | -- | Conversion from Boolean to Unsigned integer
+    BtoU Width Boolean
   deriving (Generic, Eq, NFData)
 
 instance Serialize UInt
@@ -142,12 +185,18 @@ instance Show UInt where
 
 --------------------------------------------------------------------------------
 
+-- | Encoding of the Keelung syntax
 data Expr
-  = Unit
-  | Boolean Boolean
-  | Field Field
-  | UInt UInt
-  | Array (Array Int Expr)
+  = -- | Unit
+    Unit
+  | -- | Booleans
+    Boolean Boolean
+  | -- | Field element
+    Field Field
+  | -- | Unsigned integers
+    UInt UInt
+  | -- | Arrays
+    Array (Array Int Expr)
   deriving (Generic, Eq, NFData)
 
 instance Show Expr where
@@ -164,6 +213,7 @@ instance Serialize FieldType
 
 --------------------------------------------------------------------------------
 
+-- | Encoding of a Keelung program after elaboration
 data Elaborated = Elaborated
   { -- | The resulting 'Expr'
     elabExpr :: !Expr,

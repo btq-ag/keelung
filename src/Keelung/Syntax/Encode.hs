@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Module for converting Kinded syntax to Typed syntax
+-- | Module for encoding Keelung syntax
 module Keelung.Syntax.Encode
   ( Encode (..),
     runHeapM,
@@ -16,63 +16,64 @@ import Data.IntMap qualified as IntMap
 import GHC.TypeLits (KnownNat)
 import Keelung.Heap
 import Keelung.Syntax (widthOf)
-import Keelung.Syntax qualified as Kinded
+import Keelung.Syntax qualified as Syntax
 import Keelung.Syntax.Encode.Syntax
 
 --------------------------------------------------------------------------------
 
 -- | MultiParam version of 'Encode'
 class Encode' a b where
+  -- | Encode a Keelung expression
   encode' :: a -> HeapM b
 
-instance Encode' Kinded.Boolean Boolean where
+instance Encode' Syntax.Boolean Boolean where
   encode' expr = case expr of
-    Kinded.Boolean b -> return $ ValB b
-    Kinded.VarB var -> return $ VarB var
-    Kinded.VarBI var -> return $ VarBI var
-    Kinded.VarBP var -> return $ VarBP var
-    Kinded.And x y -> AndB <$> encode' x <*> encode' y
-    Kinded.Or x y -> OrB <$> encode' x <*> encode' y
-    Kinded.Xor x y -> XorB <$> encode' x <*> encode' y
-    Kinded.Not x -> NotB <$> encode' x
-    Kinded.IfB p x y -> IfB <$> encode' p <*> encode' x <*> encode' y
-    Kinded.EqB x y -> EqB <$> encode' x <*> encode' y
-    Kinded.EqF x y -> EqF <$> encode' x <*> encode' y
-    Kinded.EqU x y -> EqU (widthOf x) <$> encode' x <*> encode' y
-    Kinded.BitU x i -> BitU (widthOf x) <$> encode' x <*> pure i
+    Syntax.Boolean b -> return $ ValB b
+    Syntax.VarB var -> return $ VarB var
+    Syntax.VarBI var -> return $ VarBI var
+    Syntax.VarBP var -> return $ VarBP var
+    Syntax.And x y -> AndB <$> encode' x <*> encode' y
+    Syntax.Or x y -> OrB <$> encode' x <*> encode' y
+    Syntax.Xor x y -> XorB <$> encode' x <*> encode' y
+    Syntax.Not x -> NotB <$> encode' x
+    Syntax.IfB p x y -> IfB <$> encode' p <*> encode' x <*> encode' y
+    Syntax.EqB x y -> EqB <$> encode' x <*> encode' y
+    Syntax.EqF x y -> EqF <$> encode' x <*> encode' y
+    Syntax.EqU x y -> EqU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.BitU x i -> BitU (widthOf x) <$> encode' x <*> pure i
 
-instance Encode' Kinded.Field Field where
+instance Encode' Syntax.Field Field where
   encode' expr = case expr of
-    Kinded.Integer n -> return $ ValF n
-    Kinded.Rational n -> return $ ValFR n
-    Kinded.VarF var -> return $ VarF var
-    Kinded.VarFI var -> return $ VarFI var
-    Kinded.VarFP var -> return $ VarFP var
-    Kinded.Add x y -> AddF <$> encode' x <*> encode' y
-    Kinded.Sub x y -> SubF <$> encode' x <*> encode' y
-    Kinded.Mul x y -> MulF <$> encode' x <*> encode' y
-    Kinded.Div x y -> DivF <$> encode' x <*> encode' y
-    Kinded.IfF p x y -> IfF <$> encode' p <*> encode' x <*> encode' y
-    Kinded.BtoF b -> BtoF <$> encode' b
+    Syntax.Integer n -> return $ ValF n
+    Syntax.Rational n -> return $ ValFR n
+    Syntax.VarF var -> return $ VarF var
+    Syntax.VarFI var -> return $ VarFI var
+    Syntax.VarFP var -> return $ VarFP var
+    Syntax.Add x y -> AddF <$> encode' x <*> encode' y
+    Syntax.Sub x y -> SubF <$> encode' x <*> encode' y
+    Syntax.Mul x y -> MulF <$> encode' x <*> encode' y
+    Syntax.Div x y -> DivF <$> encode' x <*> encode' y
+    Syntax.IfF p x y -> IfF <$> encode' p <*> encode' x <*> encode' y
+    Syntax.BtoF b -> BtoF <$> encode' b
 
-instance KnownNat w => Encode' (Kinded.UInt w) UInt where
+instance KnownNat w => Encode' (Syntax.UInt w) UInt where
   encode' expr = case expr of
-    Kinded.UInt n -> return $ ValU (widthOf expr) n
-    Kinded.VarU var -> return $ VarU (widthOf expr) var
-    Kinded.VarUI var -> return $ VarUI (widthOf expr) var
-    Kinded.VarUP var -> return $ VarUP (widthOf expr) var
-    Kinded.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
-    Kinded.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
-    Kinded.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
-    Kinded.AndU x y -> AndU (widthOf expr) <$> encode' x <*> encode' y
-    Kinded.OrU x y -> OrU (widthOf expr) <$> encode' x <*> encode' y
-    Kinded.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y
-    Kinded.NotU x -> NotU (widthOf expr) <$> encode' x
-    Kinded.IfU p x y -> IfU (widthOf expr) <$> encode' p <*> encode' x <*> encode' y
-    Kinded.RoLU w i x -> RoLU w i <$> encode' x
-    Kinded.ShLU w i x -> ShLU w i <$> encode' x
-    Kinded.SetU x i b -> SetU (widthOf expr) <$> encode' x <*> pure i <*> encode' b
-    Kinded.BtoU n -> BtoU (widthOf expr) <$> encode' n
+    Syntax.UInt n -> return $ ValU (widthOf expr) n
+    Syntax.VarU var -> return $ VarU (widthOf expr) var
+    Syntax.VarUI var -> return $ VarUI (widthOf expr) var
+    Syntax.VarUP var -> return $ VarUP (widthOf expr) var
+    Syntax.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.AndU x y -> AndU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.OrU x y -> OrU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.NotU x -> NotU (widthOf expr) <$> encode' x
+    Syntax.IfU p x y -> IfU (widthOf expr) <$> encode' p <*> encode' x <*> encode' y
+    Syntax.RoLU w i x -> RoLU w i <$> encode' x
+    Syntax.ShLU w i x -> ShLU w i <$> encode' x
+    Syntax.SetU x i b -> SetU (widthOf expr) <$> encode' x <*> pure i <*> encode' b
+    Syntax.BtoU n -> BtoU (widthOf expr) <$> encode' n
 
 --------------------------------------------------------------------------------
 
@@ -80,13 +81,13 @@ instance KnownNat w => Encode' (Kinded.UInt w) UInt where
 class Encode a where
   encode :: a -> HeapM Expr
 
-instance Encode Kinded.Boolean where
+instance Encode Syntax.Boolean where
   encode expr = Boolean <$> encode' expr
 
-instance Encode Kinded.Field where
+instance Encode Syntax.Field where
   encode expr = Field <$> encode' expr
 
-instance KnownNat w => Encode (Kinded.UInt w) where
+instance KnownNat w => Encode (Syntax.UInt w) where
   encode expr = UInt <$> encode' expr
 
 instance Encode () where
@@ -111,9 +112,11 @@ instance (Encode a, Encode b) => Encode (a, b) where
 -- | Reader Monad for Heap lookups
 type HeapM = Reader Heap
 
+-- | Run a HeapM computation
 runHeapM :: Heap -> HeapM a -> a
 runHeapM h m = runReader m h
 
+-- | Read an array from the heap
 readArray :: Addr -> Int -> HeapM Expr
 readArray addr len = Array <$> mapM (readHeap addr) indices
   where
