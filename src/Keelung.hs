@@ -49,6 +49,8 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+import Data.List (intercalate)
+import Data.String (IsString(fromString))
 
 --------------------------------------------------------------------------------
 
@@ -108,9 +110,6 @@ generate_ fieldType prog publicInput privateInput = runM $ do
               proofPath
             ]
       msg <- Process.readProcess "instrument_aurora_snark_proof" arguments mempty
-      Path.removeFile "circuit.jsonl"
-      Path.removeFile "witness.jsonl"
-      Path.removeFile "parameter.json"
       return (proofPath, msg)
     else throwError CannotLocateProver
 
@@ -122,12 +121,9 @@ generate fieldType prog publicInput privateInput = do
     Right (_, msg) -> putStr msg
 
 -- | Generate and verify a proof
-verify_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error String)
-verify_ fieldType prog publicInput privateInput = runM $ do
-  (proofPath, _) <- liftEitherT $ generate_ fieldType prog publicInput privateInput
+verify_ :: IO (Either Error String)
+verify_ = runM $ do
   exists <- checkCmd "instrument_aurora_snark_verify"
-  _ <- genCircuit fieldType prog
-  _ <- genWitness_ fieldType prog publicInput privateInput
   genParameters
   if exists
     then lift $ do
@@ -135,22 +131,18 @@ verify_ fieldType prog publicInput privateInput = runM $ do
             [ "--r1cs_filepath",
               "circuit.jsonl",
               "--input_filepath",
-              "witness.jsonl",
+              "inputs.jsonl",
               "--parameter_filepath",
               "parameter.json",
               "--proof_filepath",
-              proofPath
+              "proof"
             ]
-      msg <- Process.readProcess "instrument_aurora_snark_verify" arguments mempty
-      Path.removeFile "circuit.jsonl"
-      Path.removeFile "witness.jsonl"
-      Path.removeFile "parameter.json"
-      return msg
+      Process.readProcess "instrument_aurora_snark_verify" arguments mempty
     else throwError CannotLocateVerifier
 
-verify :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-verify fieldType prog publicInput privateInput = do
-  result <- verify_ fieldType prog publicInput privateInput
+verify :: IO ()
+verify = do
+  result <- verify_
   case result of
     Left err -> print err
     Right msg -> putStr msg
@@ -175,6 +167,11 @@ genParameters = lift $ BS.writeFile "parameter.json" "{\"security_level\": 128, 
 
 genWitness :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 genWitness fieldType prog publicInput privateInput = runM (genWitness_ fieldType prog publicInput privateInput) >>= printErrorInstead
+
+genInputs :: (Integral n) => [n] -> M ()
+genInputs inputs = do
+  let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show . toInteger) inputs
+  lift $ BS.writeFile "inputs.jsonl" $ fromString $ "{\"inputs\":[" ++ inputs' ++ "]}"
 
 --------------------------------------------------------------------------------
 
