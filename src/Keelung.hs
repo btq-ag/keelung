@@ -19,6 +19,7 @@ module Keelung
     genCircuit,
     genWitness,
     genInputs,
+    interpret_,
     interpret,
     gf181,
     bn128,
@@ -184,6 +185,7 @@ genInputs inputs = do
 
 --------------------------------------------------------------------------------
 
+-- | Interpret a program
 interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error [n])
 interpret_ fieldType prog publicInput privateInput = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
@@ -199,7 +201,7 @@ printErrorInstead (Right values) = return values
 run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
 run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
 
--- | Interpret a program with inputs
+-- | Interpret a program with public and private inputs
 interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
 
