@@ -36,7 +36,7 @@ module Keelung.Monad
     reduce,
 
     -- * Mutable Array
-    Mutable (updateM),
+    Mutable,
     toArrayM,
     fromArrayM,
     freeze,
@@ -48,6 +48,7 @@ module Keelung.Monad
     accessM,
     accessM2,
     accessM3,
+    updateM,
     lengthOf,
 
     -- * Types
@@ -323,7 +324,7 @@ inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 a
 
 --------------------------------------------------------------------------------
 
--- | Convert a mutable array to an immutable array
+-- | Convert a mutable array to a Haskell list
 freeze :: Mutable t => ArrM t -> Comp [t]
 freeze = fromArrayM
 
@@ -337,7 +338,7 @@ freeze3 xs = do
   xs' <- fromArrayM xs
   mapM freeze2 xs'
 
--- | Convert an immutable array to a mutable array
+-- | Convert a Haskell list to a mutable array
 thaw :: Mutable t => [t] -> Comp (ArrM t)
 thaw = toArrayM
 
@@ -352,81 +353,61 @@ thaw3 xs = mapM thaw2 xs >>= toArrayM
 -- | Typeclass for retrieving the element of an array
 class Mutable t where
   -- | Allocates a fresh variable for a value
-  alloc :: t -> Comp (Var, t)
+  alloc :: t -> Comp Var
 
   typeOf :: t -> ElemType
 
-  -- | Update an entry of an array.
-  updateM :: ArrM t -> Int -> t -> Comp ()
-
   constructElement :: ElemType -> Addr -> t
 
-instance Mutable ref => Mutable (ArrM ref) where
-  alloc xs@((ArrayRef elemType len _)) = do
-    elements <- mapM (accessM xs) [0 .. len - 1]
-    allocArray elemType elements
-
-  typeOf ((ArrayRef elemType len _)) = ElemArr elemType len
-
-  constructElement (ElemArr l k) elemAddr = ArrayRef l k elemAddr
-  constructElement EmptyArr elemAddr = ArrayRef EmptyArr 0 elemAddr
-  constructElement _ _ = error "expecting element to be array"
-
-  updateM (ArrayRef elemType _ addr) i expr = do
-    (var, _) <- alloc expr
-    writeHeap addr elemType (i, var)
-
 instance Mutable Field where
+  alloc (VarF var) = return var
   alloc val = do
     var <- freshVarF
     assignF var val
-    return (var, VarF var)
+    return var
 
   typeOf _ = ElemF
-
-  updateM (ArrayRef _ _ addr) i (VarF n) = writeHeap addr ElemF (i, n)
-  updateM (ArrayRef elemType _ addr) i expr = do
-    (var, _) <- alloc expr
-    writeHeap addr elemType (i, var)
 
   constructElement ElemF elemAddr = VarF elemAddr
   constructElement _ _ = error "expecting element to be of Num"
 
 instance Mutable Boolean where
+  alloc (VarB var) = return var
   alloc val = do
     var <- freshVarB
     assignB var val
-    return (var, VarB var)
+    return var
 
   typeOf _ = ElemB
-
-  updateM (ArrayRef _ _ addr) i (VarB n) = writeHeap addr ElemB (i, n)
-  updateM (ArrayRef elemType _ addr) i expr = do
-    (var, _) <- alloc expr
-    writeHeap addr elemType (i, var)
 
   constructElement ElemB elemAddr = VarB elemAddr
   constructElement _ _ = error "expecting element to be of Bool"
 
 instance KnownNat w => Mutable (UInt w) where
+  alloc (VarU var) = return var
   alloc val = do
     let width = widthOf val
     var <- freshVarU width
     heap <- gets compHeap
     let encoded = runHeapM heap (encode' val)
     assignU width var encoded
-    return (var, VarU var)
+    return var
 
-  typeOf :: KnownNat w => UInt w -> ElemType
   typeOf val = ElemU (widthOf val)
-
-  updateM (ArrayRef _ _ addr) i val@(VarU n) = writeHeap addr (ElemU (widthOf val)) (i, n)
-  updateM (ArrayRef elemType _ addr) i expr = do
-    (var, _) <- alloc expr
-    writeHeap addr elemType (i, var)
 
   constructElement (ElemU _) elemAddr = VarU elemAddr
   constructElement _ _ = error "expecting element to be of UInt"
+
+instance Mutable ref => Mutable (ArrM ref) where
+  alloc xs@((ArrayRef elemType len _)) = do
+    elements <- mapM (accessM xs) [0 .. len - 1]
+    fst <$> allocArray elemType elements
+
+  typeOf ((ArrayRef elemType len _)) = ElemArr elemType len
+
+  constructElement (ElemArr l k) elemAddr = ArrayRef l k elemAddr
+  constructElement EmptyArr elemAddr = ArrayRef EmptyArr 0 elemAddr
+  constructElement _ _ = error "expecting element to be array"
 
 -- | Converts a list of values to an 1D-array
 toArrayM :: Mutable t => [t] -> Comp (ArrM t)
@@ -453,6 +434,12 @@ accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
 accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
 
+-- | Update an entry of an array.
+updateM :: Mutable t => ArrM t -> Int -> t -> Comp ()
+updateM (ArrayRef elemType _ addr) i expr = do
+  var <- alloc expr
+  writeHeap addr elemType (i, var)
+
 --------------------------------------------------------------------------------
 
 -- | Internal helper function for allocating an array with values
@@ -462,7 +449,7 @@ allocArray elemType vals = do
   addr <- gets compAddrSize
   modify (\st -> st {compAddrSize = succ addr})
   -- allocate new variables for each element
-  addresses <- map fst <$> mapM alloc vals
+  addresses <- mapM alloc vals
   let bindings = IntMap.fromDistinctAscList $ zip [0 ..] addresses
   modifyHeap (IntMap.insert addr (elemType, bindings))
   return (addr, ArrayRef elemType (length vals) addr)
