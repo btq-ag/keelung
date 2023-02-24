@@ -102,6 +102,7 @@ generate_ fieldType prog publicInput privateInput = runM $ do
   _ <- genWitness_ fieldType prog publicInput privateInput
   proofPath <- lift $ Path.makeAbsolute "proof"
   genParameters
+  genInputs publicInput
   if exists
     then lift $ do
       let arguments =
