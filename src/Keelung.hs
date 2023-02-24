@@ -102,6 +102,7 @@ generate_ fieldType prog publicInput privateInput = runM $ do
   _ <- genWitness_ fieldType prog publicInput privateInput
   proofPath <- lift $ Path.makeAbsolute "proof"
   genParameters
+  genInputs publicInput
   lift $ do
     let arguments =
           args
@@ -136,7 +137,7 @@ verify_ = runM $ do
             ++ [ "--r1cs_filepath",
                  "circuit.jsonl",
                  "--input_filepath",
-                 "inputs.jsonl",
+                 "witness.jsonl",
                  "--parameter_filepath",
                  "parameter.json",
                  "--proof_filepath",
