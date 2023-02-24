@@ -97,7 +97,7 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 -- | Generate a proof
 generate_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
 generate_ fieldType prog publicInput privateInput = runM $ do
-  exists <- checkCmd "instrument_aurora_snark_proof"
+  exists <- checkCmd "aurora_prove"
   _ <- genCircuit fieldType prog
   _ <- genWitness_ fieldType prog publicInput privateInput
   proofPath <- lift $ Path.makeAbsolute "proof"
@@ -114,7 +114,7 @@ generate_ fieldType prog publicInput privateInput = runM $ do
               "--output_filepath",
               proofPath
             ]
-      msg <- Process.readProcess "instrument_aurora_snark_proof" arguments mempty
+      msg <- Process.readProcess "aurora_prove" arguments mempty
       return (proofPath, msg)
     else throwError CannotLocateProver
 
@@ -129,7 +129,7 @@ generate fieldType prog publicInput privateInput = do
 -- | Generate and verify a proof
 verify_ :: IO (Either Error String)
 verify_ = runM $ do
-  exists <- checkCmd "instrument_aurora_snark_verify"
+  exists <- checkCmd "aurora_verify"
   genParameters
   if exists
     then lift $ do
@@ -143,7 +143,7 @@ verify_ = runM $ do
               "--proof_filepath",
               "proof"
             ]
-      Process.readProcess "instrument_aurora_snark_verify" arguments mempty
+      Process.readProcess "aurora_verify" arguments mempty
     else throwError CannotLocateVerifier
 
 -- | Verify a proof
@@ -260,7 +260,8 @@ findKeelungc = do
   if keelungcExists
     then return ("keelungc", [])
     else do
-      dockerExists <- checkCmd "docker"
+      -- dockerExists <- checkCmd "docker"
+      let dockerExists = False
       if dockerExists
         then -- insert "--platform=linux/amd64" when we are not on a x86 machine
         case System.Info.arch of
@@ -320,7 +321,7 @@ checkCmd cmd =
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 8, 4)
+keelungVersion_ = (0, 9, 0)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
