@@ -10,7 +10,7 @@ Check out our [GitBook](https://btq.gitbook.io/keelung/) for more information.
 
 ## Language Reference
 
-The language reference will be available on Hackage soon.
+The language reference is now available on [Hackage](https://hackage.haskell.org/package/keelung).
 
 ## Standard Library
 
