@@ -138,7 +138,7 @@ verify_ = runM $ do
             [ "--r1cs_filepath",
               "circuit.jsonl",
               "--input_filepath",
-              "inputs.jsonl",
+              "witness.jsonl",
               "--parameter_filepath",
               "parameter.json",
               "--proof_filepath",
