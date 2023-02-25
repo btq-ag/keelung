@@ -97,26 +97,26 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 -- | Generate a proof
 generate_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
 generate_ fieldType prog publicInput privateInput = runM $ do
-  exists <- checkCmd "aurora_prove"
+  (cmd, args) <- findAuroraProver
   _ <- genCircuit fieldType prog
   _ <- genWitness_ fieldType prog publicInput privateInput
   proofPath <- lift $ Path.makeAbsolute "proof"
   genParameters
-  if exists
-    then lift $ do
-      let arguments =
-            [ "--r1cs_filepath",
-              "circuit.jsonl",
-              "--input_filepath",
-              "witness.jsonl",
-              "--parameter_filepath",
-              "parameter.json",
-              "--output_filepath",
-              proofPath
-            ]
-      msg <- Process.readProcess "aurora_prove" arguments mempty
-      return (proofPath, msg)
-    else throwError CannotLocateProver
+  genInputs publicInput
+  lift $ do
+    let arguments =
+          args
+            ++ [ "--r1cs_filepath",
+                 "circuit.jsonl",
+                 "--input_filepath",
+                 "witness.jsonl",
+                 "--parameter_filepath",
+                 "parameter.json",
+                 "--output_filepath",
+                 proofPath
+               ]
+    msg <- Process.readProcess cmd arguments mempty
+    return (proofPath, msg)
 
 -- | Generate a proof
 generate :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
@@ -129,22 +129,21 @@ generate fieldType prog publicInput privateInput = do
 -- | Generate and verify a proof
 verify_ :: IO (Either Error String)
 verify_ = runM $ do
-  exists <- checkCmd "aurora_verify"
+  (cmd, args) <- findAuroraVerifier
   genParameters
-  if exists
-    then lift $ do
-      let arguments =
-            [ "--r1cs_filepath",
-              "circuit.jsonl",
-              "--input_filepath",
-              "inputs.jsonl",
-              "--parameter_filepath",
-              "parameter.json",
-              "--proof_filepath",
-              "proof"
-            ]
-      Process.readProcess "aurora_verify" arguments mempty
-    else throwError CannotLocateVerifier
+  lift $ do
+    let arguments =
+          args
+            ++ [ "--r1cs_filepath",
+                 "circuit.jsonl",
+                 "--input_filepath",
+                 "witness.jsonl",
+                 "--parameter_filepath",
+                 "parameter.json",
+                 "--proof_filepath",
+                 "proof"
+               ]
+    Process.readProcess cmd arguments mempty
 
 -- | Verify a proof
 verify :: IO ()
@@ -260,14 +259,42 @@ findKeelungc = do
   if keelungcExists
     then return ("keelungc", [])
     else do
-      -- dockerExists <- checkCmd "docker"
-      let dockerExists = False
+      dockerExists <- checkCmd "docker"
       if dockerExists
-        then -- insert "--platform=linux/amd64" when we are not on a x86 machine
-        case System.Info.arch of
-          "x86_64" -> return ("docker", ["run", "-i", "banacorn/keelung"])
-          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "banacorn/keelung"])
+        then case System.Info.arch of
+          "x86_64" -> return ("docker", ["run", "-i", "btqag/keelungc"])
+          -- insert "--platform=linux/amd64" when we are not on a x86 machine
+          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "btqag/keelungc"])
         else throwError CannotLocateKeelungC
+
+findAuroraProver :: M (String, [String])
+findAuroraProver = do
+  auroraExists <- checkCmd "aurora_prove"
+  if auroraExists
+    then return ("aurora_prove", [])
+    else do
+      dockerExists <- checkCmd "docker"
+      -- let currentDirector = Path.getCurrentDirectory
+      if dockerExists
+        then case System.Info.arch of
+          "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-prove"])
+          -- insert "--platform=linux/amd64" when we are not on a x86 machine
+          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "btqag/aurora-prove"])
+        else throwError CannotLocateProver
+
+findAuroraVerifier :: M (String, [String])
+findAuroraVerifier = do
+  auroraExists <- checkCmd "aurora_verify"
+  if auroraExists
+    then return ("aurora_verify", [])
+    else do
+      dockerExists <- checkCmd "docker"
+      if dockerExists
+        then case System.Info.arch of
+          "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-verify"])
+          -- insert "--platform=linux/amd64" when we are not on a x86 machine
+          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "btqag/aurora-verify"])
+        else throwError CannotLocateVerifier
 
 -- | Check the version of the Keelung compiler
 readKeelungVersion :: FilePath -> [String] -> M (Int, Int, Int)
@@ -321,7 +348,7 @@ checkCmd cmd =
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 9, 0)
+keelungVersion_ = (0, 9, 1)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
