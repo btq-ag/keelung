@@ -274,6 +274,7 @@ findAuroraProver = do
     then return ("aurora_prove", [])
     else do
       dockerExists <- checkCmd "docker"
+      -- let currentDirector = Path.getCurrentDirectory
       if dockerExists
         then case System.Info.arch of
           "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-prove"])
@@ -347,7 +348,7 @@ checkCmd cmd =
 
 -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
 keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 9, 0)
+keelungVersion_ = (0, 9, 1)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
