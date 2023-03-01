@@ -241,7 +241,7 @@ wrapper :: (Serialize a, Serialize b) => [String] -> a -> M b
 wrapper args' payload = do
   (cmd, args) <- findKeelungc
   version <- readKeelungVersion cmd args
-  checkKeelungVersion version
+  checkCompilerVersion version
   blob <- lift $ Process.readProcess cmd (args ++ args') (BS.unpack $ Serialize.encode payload)
   let result = Serialize.decode (BS.pack blob)
   case result of
@@ -322,8 +322,8 @@ readKeelungVersion cmd args = do
         _ -> Nothing
       (,,) <$> readMaybe major <*> readMaybe minor <*> readMaybe patch
 
-checkKeelungVersion :: (Int, Int, Int) -> M ()
-checkKeelungVersion (major, minor, patch) = do
+checkCompilerVersion :: (Int, Int, Int) -> M ()
+checkCompilerVersion (major, minor, patch) = do
   if major == 0 && minor >= 9 && minor < 10 && patch >= 0
     then return ()
     else throwError (VersionMismatchError major minor patch)
@@ -346,14 +346,15 @@ checkCmd cmd =
 
 --------------------------------------------------------------------------------
 
--- | The version of Keelung is a triple of three numbers, we're not going full semver yet
-keelungVersion_ :: (Int, Int, Int)
-keelungVersion_ = (0, 9, 1)
 
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
 keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
-
+  where 
+    -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
+    keelungVersion_ :: (Int, Int, Int)
+    keelungVersion_ = (0, 9, 2)
+    
 --------------------------------------------------------------------------------
 
 type M = ExceptT Error IO
