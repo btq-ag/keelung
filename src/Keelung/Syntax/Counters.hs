@@ -80,8 +80,8 @@ data Counters = Counters
     countPublicInput :: !SmallCounters, -- counters for input variables
     countPrivateInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
-    countPublicInputSequence :: !(Seq (VarType, Int)), -- Sequence of public input variables
-    countPrivateInputSequence :: !(Seq (VarType, Int)), -- Sequence of private input variables
+    countPublicInputSequence :: !(Seq VarType), -- Sequence of public input variables
+    countPrivateInputSequence :: !(Seq VarType), -- Sequence of private input variables
     countReducedVarHack :: !Int -- HACK, keep track of the number of variables reduced after renumbering
   }
   deriving (Generic, NFData, Eq, Show)
@@ -169,16 +169,14 @@ addCount sort typ n (Counters o i1 i2 x s1 s2 r) =
         OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
         OfUInt w -> Struct f b (IntMap.insertWith (+) w n u)
 
-    oldCount = getCount sort typ (Counters o i1 i2 x s1 s2 r)
-
-    newInputSequence :: Seq (VarType, Int)
-    newInputSequence = Seq.fromList [(typ, index) | index <- [oldCount .. oldCount + n - 1]]
+    newInputSequence :: Seq VarType
+    newInputSequence = Seq.fromList $ replicate n typ
 
 -- | For parsing raw inputs
-getPublicInputSequence :: Counters -> Seq (VarType, Int)
+getPublicInputSequence :: Counters -> Seq VarType
 getPublicInputSequence = countPublicInputSequence
 
-getPrivateInputSequence :: Counters -> Seq (VarType, Int)
+getPrivateInputSequence :: Counters -> Seq VarType
 getPrivateInputSequence = countPrivateInputSequence
 
 --------------------------------------------------------------------------------
