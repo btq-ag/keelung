@@ -203,8 +203,16 @@ offsetOfType (Struct f _ _) OfBoolean index = f + index
 offsetOfType (Struct f b u) (OfUIntBinRep width) index =
   f
     + b
-    + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
-    + width * index
+    + sum
+      ( IntMap.mapWithKey
+          ( \width' count -> case compare width width' of
+              LT -> 0
+              EQ -> index * width
+              GT -> width' * count
+          )
+          u
+      )
+-- + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
 offsetOfType (Struct f b u) (OfUInt width) index = f + b + binRepSize u + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
 
 --------------------------------------------------------------------------------
