@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
@@ -346,15 +347,14 @@ checkCmd cmd =
 
 --------------------------------------------------------------------------------
 
-
 -- | String of Keelung version exposed to the user
 keelungVersion :: String
 keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
-  where 
-    -- | The version of Keelung is a triple of three numbers, we're not going full semver yet
+  where
+    -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
     keelungVersion_ :: (Int, Int, Int)
     keelungVersion_ = (0, 9, 2)
-    
+
 --------------------------------------------------------------------------------
 
 type M = ExceptT Error IO

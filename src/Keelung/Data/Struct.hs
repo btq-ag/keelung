@@ -35,8 +35,11 @@ updateF func (Struct f b u) = Struct (func f) b u
 updateB :: (x -> y) -> Struct f x u -> Struct f y u
 updateB func (Struct f b u) = Struct f (func b) u
 
-updateU :: Width -> (x -> x) -> Struct f b x -> Struct f b x
-updateU w func (Struct f b u) = Struct f b $ IntMap.adjust func w u
+-- | When the width is not present in the map, the function is applied with mempty
+updateU :: Monoid x => Width -> (x -> x) -> Struct f b x -> Struct f b x
+updateU w func (Struct f b u) = Struct f b $ case IntMap.lookup w u of
+  Nothing -> IntMap.insert w (func mempty) u
+  Just xs -> IntMap.insert w (func xs) u
 
 empty :: (Monoid f, Eq f, Eq b, Monoid b) => Struct f b u -> Bool
 empty (Struct f b u) = f == mempty && b == mempty && IntMap.null u
