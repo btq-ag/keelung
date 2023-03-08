@@ -212,8 +212,12 @@ offsetOfType (Struct f b u) (OfUIntBinRep width) index =
           )
           u
       )
--- + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u)
-offsetOfType (Struct f b u) (OfUInt width) index = f + b + binRepSize u + IntMap.size (IntMap.filterWithKey (\width' _ -> width' < width) u) + index
+offsetOfType (Struct f b u) (OfUInt width) index =
+  f
+    + b
+    + binRepSize u
+    + sum (IntMap.filterWithKey (\width' _ -> width' < width) u)
+    + index
 
 --------------------------------------------------------------------------------
 
