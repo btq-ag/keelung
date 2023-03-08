@@ -104,11 +104,10 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 generate_ :: (Serialize n, Integral n, Encode t) =>
   FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
   FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
-generate_ circuit witness inputs param proof fieldType prog publicInput privateInput = runM $ do
+generate_ circuit witness inputs param proofPath fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
   _ <- genCircuit circuit fieldType prog
   _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs
-  proofPath <- lift $ Path.makeAbsolute proof
   genParameters param
   -- genInputs inputs publicInput -- Should generate public inputs only for verifier
   lift $ do
@@ -137,7 +136,9 @@ generate circuit witness inputs param proof fieldType prog publicInput privateIn
     Right (_, msg) -> putStr msg
 
 generateDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generateDefault = generate "circuit.jsonl" "witness.jsonl" "inputs.jsonl" "parameter.json" "proof"
+generateDefault fieldType prog publicInput privateInput = do
+  Path.createDirectoryIfMissing True "aurora"
+  generate "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/inputs.jsonl" "aurora/parameter.json" "aurora/proof" fieldType prog publicInput privateInput
 
 -- | Generate and verify a proof given circuit, inputs (witness), paratemer, and proof
 verify_ :: FilePath -> FilePath -> FilePath -> FilePath -> IO (Either Error String)
@@ -168,7 +169,7 @@ verify circuit inputs param proof = do
 
 -- TODO: Verify inputs.jsonl instead
 verifyDefault :: IO ()
-verifyDefault = verify "circuit.jsonl" "witness.jsonl" "parameter.json" "proof"
+verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
@@ -180,7 +181,7 @@ genCircuit fp fieldType prog = do
     B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
 
 genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
-genCircuitDefault = genCircuit "circuit.jsonl"
+genCircuitDefault = genCircuit "aurora/circuit.jsonl"
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: (Serialize n, Integral n, Encode t) => FilePath -> FieldType -> Comp t -> [n] -> [n] -> M [n]
@@ -197,7 +198,7 @@ genWitness :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integ
 genWitness fp fieldType prog publicInput privateInput = runM (genWitness_ fp fieldType prog publicInput privateInput) >>= printErrorInstead
 
 genWitnessDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-genWitnessDefault = genWitness "witness.jsonl"
+genWitnessDefault = genWitness "aurora/witness.jsonl"
 
 -- | For generating inputs.jsonl
 genInputs :: (Integral n) => FilePath -> [n] -> M ()
@@ -287,10 +288,13 @@ findKeelungc = do
     else do
       dockerExists <- checkCmd "docker"
       if dockerExists
-        then case System.Info.arch of
-          "x86_64" -> return ("docker", ["run", "-i", "btqag/keelungc"])
-          -- insert "--platform=linux/amd64" when we are not on a x86 machine
-          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume $(pwd):/aurora", "btqag/keelungc"])
+        then do
+          lift $ Path.createDirectoryIfMissing True "aurora"
+          filepath <- lift $ Path.makeAbsolute "aurora"
+          case System.Info.arch of
+            "x86_64" -> return ("docker", ["run", "-i", "btqag/keelungc"])
+            -- insert "--platform=linux/amd64" when we are not on a x86 machine
+            _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/keelungc"])
         else throwError CannotLocateKeelungC
 
 findAuroraProver :: M (String, [String])
@@ -302,10 +306,13 @@ findAuroraProver = do
       dockerExists <- checkCmd "docker"
       -- let currentDirector = Path.getCurrentDirectory
       if dockerExists
-        then case System.Info.arch of
-          "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-prove"])
-          -- insert "--platform=linux/amd64" when we are not on a x86 machine
-          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "btqag/aurora-prove"])
+        then do
+          lift $ Path.createDirectoryIfMissing True "aurora"
+          filepath <- lift $ Path.makeAbsolute "aurora"
+          case System.Info.arch of
+            "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-prove"])
+            -- insert "--platform=linux/amd64" when we are not on a x86 machine
+            _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/aurora-prove"])
         else throwError CannotLocateProver
 
 findAuroraVerifier :: M (String, [String])
@@ -316,10 +323,13 @@ findAuroraVerifier = do
     else do
       dockerExists <- checkCmd "docker"
       if dockerExists
-        then case System.Info.arch of
-          "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-verify"])
-          -- insert "--platform=linux/amd64" when we are not on a x86 machine
-          _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "btqag/aurora-verify"])
+        then do
+          lift $ Path.createDirectoryIfMissing True "aurora"
+          filepath <- lift $ Path.makeAbsolute "aurora"
+          case System.Info.arch of
+            "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-verify"])
+            -- insert "--platform=linux/amd64" when we are not on a x86 machine
+            _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/aurora-verify"])
         else throwError CannotLocateVerifier
 
 -- | Check the version of the Keelung compiler
