@@ -102,12 +102,12 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
 generate_ :: (Serialize n, Integral n, Encode t) =>
-  FilePath -> FilePath -> FilePath -> FilePath ->
+  FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
   FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
-generate_ circuit inputs param proof fieldType prog publicInput privateInput = runM $ do
+generate_ circuit witness inputs param proof fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
   _ <- genCircuit circuit fieldType prog
-  _ <- genWitness_ inputs fieldType prog publicInput privateInput -- Should generate public as well as private inputs
+  _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs
   proofPath <- lift $ Path.makeAbsolute proof
   genParameters param
   -- genInputs inputs publicInput -- Should generate public inputs only for verifier
@@ -117,7 +117,7 @@ generate_ circuit inputs param proof fieldType prog publicInput privateInput = r
             ++ [ "--r1cs_filepath",
                  circuit,
                  "--input_filepath",
-                 inputs,
+                 witness,
                  "--parameter_filepath",
                  param,
                  "--output_filepath",
@@ -128,16 +128,16 @@ generate_ circuit inputs param proof fieldType prog publicInput privateInput = r
 
 -- | Generate a proof
 generate :: Encode t =>
-  FilePath -> FilePath -> FilePath -> FilePath ->
+  FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
   FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generate circuit inputs param proof fieldType prog publicInput privateInput = do
-  result <- generate_ circuit inputs param proof fieldType prog publicInput privateInput
+generate circuit witness inputs param proof fieldType prog publicInput privateInput = do
+  result <- generate_ circuit witness inputs param proof fieldType prog publicInput privateInput
   case result of
     Left err -> print err
     Right (_, msg) -> putStr msg
 
 generateDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generateDefault = generate "circuit.jsonl" "witness.jsonl" "parameter.json" "proof"
+generateDefault = generate "circuit.jsonl" "witness.jsonl" "inputs.jsonl" "parameter.json" "proof"
 
 -- | Generate and verify a proof given circuit, inputs (witness), paratemer, and proof
 verify_ :: FilePath -> FilePath -> FilePath -> FilePath -> IO (Either Error String)
@@ -166,6 +166,7 @@ verify circuit inputs param proof = do
     Left err -> print err
     Right msg -> putStr msg
 
+-- TODO: Verify inputs.jsonl instead
 verifyDefault :: IO ()
 verifyDefault = verify "circuit.jsonl" "witness.jsonl" "parameter.json" "proof"
 
