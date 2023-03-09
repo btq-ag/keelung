@@ -17,7 +17,6 @@ module Keelung.Syntax.Counters
     getOutputBinRepRange,
     getPublicInputVarRange,
     getPrivateInputVarRange,
-    getBinRepConstraintSize,
     getBinReps,
     getBooleanConstraintSize,
     getBooleanConstraintRanges,
@@ -30,7 +29,6 @@ module Keelung.Syntax.Counters
     prettyConstraints,
     prettyVariables,
     prettyBooleanConstraints,
-    prettyBinRepConstraints,
   )
 where
 
@@ -242,12 +240,6 @@ getPrivateInputVarRange counters =
       inputSize = getCountBySort OfPrivateInput counters
    in (inputOffset, inputOffset + inputSize)
 
--- | Generate one BinRep constraint for each UInt input & output variable
-getBinRepConstraintSize :: Counters -> Int
-getBinRepConstraintSize (Counters o i1 i2 _ _ _ _) = f o + f i1 + f i2
-  where
-    f (Struct _ _ u) = uIntSize u
-
 getBinReps :: Counters -> [BinRep]
 getBinReps counters@(Counters o i1 i2 x _ _ _) =
   fromSmallCounter OfOutput o ++ fromSmallCounter OfPublicInput i1 ++ fromSmallCounter OfPrivateInput i2 ++ fromSmallCounter OfIntermediate x
@@ -325,15 +317,15 @@ prettyVariables counters@(Counters o i1 i2 _ _ _ _) =
             <> privateInputVars
             <> "\n"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> String
-prettyConstraints counters cs =
+prettyConstraints :: Show constraint => Counters -> [constraint] -> [BinRep] -> String
+prettyConstraints counters cs binReps =
   showConstraintSummary
     <> showOrdinaryConstraints
     <> showBooleanConstraints
     <> showBinRepConstraints
   where
     -- sizes of constraint groups
-    totalBinRepConstraintSize = getBinRepConstraintSize counters
+    totalBinRepConstraintSize = length binReps
     booleanConstraintSize = getBooleanConstraintSize counters
     ordinaryConstraintSize = length cs
 
@@ -367,13 +359,13 @@ prettyConstraints counters cs =
 
     -- BinRep constraints
     showBinRepConstraints =
-      if totalBinRepConstraintSize == 0
+      if null binReps
         then ""
         else
           "    Binary representation constriants ("
-            <> show totalBinRepConstraintSize
+            <> show (length binReps)
             <> "):\n\n"
-            <> unlines (map ("      " <>) (prettyBinRepConstraints counters))
+            <> unlines (map (("      " <>) . show) binReps)
             <> "\n"
 
 prettyBooleanConstraints :: Counters -> [String]
@@ -402,6 +394,3 @@ prettyBooleanConstraints counters =
 
     showBooleanConstraint :: Int -> String
     showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
-
-prettyBinRepConstraints :: Counters -> [String]
-prettyBinRepConstraints = map show . getBinReps

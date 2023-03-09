@@ -20,6 +20,8 @@ import Keelung.Syntax.Counters
 data R1CS n = R1CS
   { -- | List of constraints
     r1csConstraints :: [R1C n],
+    -- | List of binary representations
+    r1csBinReps :: [BinRep],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
     -- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
@@ -30,9 +32,9 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show (R1CS cs counters _) =
+  show (R1CS cs binReps counters _) =
     "R1CS {\n"
-      <> prettyConstraints counters cs
+      <> prettyConstraints counters cs binReps
       <> prettyVariables counters
       <> "}"
 
@@ -41,7 +43,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS ordinaryConstraints counters _) =
+toR1Cs (R1CS ordinaryConstraints binReps counters _) =
   ordinaryConstraints
     <> booleanInputVarConstraints
     <> binRepConstraints
@@ -66,7 +68,17 @@ toR1Cs (R1CS ordinaryConstraints counters _) =
               (Left 1)
               (Right (Poly.singleVar fVar))
         )
-        (getBinReps counters)
+        binReps
+
+-- binRepConstraints =
+--   map
+--     ( \(BinRep fVar width bVar) ->
+--         R1C
+--           (Poly.buildEither 0 [(bVar + i, 2 ^ i) | i <- [0 .. width - 1]])
+--           (Left 1)
+--           (Right (Poly.singleVar fVar))
+--     )
+--     (getBinReps counters)
 
 --------------------------------------------------------------------------------
 
