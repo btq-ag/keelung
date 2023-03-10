@@ -104,7 +104,7 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 generate_ :: (Serialize n, Integral n, Encode t) =>
   FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
   FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
-generate_ circuit witness inputs param proofPath fieldType prog publicInput privateInput = runM $ do
+generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
   _ <- genCircuit circuit fieldType prog
   _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs
@@ -360,7 +360,7 @@ readKeelungVersion cmd args = do
 
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if major == 0 && minor >= 9 && minor < 10 && patch >= 0
+  if major == 0 && minor >= 9 && minor < 10 && patch >= 3
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
@@ -388,7 +388,7 @@ keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ ".
   where
     -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
     keelungVersion_ :: (Int, Int, Int)
-    keelungVersion_ = (0, 9, 2)
+    keelungVersion_ = (0, 9, 3)
 
 --------------------------------------------------------------------------------
 

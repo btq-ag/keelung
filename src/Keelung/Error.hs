@@ -33,7 +33,7 @@ instance Show Error where
   show CannotReadVersionError = "Cannot read the version of the Keelung compiler"
   show (VersionMismatchError major minor patch) =
     "The version of the Keelung compiler is not supported: \n"
-      ++ "  expected range of version: >= v0.9.0 and < v0.10.0, but got v"
+      ++ "  expected range of version: >= v0.9.3 and < v0.10.0, but got v"
       ++ show major
       ++ "."
       ++ show minor
