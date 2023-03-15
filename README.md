@@ -15,3 +15,6 @@ The language reference is now available on [Hackage](https://hackage.haskell.org
 ## Standard Library
 
 The standard library is available [here](https://github.com/btq-ag/keelung-stdlib).
+
+## Discord
+Find us on [Discord](https://discord.gg/SgVuUWDR)!
