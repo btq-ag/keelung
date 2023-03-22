@@ -104,7 +104,7 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 generate_ :: (Serialize n, Integral n, Encode t) =>
   FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
   FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
-generate_ circuit witness inputs param proofPath fieldType prog publicInput privateInput = runM $ do
+generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
   _ <- genCircuit circuit fieldType prog
   _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs

@@ -24,15 +24,17 @@ data R1CS n = R1CS
     r1csBinReps :: [BinRep],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
-    -- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
-    r1csCNEQs :: [CNEQ n]
+    -- | Hints for generating witnesses of CNQZ constraints
+    r1csCNEQs :: [CNEQ n],
+    -- | Hints for generating witnesses of DivMod constraints
+    r1csDivMods :: [(Var, Var, Var, Var)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show (R1CS cs binReps counters _) =
+  show (R1CS cs binReps counters _ _) =
     "R1CS {\n"
       <> prettyConstraints counters cs binReps
       <> prettyVariables counters
@@ -43,7 +45,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS ordinaryConstraints binReps counters _) =
+toR1Cs (R1CS ordinaryConstraints binReps counters _ _) =
   ordinaryConstraints
     <> booleanInputVarConstraints
     <> binRepConstraints
