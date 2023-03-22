@@ -292,7 +292,7 @@ findKeelungc = do
           lift $ Path.createDirectoryIfMissing True "aurora"
           filepath <- lift $ Path.makeAbsolute "aurora"
           case System.Info.arch of
-            "x86_64" -> return ("docker", ["run", "-i", "btqag/keelungc"])
+            "x86_64" -> return ("docker", ["run", "-i", "--volume", filepath ++ ":/aurora", "btqag/keelungc"])
             -- insert "--platform=linux/amd64" when we are not on a x86 machine
             _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/keelungc"])
         else throwError CannotLocateKeelungC
@@ -310,7 +310,7 @@ findAuroraProver = do
           lift $ Path.createDirectoryIfMissing True "aurora"
           filepath <- lift $ Path.makeAbsolute "aurora"
           case System.Info.arch of
-            "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-prove"])
+            "x86_64" -> return ("docker", ["run", "-i", "--volume", filepath ++ ":/aurora", "btqag/aurora-prove"])
             -- insert "--platform=linux/amd64" when we are not on a x86 machine
             _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/aurora-prove"])
         else throwError CannotLocateProver
@@ -327,7 +327,7 @@ findAuroraVerifier = do
           lift $ Path.createDirectoryIfMissing True "aurora"
           filepath <- lift $ Path.makeAbsolute "aurora"
           case System.Info.arch of
-            "x86_64" -> return ("docker", ["run", "-i", "btqag/aurora-verify"])
+            "x86_64" -> return ("docker", ["run", "-i", "--volume", filepath ++ ":/aurora", "btqag/aurora-verify"])
             -- insert "--platform=linux/amd64" when we are not on a x86 machine
             _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/aurora-verify"])
         else throwError CannotLocateVerifier
