@@ -93,7 +93,7 @@ data Computation = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
     -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap (Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)
+    compDivModRelsU :: IntMap [(Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)]
   }
   deriving (Eq)
 
@@ -640,6 +640,13 @@ assertDivMod ::
 assertDivMod dividend divisor quotient remainder = do
   heap <- gets compHeap
   let encoded = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
-  modify (\st -> st {compDivModRelsU = IntMap.insert width encoded (compDivModRelsU st)})
+  modify'
+    ( \st ->
+        st
+          { compDivModRelsU = case IntMap.lookup width (compDivModRelsU st) of
+              Nothing -> IntMap.insert width [encoded] (compDivModRelsU st)
+              Just divMods -> IntMap.insert width (encoded : divMods) (compDivModRelsU st)
+          }
+    )
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))

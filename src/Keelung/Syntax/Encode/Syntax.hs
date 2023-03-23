@@ -270,7 +270,7 @@ data Computation = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
     -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap (UInt, UInt, UInt, UInt)
+    compDivModRelsU :: IntMap [(UInt, UInt, UInt, UInt)]
   }
   deriving (Show, Generic, NFData)
 
