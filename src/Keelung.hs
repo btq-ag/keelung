@@ -11,7 +11,7 @@ module Keelung
     run,
     compile,
     compileO0,
-    compileO2,
+    compileOld,
     compileWithOpts,
     rtsoptProf,
     rtsoptMemory,
@@ -71,8 +71,8 @@ compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 = compileWithOpts 0 [] []
 
 -- | Compile a program to a 'R1CS' constraint system with optimization level 2.
-compileO2 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileO2 = compileWithOpts 2 [] []
+compileOld :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileOld = compileWithOpts 2 [] []
 
 -- | Compile a program to a 'R1CS' constraint system with optimization level and RTS options as arguments.
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
