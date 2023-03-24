@@ -67,7 +67,7 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.Sequence (Seq)
+import Data.Sequence (Seq ((:|>)))
 import Data.Traversable (mapAccumL)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vec
@@ -567,13 +567,25 @@ instance (Reusable t, Traversable f) => Reusable (f t) where
   reuse = mapM reuse
 
 assignF :: Var -> Field -> Comp ()
-assignF var expr = modify' $ \st -> st {compExprBindings = updateF (IntMap.insert var expr) (compExprBindings st)}
+assignF var expr = modify' $ \st ->
+  st
+    { compExprBindings = updateF (IntMap.insert var expr) (compExprBindings st),
+      compSideEffects = compSideEffects st :|> AssignmentF var expr
+    }
 
 assignB :: Var -> Boolean -> Comp ()
-assignB var expr = modify' $ \st -> st {compExprBindings = updateB (IntMap.insert var expr) (compExprBindings st)}
+assignB var expr = modify' $ \st ->
+  st
+    { compExprBindings = updateB (IntMap.insert var expr) (compExprBindings st),
+      compSideEffects = compSideEffects st :|> AssignmentB var expr
+    }
 
 assignU :: Width -> Var -> Encoding.UInt -> Comp ()
-assignU width var expr = modify' $ \st -> st {compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st)}
+assignU width var expr = modify' $ \st ->
+  st
+    { compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st),
+      compSideEffects = compSideEffects st :|> AssignmentU width var expr
+    }
 
 --------------------------------------------------------------------------------
 -- Asserting DivMod relations
@@ -643,13 +655,15 @@ assertDivMod ::
   Comp ()
 assertDivMod dividend divisor quotient remainder = do
   heap <- gets compHeap
-  let encoded = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
+  let encoded' = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
+  let encoded = runHeapM heap $ DivMod width <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
   modify'
     ( \st ->
         st
           { compDivModRelsU = case IntMap.lookup width (compDivModRelsU st) of
-              Nothing -> IntMap.insert width [encoded] (compDivModRelsU st)
-              Just divMods -> IntMap.insert width (encoded : divMods) (compDivModRelsU st)
+              Nothing -> IntMap.insert width [encoded'] (compDivModRelsU st)
+              Just divMods -> IntMap.insert width (encoded' : divMods) (compDivModRelsU st),
+            compSideEffects = compSideEffects st :|> encoded
           }
     )
   where
