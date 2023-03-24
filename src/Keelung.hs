@@ -101,9 +101,18 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 --------------------------------------------------------------------------------
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
-generate_ :: (Serialize n, Integral n, Encode t) =>
-  FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
-  FieldType -> Comp t -> [n] -> [n] -> IO (Either Error (FilePath, String))
+generate_ ::
+  (Serialize n, Integral n, Encode t) =>
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FieldType ->
+  Comp t ->
+  [n] ->
+  [n] ->
+  IO (Either Error (FilePath, String))
 generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
   _ <- genCircuit circuit fieldType prog
@@ -126,9 +135,18 @@ generate_ circuit witness _inputs param proofPath fieldType prog publicInput pri
     return (proofPath, msg)
 
 -- | Generate a proof
-generate :: Encode t =>
-  FilePath -> FilePath -> FilePath -> FilePath -> FilePath ->
-  FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+generate ::
+  Encode t =>
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FilePath ->
+  FieldType ->
+  Comp t ->
+  [Integer] ->
+  [Integer] ->
+  IO ()
 generate circuit witness inputs param proof fieldType prog publicInput privateInput = do
   result <- generate_ circuit witness inputs param proof fieldType prog publicInput privateInput
   case result of
@@ -162,7 +180,7 @@ verify_ circuit inputs param proof = runM $ do
 -- | Verify a proof
 verify :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
 verify circuit inputs param proof = do
-  result <- verify_ circuit inputs param proof 
+  result <- verify_ circuit inputs param proof
   case result of
     Left err -> print err
     Right msg -> putStr msg
@@ -251,7 +269,7 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where
     encodeElaborated :: Encode t => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap eb assertions divModRelsU = comp
+      let Computation counters _addrSize _heap eb assertions divModRelsU sideEffects = comp
        in Encoding.Elaborated
             <$> encode expr
             <*> ( Encoding.Computation
@@ -259,7 +277,14 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
                     <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
                     <*> mapM encode assertions
                     <*> pure divModRelsU
+                    <*> mapM encodeSideEffect sideEffects
                 )
+
+    encodeSideEffect :: SideEffect -> HeapM Encoding.SideEffect
+    encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
+    encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
+    encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
+    encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
 
 --------------------------------------------------------------------------------
 

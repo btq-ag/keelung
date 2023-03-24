@@ -13,6 +13,7 @@ module Keelung.Monad
     assert,
     performDivMod,
     assertDivMod,
+    SideEffect (..),
 
     -- * Inputs
     Proper (..),
@@ -66,6 +67,7 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Sequence (Seq)
 import Data.Traversable (mapAccumL)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vec
@@ -93,12 +95,14 @@ data Computation = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
     -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap [(Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)]
+    compDivModRelsU :: IntMap [(Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)],
+    -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
+    compSideEffects :: Seq SideEffect
   }
   deriving (Eq)
 
 instance Show Computation where
-  show (Computation _ addrSize _ eb assertions _divModRelsU) =
+  show (Computation _ addrSize _ eb assertions _divModRelsU _) =
     "{\n"
       <> "  Address size: "
       <> show addrSize
@@ -140,7 +144,7 @@ type Comp = StateT Computation (Except ElabError)
 -- | Elaborates a Keelung program
 elaborate :: Comp t -> Either Error (Elaborated t)
 elaborate prog = do
-  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty) prog
+  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated expr comp
 
 -- | How to run the 'Comp' monad
@@ -650,3 +654,12 @@ assertDivMod dividend divisor quotient remainder = do
     )
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
+
+--------------------------------------------------------------------------------
+
+data SideEffect
+  = AssignmentF Var Field
+  | AssignmentB Var Boolean
+  | AssignmentU Width Var Encoding.UInt
+  | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
+  deriving (Show, Eq)

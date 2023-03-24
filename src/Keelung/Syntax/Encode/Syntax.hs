@@ -8,6 +8,7 @@ import Control.DeepSeq (NFData)
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
+import Data.Sequence (Seq)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.Struct
@@ -270,8 +271,21 @@ data Computation = Computation
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
     -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap [(UInt, UInt, UInt, UInt)]
+    compDivModRelsU :: IntMap [(UInt, UInt, UInt, UInt)],
+    -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
+    compSideEffects :: Seq SideEffect
   }
   deriving (Show, Generic, NFData)
 
 instance Serialize Computation
+
+--------------------------------------------------------------------------------
+
+data SideEffect
+  = AssignmentF Var Field
+  | AssignmentB Var Boolean
+  | AssignmentU Width Var UInt
+  | DivMod Width UInt UInt UInt UInt
+  deriving (Show, Generic, NFData)
+
+instance Serialize SideEffect

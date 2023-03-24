@@ -5,6 +5,7 @@
 module Keelung.Syntax.Encode
   ( Encode (..),
     runHeapM,
+    HeapM,
     encode',
     Expr (..),
   )
