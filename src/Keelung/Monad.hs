@@ -65,14 +65,12 @@ import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
-import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq ((:|>)))
 import Data.Traversable (mapAccumL)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vec
 import GHC.TypeNats (KnownNat, natVal)
-import Keelung.Data.Struct
 import Keelung.Error
 import Keelung.Heap
 import Keelung.Syntax
@@ -90,24 +88,18 @@ data Computation = Computation
     compAddrSize :: Int,
     -- Heap for arrays
     compHeap :: Heap,
-    -- Bindings to expressions
-    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap Encoding.UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
-    -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap [(Encoding.UInt, Encoding.UInt, Encoding.UInt, Encoding.UInt)],
     -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
     compSideEffects :: Seq SideEffect
   }
   deriving (Eq)
 
 instance Show Computation where
-  show (Computation _ addrSize _ eb assertions _divModRelsU _) =
+  show (Computation _ addrSize _ assertions _) =
     "{\n"
       <> "  Address size: "
       <> show addrSize
-      ++ "\n  Bindings to expressions: \n"
-      ++ show eb
       ++ "\n  Assertions: \n"
       ++ show assertions
       ++ "\n\
@@ -144,7 +136,7 @@ type Comp = StateT Computation (Except ElabError)
 -- | Elaborates a Keelung program
 elaborate :: Comp t -> Either Error (Elaborated t)
 elaborate prog = do
-  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty) prog
   return $ Elaborated expr comp
 
 -- | How to run the 'Comp' monad
@@ -567,25 +559,13 @@ instance (Reusable t, Traversable f) => Reusable (f t) where
   reuse = mapM reuse
 
 assignF :: Var -> Field -> Comp ()
-assignF var expr = modify' $ \st ->
-  st
-    { compExprBindings = updateF (IntMap.insert var expr) (compExprBindings st),
-      compSideEffects = compSideEffects st :|> AssignmentF var expr
-    }
+assignF var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentF var expr}
 
 assignB :: Var -> Boolean -> Comp ()
-assignB var expr = modify' $ \st ->
-  st
-    { compExprBindings = updateB (IntMap.insert var expr) (compExprBindings st),
-      compSideEffects = compSideEffects st :|> AssignmentB var expr
-    }
+assignB var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentB var expr}
 
 assignU :: Width -> Var -> Encoding.UInt -> Comp ()
-assignU width var expr = modify' $ \st ->
-  st
-    { compExprBindings = updateU width (IntMap.insert var expr) (compExprBindings st),
-      compSideEffects = compSideEffects st :|> AssignmentU width var expr
-    }
+assignU width var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var expr}
 
 --------------------------------------------------------------------------------
 -- Asserting DivMod relations
@@ -655,17 +635,8 @@ assertDivMod ::
   Comp ()
 assertDivMod dividend divisor quotient remainder = do
   heap <- gets compHeap
-  let encoded' = runHeapM heap $ (,,,) <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
   let encoded = runHeapM heap $ DivMod width <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
-  modify'
-    ( \st ->
-        st
-          { compDivModRelsU = case IntMap.lookup width (compDivModRelsU st) of
-              Nothing -> IntMap.insert width [encoded'] (compDivModRelsU st)
-              Just divMods -> IntMap.insert width (encoded' : divMods) (compDivModRelsU st),
-            compSideEffects = compSideEffects st :|> encoded
-          }
-    )
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 

@@ -46,7 +46,6 @@ import Data.Serialize qualified as Serialize
 import Data.String (IsString (fromString))
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Bits
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Error
 import Keelung.Field
 import Keelung.Heap
@@ -269,14 +268,12 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where
     encodeElaborated :: Encode t => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap eb assertions divModRelsU sideEffects = comp
+      let Computation counters _addrSize _heap assertions sideEffects = comp
        in Encoding.Elaborated
             <$> encode expr
             <*> ( Encoding.Computation
                     counters
-                    <$> (Struct <$> mapM encode' (structF eb) <*> mapM encode' (structB eb) <*> pure (structU eb))
-                    <*> mapM encode assertions
-                    <*> pure divModRelsU
+                    <$> mapM encode assertions
                     <*> mapM encodeSideEffect sideEffects
                 )
 

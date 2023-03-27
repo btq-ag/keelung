@@ -7,11 +7,10 @@ module Keelung.Syntax.Encode.Syntax where
 import Control.DeepSeq (NFData)
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
-import Data.IntMap.Strict (IntMap)
 import Data.Sequence (Seq)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Data.Struct
+-- import Keelung.Data.Struct
 import Keelung.Field (FieldType)
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
@@ -229,21 +228,12 @@ instance Show Elaborated where
     "{\n  Expression: \n    "
       <> showExpr
       <> "\n"
-      <> showExprBindings (compExprBindings comp)
       <> showAssertions (compAssertions comp)
       <> "}"
     where
       showExpr = case expr of
         Array xs -> prettyList2 4 (toList xs)
         _ -> show expr
-
-      showExprBindings eb =
-        if empty eb
-          then ""
-          else
-            "  Bindings of expressions: \n"
-              <> unlines (map ("    " <>) (prettyStruct "" eb))
-              <> "\n"
       showAssertions assertions =
         if null assertions
           then ""
@@ -266,12 +256,8 @@ instance Serialize Elaborated
 data Computation = Computation
   { -- Variable bookkeeping
     compCounters :: !Counters,
-    -- Bindings from variables to expressions
-    compExprBindings :: Struct (IntMap Field) (IntMap Boolean) (IntMap UInt),
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
-    -- DivMod relations: dividend = divisor * quotient + remainder
-    compDivModRelsU :: IntMap [(UInt, UInt, UInt, UInt)],
     -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
     compSideEffects :: Seq SideEffect
   }
