@@ -127,6 +127,8 @@ data UInt
     SubU Width UInt UInt
   | -- | Multiplication
     MulU Width UInt UInt
+  | -- | Multiplicatie Inverse
+    InvU Width UInt
   | -- | Bitwise conjunction
     AndU Width UInt UInt
   | -- | Bitwise disjunction
@@ -158,6 +160,7 @@ instance Show UInt where
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    InvU _ x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
     AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
