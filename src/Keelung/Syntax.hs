@@ -13,6 +13,7 @@ module Keelung.Syntax
     true,
     false,
     setBit,
+    modInv,
     Var,
     Width,
   )
@@ -109,10 +110,9 @@ data UInt (w :: Nat)
     SubU (UInt w) (UInt w)
   | -- | Multiplication
     MulU (UInt w) (UInt w)
-  | -- \| Bitwise conjunction
-
-    -- | -- | Multiplicatie Inverse
-    --   InvU (UInt w)
+  | -- | Modular multiplicatie inverse
+    MMIU (UInt w) Integer
+  | -- | Bitwise conjunction
     AndU (UInt w) (UInt w)
   | -- | Bitwise disjunction
     OrU (UInt w) (UInt w)
@@ -141,7 +141,7 @@ instance KnownNat w => Show (UInt w) where
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    -- InvU x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
+    MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
@@ -277,6 +277,12 @@ false = Boolean False
 -- | Set the i-th bit of a Unsigned integer with a Boolean
 setBit :: KnownNat w => UInt w -> Int -> Boolean -> UInt w
 setBit = SetU
+
+-- | Modular multiplicative inverse of an Unsigned integer with a given modulus
+--
+--   @since 0.9.3.0
+modInv :: KnownNat w => Integer -> UInt w -> UInt w
+modInv = flip MMIU
 
 --------------------------------------------------------------------------------
 

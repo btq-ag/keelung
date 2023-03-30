@@ -66,7 +66,7 @@ instance KnownNat w => Encode' (Syntax.UInt w) UInt where
     Syntax.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
     Syntax.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
     Syntax.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
-    -- Syntax.InvU x -> InvU (widthOf x) <$> encode' x
+    Syntax.MMIU x p -> MMIU (widthOf x) <$> encode' x <*> pure p
     Syntax.AndU x y -> AndU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.OrU x y -> OrU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y

@@ -643,6 +643,18 @@ assertDivMod dividend divisor quotient remainder = do
 
 --------------------------------------------------------------------------------
 
+-- | Assert that a 'UInt' is less than or equal to a given bound.
+--
+--   /Example/
+--
+--   @
+-- assertLTE3 :: Comp ()
+-- assertLTE3 = do
+--     x <- inputUInt
+--     assertLTE x 3
+--   @
+--
+--   @since 0.9.3.0
 assertLTE :: KnownNat w => UInt w -> Integer -> Comp ()
 assertLTE value bound = do
   heap <- gets compHeap
@@ -652,6 +664,7 @@ assertLTE value bound = do
 
 --------------------------------------------------------------------------------
 
+-- | Data type representing the side effects of a computation.
 data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
