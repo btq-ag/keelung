@@ -109,9 +109,10 @@ data UInt (w :: Nat)
     SubU (UInt w) (UInt w)
   | -- | Multiplication
     MulU (UInt w) (UInt w)
-  | -- | Multiplicatie Inverse
-    InvU (UInt w)
-  | -- | Bitwise conjunction
+  | -- \| Bitwise conjunction
+
+    -- | -- | Multiplicatie Inverse
+    --   InvU (UInt w)
     AndU (UInt w) (UInt w)
   | -- | Bitwise disjunction
     OrU (UInt w) (UInt w)
@@ -140,7 +141,7 @@ instance KnownNat w => Show (UInt w) where
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    InvU x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
+    -- InvU x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
@@ -181,10 +182,10 @@ instance KnownNat w => Num (UInt w) where
 
   fromInteger n = UInt (fromIntegral n)
 
--- | Make UInt an instance of Fractional
-instance KnownNat w => Fractional (UInt w) where
-  fromRational = UInt . round . toRational
-  recip = InvU
+-- -- | Make UInt an instance of Fractional
+-- instance KnownNat w => Fractional (UInt w) where
+--   fromRational = UInt . round . toRational
+--   recip = InvU
 
 --------------------------------------------------------------------------------
 

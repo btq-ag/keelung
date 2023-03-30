@@ -13,6 +13,7 @@ module Keelung.Monad
     assert,
     performDivMod,
     assertDivMod,
+    assertLTE,
     SideEffect (..),
 
     -- * Inputs
@@ -642,9 +643,19 @@ assertDivMod dividend divisor quotient remainder = do
 
 --------------------------------------------------------------------------------
 
+assertLTE :: KnownNat w => UInt w -> Integer -> Comp ()
+assertLTE value bound = do
+  heap <- gets compHeap
+  let width = widthOf value
+  let encoded = runHeapM heap $ AssertLTE width <$> encode' value <*> pure bound
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+
+--------------------------------------------------------------------------------
+
 data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
   | AssignmentU Width Var Encoding.UInt
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
+  | AssertLTE Width Encoding.UInt Integer
   deriving (Show, Eq)
