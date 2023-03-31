@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -385,7 +384,7 @@ readKeelungVersion cmd args = do
 
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if major == 0 && minor >= 9 && minor < 10 && patch >= 3
+  if major == 0 && minor >= 9 && minor < 10 && patch >= 4
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
@@ -413,7 +412,7 @@ keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ ".
   where
     -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
     keelungVersion_ :: (Int, Int, Int)
-    keelungVersion_ = (0, 9, 3)
+    keelungVersion_ = (0, 9, 4)
 
 --------------------------------------------------------------------------------
 
@@ -443,20 +442,3 @@ instance Encode a => Show (Comp a) where
   show prog = case elaborateAndEncode prog of
     Left err -> show err
     Right elaborated -> show elaborated
-
-program :: Comp Field
--- program :: Comp [Field]
-program = do
-  x <- inputField Public
-  y <- inputField Public
-
-  z <- reuse $ x `eq` y
-  w <- reuse $ x `eq` y .|. z
-
-  assert z 
-
-  return w
-
-  -- return [x + y, x - y]
-  -- return [x + y]
-  return x

@@ -654,7 +654,7 @@ assertDivMod dividend divisor quotient remainder = do
 --     assertLTE x 3
 --   @
 --
---   @since 0.9.3.0
+--   @since 0.9.4.0
 assertLTE :: KnownNat w => UInt w -> Integer -> Comp ()
 assertLTE value bound = do
   heap <- gets compHeap

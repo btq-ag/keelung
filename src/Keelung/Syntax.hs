@@ -280,7 +280,7 @@ setBit = SetU
 
 -- | Modular multiplicative inverse of an Unsigned integer with a given modulus
 --
---   @since 0.9.3.0
+--   @since 0.9.4.0
 modInv :: KnownNat w => UInt w -> Integer -> UInt w
 modInv = MMIU
 
