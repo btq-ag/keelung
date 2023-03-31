@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -434,3 +436,27 @@ catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left er
 -- | Prettify and convert all field elements to 'Integer' in a 'R1CS'
 convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
 convertFieldElement = fmap (fmap (toInteger . N))
+
+--------------------------------------------------------------------------------
+
+instance Encode a => Show (Comp a) where
+  show prog = case elaborateAndEncode prog of
+    Left err -> show err
+    Right elaborated -> show elaborated
+
+program :: Comp Field
+-- program :: Comp [Field]
+program = do
+  x <- inputField Public
+  y <- inputField Public
+
+  z <- reuse $ x `eq` y
+  w <- reuse $ x `eq` y .|. z
+
+  assert z 
+
+  return w
+
+  -- return [x + y, x - y]
+  -- return [x + y]
+  return x

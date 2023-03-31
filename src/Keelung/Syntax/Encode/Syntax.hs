@@ -228,28 +228,34 @@ data Elaborated = Elaborated
 
 instance Show Elaborated where
   show (Elaborated expr comp) =
-    "{\n  Expression: \n    "
+    "Keelung {\n  Output:\n"
       <> showExpr
       <> "\n"
       <> showAssertions (compAssertions comp)
+      <> showSideEffects (compSideEffects comp)
       <> "}"
     where
       showExpr = case expr of
         Array xs -> prettyList2 4 (toList xs)
-        _ -> show expr
+        _ -> "    " <> show expr
       showAssertions assertions =
         if null assertions
           then ""
-          else "  Assertions: \n" <> unlines (map (("    " <>) . show) assertions) <> "\n"
+          else "\n  Assertions (should evaluate to true): \n" <> unlines (map (("    " <>) . show) assertions)
+
+      showSideEffects sideEffects =
+        if null sideEffects
+          then ""
+          else "\n  Other side effects: \n" <> unlines (map (("    " <>) . show) (toList sideEffects))
 
       prettyList2 :: Show a => Int -> [a] -> String
       prettyList2 n list = case list of
-        [] -> "[]"
-        [x] -> "[" <> show x <> "]"
+        [] -> "    []"
+        [x] -> "    [" <> show x <> "]"
         (x : xs) ->
           unlines $
             map (replicate n ' ' <>) $
-              "" : "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
+              "[ " <> show x : map (\y -> ", " <> show y) xs <> ["]"]
 
 instance Serialize Elaborated
 
@@ -276,6 +282,13 @@ data SideEffect
   | AssignmentU Width Var UInt
   | DivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
-  deriving (Show, Generic, NFData)
+  deriving (Generic, NFData)
 
 instance Serialize SideEffect
+
+instance Show SideEffect where
+  show (AssignmentF var val) = show (VarF var) <> " := " <> show val
+  show (AssignmentB var val) = show (VarB var) <> " := " <> show val
+  show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
+  show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
+  show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n
