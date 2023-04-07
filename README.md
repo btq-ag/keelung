@@ -18,3 +18,6 @@ The standard library is available [here](https://github.com/btq-ag/keelung-stdli
 
 ## Discord
 Find us on [Discord](https://discord.gg/SgVuUWDR)!
+
+## Codespaces
+Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codespaces` in [Keelung Examples](https://github.com/btq-ag/keelung-examples/)!
