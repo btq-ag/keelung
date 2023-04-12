@@ -17,4 +17,7 @@ The language reference is now available on [Hackage](https://hackage.haskell.org
 The standard library is available [here](https://github.com/btq-ag/keelung-stdlib).
 
 ## Discord
-Find us on [Discord](https://discord.gg/SgVuUWDR)!
+Find us on [Discord](https://discord.gg/nTr2kBmW2q)!
+
+## Codespaces
+Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codespaces` in [Keelung Examples](https://github.com/btq-ag/keelung-examples/)!
