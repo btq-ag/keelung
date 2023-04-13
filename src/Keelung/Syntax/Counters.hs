@@ -340,7 +340,7 @@ prettyConstraints counters cs binReps =
       if ordinaryConstraintSize == 0
         then ""
         else
-          "    Ordinary constriants ("
+          "    Ordinary constraints ("
             <> show ordinaryConstraintSize
             <> "):\n\n"
             <> unlines (map (\x -> "      " <> show x) cs)
@@ -351,7 +351,7 @@ prettyConstraints counters cs binReps =
       if booleanConstraintSize == 0
         then ""
         else
-          "    Boolean constriants ("
+          "    Boolean constraints ("
             <> show booleanConstraintSize
             <> "):\n\n"
             <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
@@ -362,7 +362,7 @@ prettyConstraints counters cs binReps =
       if null binReps
         then ""
         else
-          "    Binary representation constriants ("
+          "    Binary representation constraints ("
             <> show (length binReps)
             <> "):\n\n"
             <> unlines (map (("      " <>) . show) binReps)
