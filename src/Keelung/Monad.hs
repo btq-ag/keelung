@@ -14,6 +14,9 @@ module Keelung.Monad
     performDivMod,
     assertDivMod,
     assertLTE,
+    assertLT,
+    assertGTE,
+    assertGT,
     SideEffect (..),
 
     -- * Inputs
@@ -643,7 +646,7 @@ assertDivMod dividend divisor quotient remainder = do
 
 --------------------------------------------------------------------------------
 
--- | Assert that a 'UInt' is less than or equal to a given bound.
+-- | Assert that a 'UInt' is lesser than or equal to a given bound.
 --
 --   /Example/
 --
@@ -662,7 +665,7 @@ assertLTE value bound = do
   let encoded = runHeapM heap $ AssertLTE width <$> encode' value <*> pure bound
   modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
 
--- | Assert that a 'UInt' is less than a given bound.
+-- | Assert that a 'UInt' is lesser than a given bound.
 --
 --   /Example/
 --
@@ -679,6 +682,44 @@ assertLT value bound = do
   heap <- gets compHeap
   let width = widthOf value
   let encoded = runHeapM heap $ AssertLT width <$> encode' value <*> pure bound
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+
+-- | Assert that a 'UInt' is greater than or equal to a given bound.
+--
+--   /Example/
+--
+--   @
+-- assertGTE3 :: Comp ()
+-- assertGTE3 = do
+--     x <- inputUInt
+--     assertGTE x 3
+--   @
+--
+--   @since 0.9.5.0
+assertGTE :: KnownNat w => UInt w -> Integer -> Comp ()
+assertGTE value bound = do
+  heap <- gets compHeap
+  let width = widthOf value
+  let encoded = runHeapM heap $ AssertGTE width <$> encode' value <*> pure bound
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+
+-- | Assert that a 'UInt' is greater than a given bound.
+--
+--   /Example/
+--
+--   @
+-- assertGT3 :: Comp ()
+-- assertGT3 = do
+--     x <- inputUInt
+--     assertGT x 3
+--   @
+--
+--   @since 0.9.5.0
+assertGT :: KnownNat w => UInt w -> Integer -> Comp ()
+assertGT value bound = do
+  heap <- gets compHeap
+  let width = widthOf value
+  let encoded = runHeapM heap $ AssertGT width <$> encode' value <*> pure bound
   modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
 
 --------------------------------------------------------------------------------
