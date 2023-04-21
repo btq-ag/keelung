@@ -284,6 +284,9 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
     encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
     encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
     encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b
+    encodeSideEffect (AssertLT width a b) = return $ Encoding.AssertLT width a b
+    encodeSideEffect (AssertGTE width a b) = return $ Encoding.AssertGTE width a b
+    encodeSideEffect (AssertGT width a b) = return $ Encoding.AssertGT width a b
 
 --------------------------------------------------------------------------------
 

@@ -662,6 +662,25 @@ assertLTE value bound = do
   let encoded = runHeapM heap $ AssertLTE width <$> encode' value <*> pure bound
   modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
 
+-- | Assert that a 'UInt' is less than a given bound.
+--
+--   /Example/
+--
+--   @
+-- assertLT3 :: Comp ()
+-- assertLT3 = do
+--     x <- inputUInt
+--     assertLT x 3
+--   @
+--
+--   @since 0.9.5.0
+assertLT :: KnownNat w => UInt w -> Integer -> Comp ()
+assertLT value bound = do
+  heap <- gets compHeap
+  let width = widthOf value
+  let encoded = runHeapM heap $ AssertLT width <$> encode' value <*> pure bound
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+
 --------------------------------------------------------------------------------
 
 -- | Data type representing the side effects of a computation.
@@ -671,4 +690,7 @@ data SideEffect
   | AssignmentU Width Var Encoding.UInt
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | AssertLTE Width Encoding.UInt Integer
+  | AssertLT Width Encoding.UInt Integer
+  | AssertGTE Width Encoding.UInt Integer
+  | AssertGT Width Encoding.UInt Integer
   deriving (Show, Eq)

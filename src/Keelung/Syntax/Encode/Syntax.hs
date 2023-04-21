@@ -282,6 +282,9 @@ data SideEffect
   | AssignmentU Width Var UInt
   | DivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
+  | AssertLT Width UInt Integer
+  | AssertGTE Width UInt Integer
+  | AssertGT Width UInt Integer
   deriving (Generic, NFData)
 
 instance Serialize SideEffect
@@ -292,3 +295,6 @@ instance Show SideEffect where
   show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
   show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
   show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n
+  show (AssertLT _ x n) = "assert " <> show x <> " < " <> show n
+  show (AssertGTE _ x n) = "assert " <> show x <> " ≥ " <> show n
+  show (AssertGT _ x n) = "assert " <> show x <> " > " <> show n
