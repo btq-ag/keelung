@@ -43,6 +43,14 @@ data Boolean
     EqF Field Field
   | -- | Equality on Unsigned integers
     EqU Width UInt UInt
+  | -- | GTE on Unsigned integers
+    GTEU Width UInt UInt
+  | -- | GT on Unsigned integers
+    GTU Width UInt UInt
+  | -- | LTE on Unsigned integers
+    LTEU Width UInt UInt
+  | -- | LT on Unsigned integers
+    LTU Width UInt UInt
   | -- | Bit test on Unsigned integers
     BitU Width UInt Int
   deriving (Generic, Eq, NFData)
@@ -63,6 +71,10 @@ instance Show Boolean where
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqF x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    GTEU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " ≥ " . showsPrec 6 y
+    GTU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " > " . showsPrec 6 y
+    LTEU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " ≤ " . showsPrec 6 y
+    LTU _ x y -> showParen (prec > 5) $ showsPrec 6 x . showString " < " . showsPrec 6 y
     BitU _ x i -> showParen (prec > 6) $ showsPrec 7 x . showString " [" . shows i . showString "]"
 
 --------------------------------------------------------------------------------

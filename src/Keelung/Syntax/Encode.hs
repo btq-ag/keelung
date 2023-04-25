@@ -41,6 +41,10 @@ instance Encode' Syntax.Boolean Boolean where
     Syntax.EqB x y -> EqB <$> encode' x <*> encode' y
     Syntax.EqF x y -> EqF <$> encode' x <*> encode' y
     Syntax.EqU x y -> EqU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.LTU x y -> LTU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.LTEU x y -> LTEU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.GTU x y -> GTU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.GTEU x y -> GTEU (widthOf x) <$> encode' x <*> encode' y
     Syntax.BitU x i -> BitU (widthOf x) <$> encode' x <*> pure i
 
 instance Encode' Syntax.Field Field where

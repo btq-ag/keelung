@@ -9,7 +9,11 @@ module Keelung.Syntax
     Boolean (..),
     UInt (..),
     HasWidth (..),
-    Cmp (..),
+    EQ (..),
+    gt,
+    gte,
+    lt,
+    lte,
     true,
     false,
     setBit,
@@ -223,6 +227,14 @@ data Boolean
     EqF Field Field
   | -- | Equality on Unsigned integers
     forall w. KnownNat w => EqU (UInt w) (UInt w)
+  | -- | GTE on Unsigned integers
+    forall w. KnownNat w => GTEU (UInt w) (UInt w)
+  | -- | GT on Unsigned integers
+    forall w. KnownNat w => GTU (UInt w) (UInt w)
+  | -- | LTE on Unsigned integers
+    forall w. KnownNat w => LTEU (UInt w) (UInt w)
+  | -- | LT on Unsigned integers
+    forall w. KnownNat w => LTU (UInt w) (UInt w)
   | -- | Conditional that returns a Boolean
     IfB Boolean Boolean Boolean
   | -- | Bit test on Unsigned integers
@@ -262,6 +274,10 @@ instance Show Boolean where
     Not x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     EqB x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     EqU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    GTEU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " ≥ " . showsPrec 6 y
+    GTU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " > " . showsPrec 6 y
+    LTEU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " ≤ " . showsPrec 6 y
+    LTU x y -> showParen (prec > 5) $ showsPrec 6 x . showString " < " . showsPrec 6 y
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
@@ -284,25 +300,49 @@ setBit = SetU
 modInv :: KnownNat w => UInt w -> Integer -> UInt w
 modInv = MMIU
 
+-- | Greater than on Unsigned integers
+--
+--   @since 0.9.6.0
+gt :: KnownNat w => UInt w -> UInt w -> Boolean
+gt = GTU
+
+-- | Greater than or equal on Unsigned integers
+--
+--   @since 0.9.6.0
+gte :: KnownNat w => UInt w -> UInt w -> Boolean
+gte = GTEU
+
+-- | Less than on Unsigned integers
+--
+--   @since 0.9.6.0
+lt :: KnownNat w => UInt w -> UInt w -> Boolean
+lt = LTU
+
+-- | Less than or equal on Unsigned integers
+--
+--   @since 0.9.6.0
+lte :: KnownNat w => UInt w -> UInt w -> Boolean
+lte = LTEU
+
 --------------------------------------------------------------------------------
 
--- | Typeclass for comparing values
-class Cmp a where
+-- | Typeclass for computing equality on values
+class EQ a where
   -- | Equality
   eq :: a -> a -> Boolean
 
   -- | Inequality
   neq :: a -> a -> Boolean
 
-instance Cmp Boolean where
+instance EQ Boolean where
   eq = EqB
   neq x y = Not (x `eq` y)
 
-instance Cmp Field where
+instance EQ Field where
   eq = EqF
   neq x y = Not (x `eq` y)
 
-instance KnownNat w => Cmp (UInt w) where
+instance KnownNat w => EQ (UInt w) where
   eq = EqU
   neq x y = Not (x `eq` y)
 
