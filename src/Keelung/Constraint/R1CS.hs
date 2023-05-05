@@ -27,9 +27,9 @@ data R1CS n = R1CS
     -- | Hints for generating witnesses of CNQZ constraints
     r1csCNEQs :: [CNEQ n],
     -- | Hints for generating witnesses of DivMod constraints
-    r1csDivMods :: [(Var, Var, Var, Var)],
-    -- | Hints for generating witnesses of modInv constraints
-    r1csModInvs :: [(Var, Var, Integer)]
+    r1csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
+    -- | Hints for generating witnesses of ModInv constraints
+    r1csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
