@@ -5,12 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.10.0]
+
+### Added
+
+* Added `lte`, `lt`, `gte`, and `gt` operators for comparing `UInt`s. These operators can be used in conjunction with `assert` to create assertions about ranges of `UInt`s.
+
+* Addressed miscellaneous issues with the optimizer.
+
 ## [v0.9.5]
 
 ### Added
 
-* `assertLTE`, `assertGTE`, `assertGT`, and `assertLT`: assertions for comparing a `UInt` with some constant.
-* Miscellaneous issues with the compiler.
+* `assertLTE`, `assertLT`, `assertGTE`, and `assertGT`: assertions for comparing a `UInt` with some constant.
+
+### Fixed 
+
+* Addressed miscellaneous issues with the compiler.
 
 ## [v0.9.4]
 

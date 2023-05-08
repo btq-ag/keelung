@@ -387,7 +387,7 @@ readKeelungVersion cmd args = do
 
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if major == 0 && minor >= 9 && minor < 10 && patch >= 5
+  if major == 0 && minor >= 10 && minor < 11 && patch >= 0
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
@@ -415,7 +415,7 @@ keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ ".
   where
     -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
     keelungVersion_ :: (Int, Int, Int)
-    keelungVersion_ = (0, 9, 5)
+    keelungVersion_ = (0, 10, 0)
 
 --------------------------------------------------------------------------------
 
