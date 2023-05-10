@@ -13,12 +13,15 @@ import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Keelung.Field (FieldType)
 
 --------------------------------------------------------------------------------
 
 -- | Rank-1 Constraint System
 data R1CS n = R1CS
-  { -- | List of constraints
+  { -- | (Field type, characteristic, degree)
+    r1csField :: (FieldType, Integer, Integer),
+    -- | List of constraints
     r1csConstraints :: [R1C n],
     -- | List of binary representations
     r1csBinReps :: [BinRep],
@@ -36,7 +39,7 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show (R1CS cs binReps counters _ _ _) =
+  show (R1CS _ cs binReps counters _ _ _) =
     "R1CS {\n"
       <> prettyConstraints counters cs binReps
       <> prettyVariables counters
@@ -47,7 +50,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS ordinaryConstraints binReps counters _ _ _) =
+toR1Cs (R1CS _ ordinaryConstraints binReps counters _ _ _) =
   ordinaryConstraints
     <> booleanInputVarConstraints
     <> binRepConstraints
