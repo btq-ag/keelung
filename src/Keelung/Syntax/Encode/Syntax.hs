@@ -11,7 +11,6 @@ import Data.Sequence (Seq)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 -- import Keelung.Data.Struct
-import Keelung.Field (FieldType)
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 
@@ -224,8 +223,6 @@ instance Show Expr where
     Array xs -> showList (toList xs)
 
 instance Serialize Expr
-
-instance Serialize FieldType
 
 --------------------------------------------------------------------------------
 

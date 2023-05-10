@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -9,7 +10,7 @@ module Keelung
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
-    run,
+    -- run,
     compile,
     compileO0,
     compileOld,
@@ -28,9 +29,9 @@ module Keelung
     genInputsDefault,
     interpret_,
     interpret,
-    gf181,
-    bn128,
-    b64,
+    -- gf181,
+    -- bn128,
+    -- b64,
     elaborateAndEncode,
     Encode,
     GaloisField,
@@ -79,13 +80,15 @@ compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp 
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
   let opts' = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
-  case fieldType of
-    GF181 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldElement (wrapper opts' (fieldType, elab) :: M (R1CS B64))
+  wrapper opts' (fieldType, elab) :: M (R1CS Integer)
   where
     optOptimize :: Int -> String
     optOptimize i = "O" <> show i
+
+-- echo :: Comp Field
+-- echo = do 
+--   x <- input Public 
+--   return $ recip x
 
 -- | Default RTS options for profiling
 rtsoptProf :: [String]
@@ -193,10 +196,11 @@ verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/par
 genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
 genCircuit fp fieldType prog = do
   elab <- liftEither (elaborateAndEncode prog)
-  case fieldType of
-    GF181 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS GF181))
-    BN128 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS BN128))
-    B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
+  wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  -- case fieldType of
+  --   GF181 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS GF181))
+  --   BN128 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS BN128))
+  --   B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
 
 genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuitDefault = genCircuit "aurora/circuit.jsonl"
@@ -242,24 +246,24 @@ printErrorInstead (Left err) = do
 printErrorInstead (Right values) = return values
 
 -- | Interpret a program with public and private inputs
-run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
-run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
+-- run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
+-- run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
 
 -- | Interpret a program with public and private inputs
 interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
 
--- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
-gf181 :: Encode t => Comp t -> [GF181] -> [GF181] -> IO [N GF181]
-gf181 prog publicInput privateInput = map N <$> (interpret_ GF181 prog publicInput privateInput >>= printErrorInstead)
+-- -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
+-- gf181 :: Encode t => Comp t -> [GF181] -> [GF181] -> IO [N GF181]
+-- gf181 prog publicInput privateInput = map N <$> (interpret_ GF181 prog publicInput privateInput >>= printErrorInstead)
 
--- | A specialized version of 'interpret' that outputs numbers as 'N B64'
-b64 :: Encode t => Comp t -> [B64] -> [B64] -> IO [N B64]
-b64 prog publicInput privateInput = map N <$> (interpret_ B64 prog publicInput privateInput >>= printErrorInstead)
+-- -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
+-- b64 :: Encode t => Comp t -> [B64] -> [B64] -> IO [N B64]
+-- b64 prog publicInput privateInput = map N <$> (interpret_ B64 prog publicInput privateInput >>= printErrorInstead)
 
--- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
-bn128 :: Encode t => Comp t -> [BN128] -> [BN128] -> IO [N BN128]
-bn128 prog publicInput privateInput = map N <$> (interpret_ BN128 prog publicInput privateInput >>= printErrorInstead)
+-- -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
+-- bn128 :: Encode t => Comp t -> [BN128] -> [BN128] -> IO [N BN128]
+-- bn128 prog publicInput privateInput = map N <$> (interpret_ BN128 prog publicInput privateInput >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 
@@ -424,20 +428,13 @@ type M = ExceptT Error IO
 runM :: M a -> IO (Either Error a)
 runM = runExceptT
 
--- liftEitherT :: IO (Either Error a) -> M a
--- liftEitherT f = do
---   result <- lift f
---   case result of
---     Left err -> throwError err
---     Right x -> return x
-
 -- | Handle 'IO' Exceptions in the 'M' Monad
 catchIOError :: Error -> IO a -> M a
 catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left err)))) >>= liftEither
 
 -- | Prettify and convert all field elements to 'Integer' in a 'R1CS'
-convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
-convertFieldElement = fmap (fmap (toInteger . N))
+-- convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
+-- convertFieldElement = fmap (fmap (toInteger . N))
 
 --------------------------------------------------------------------------------
 

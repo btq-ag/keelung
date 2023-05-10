@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Added `lte`, `lt`, `gte`, and `gt` operators for comparing `UInt`s. These operators can be used in conjunction with `assert` to create assertions about ranges of `UInt`s.
 
+### Fixed 
+
 * Addressed miscellaneous issues with the optimizer.
 
 ## [v0.9.5]
