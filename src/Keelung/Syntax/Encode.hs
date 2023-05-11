@@ -57,6 +57,7 @@ instance Encode' Syntax.Field Field where
     Syntax.Add x y -> AddF <$> encode' x <*> encode' y
     Syntax.Sub x y -> SubF <$> encode' x <*> encode' y
     Syntax.Mul x y -> MulF <$> encode' x <*> encode' y
+    Syntax.Exp x n -> ExpF <$> encode' x <*> pure n
     Syntax.Div x y -> DivF <$> encode' x <*> encode' y
     Syntax.IfF p x y -> IfF <$> encode' p <*> encode' x <*> encode' y
     Syntax.BtoF b -> BtoF <$> encode' b

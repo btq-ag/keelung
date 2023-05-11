@@ -18,6 +18,7 @@ module Keelung.Syntax
     false,
     setBit,
     modInv,
+    pow,
     Var,
     Width,
   )
@@ -47,6 +48,8 @@ data Field
     Sub Field Field
   | -- | Multiplication
     Mul Field Field
+  | -- | Exponentiation
+    Exp Field Integer
   | -- | Division (without remainders)
     Div Field Field
   | -- | Conditional that returns a Field element
@@ -77,6 +80,7 @@ instance Show Field where
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    Exp x y -> showParen (prec > 9) $ showsPrec 9 x . showString " ^ " . showsPrec 10 y
     Div x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoF x -> showString "B→F" . showsPrec prec x
@@ -302,27 +306,33 @@ modInv = MMIU
 
 -- | Greater than on Unsigned integers
 --
---   @since 0.9.6.0
+--   @since 0.10.0
 gt :: KnownNat w => UInt w -> UInt w -> Boolean
 gt = GTU
 
 -- | Greater than or equal on Unsigned integers
 --
---   @since 0.9.6.0
+--   @since 0.10.0
 gte :: KnownNat w => UInt w -> UInt w -> Boolean
 gte = GTEU
 
 -- | Less than on Unsigned integers
 --
---   @since 0.9.6.0
+--   @since 0.10.0
 lt :: KnownNat w => UInt w -> UInt w -> Boolean
 lt = LTU
 
 -- | Less than or equal on Unsigned integers
 --
---   @since 0.9.6.0
+--   @since 0.10.0
 lte :: KnownNat w => UInt w -> UInt w -> Boolean
 lte = LTEU
+
+-- | Fast exponentiation
+--
+--   @since 0.11.0
+pow :: Field -> Integer -> Field
+pow = Exp
 
 --------------------------------------------------------------------------------
 

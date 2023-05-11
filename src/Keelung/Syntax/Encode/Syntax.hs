@@ -96,6 +96,8 @@ data Field
     SubF Field Field
   | -- | Multiplication
     MulF Field Field
+  | -- | Exponentiation
+    ExpF Field Integer
   | -- |  Division (without remainders)
     DivF Field Field
   | -- | Conditional that returns a Field element
@@ -116,6 +118,7 @@ instance Show Field where
     AddF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubF x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    ExpF x y -> showParen (prec > 9) $ showsPrec 9 x . showString " ^ " . showsPrec 10 y
     DivF x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
     IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoF x -> showString "B→F " . showsPrec prec x
