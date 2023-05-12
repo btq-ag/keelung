@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Constraint system for rank-1 constraints
-module Keelung.Constraint.R1CS (R1CS (..), toR1Cs, CNEQ (..)) where
+module Keelung.Constraint.R1CS (R1CS (..), toR1Cs) where
 
 import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
@@ -11,9 +11,9 @@ import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Field (FieldType)
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Field (FieldType)
 
 --------------------------------------------------------------------------------
 
@@ -27,8 +27,8 @@ data R1CS n = R1CS
     r1csBinReps :: [BinRep],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
-    -- | Hints for generating witnesses of CNQZ constraints
-    r1csCNEQs :: [CNEQ n],
+    -- | Hints for generating witnesses of Eq constraints
+    r1csEqs :: [(Var, Either Var n, Var)],
     -- | Hints for generating witnesses of DivMod constraints
     r1csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     -- | Hints for generating witnesses of ModInv constraints
@@ -87,33 +87,28 @@ toR1Cs (R1CS _ ordinaryConstraints binReps counters _ _ _) =
 --     )
 --     (getBinReps counters)
 
---------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- -- The encoding for constraint @x != y = out@ and some @m@ is:
+-- --
+-- --  > (x - y) * m = out
+-- --  > (x - y) * (1 - out) = 0
+-- data CNEQ n
+--   = CNEQ
+--       Var
+--       -- ^ @x@: always a variable
+--       (Either Var n)
+--       -- ^ @y@: could be a variable or a constant
+--       Var
+--       -- ^ @m@: a constant
+--   deriving
+--     ( Generic,
+--       Eq,
+--       NFData,
+--       Functor
+--     )
 
--- | For restoring CNQZ constraints during R1CS \<=\> ConstraintSystem conversion
---
--- The encoding for constraint @x != y = out@ and some @m@ is:
---
---  > (x - y) * m = out
---  > (x - y) * (1 - out) = 0
-data CNEQ n
-  = CNEQ
-      (Either Var n)
-      -- ^ @x@: could be a variable or a constant
-      (Either Var n)
-      -- ^ @y@: could be a variable or a constant
-      Var
-      -- ^ @m@: a constant
-  deriving
-    ( Generic,
-      Eq,
-      NFData,
-      Functor
-    )
+-- instance Serialize n => Serialize (CNEQ n)
 
-instance Serialize n => Serialize (CNEQ n)
-
-instance Show n => Show (CNEQ n) where
-  show (CNEQ (Left x) (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
-  show (CNEQ (Left x) (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
-  show (CNEQ (Right x) (Left y) m) = "Q " <> show x <> " $" <> show y <> " $" <> show m
-  show (CNEQ (Right x) (Right y) m) = "Q " <> show x <> " " <> show y <> " $" <> show m
+-- instance Show n => Show (CNEQ n) where
+--   show (CNEQ x (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
+--   show (CNEQ x (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
