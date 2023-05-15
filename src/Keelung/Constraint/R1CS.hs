@@ -14,6 +14,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field (FieldType)
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Keelung.Data.Polynomial (Poly)
 
 --------------------------------------------------------------------------------
 
@@ -27,8 +28,8 @@ data R1CS n = R1CS
     r1csBinReps :: [BinRep],
     -- | Variable bookkeeping
     r1csCounters :: Counters,
-    -- | Hints for generating witnesses of Eq constraints
-    r1csEqs :: [(Var, Either Var n, Var)],
+    -- | Hints for generating witnesses of EqZero constraints
+    r1csEqZeros :: [(Poly n, Var)],
     -- | Hints for generating witnesses of DivMod constraints
     r1csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     -- | Hints for generating witnesses of ModInv constraints
