@@ -390,7 +390,7 @@ readKeelungVersion cmd args = do
 
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if major == 0 && minor >= 10 && minor < 11 && patch >= 0
+  if major == 0 && minor >= 11 && minor < 12 && patch >= 0
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
