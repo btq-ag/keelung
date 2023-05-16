@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.11.0]
+
+### Added
+
+* Added `pow` operator for calculating exponentiation of field elements. This operator allow for exponentiation by squaring, which is more efficient than repeated multiplication.
+* Added helpers like `gf181`, `bn128`, and `b64` for constructing field type information.
+
+### Removed
+
+* Removed fixed field type constructors like `GF181`, `BN128`, and `B64`.
+
+### Fixed 
+
+* [Issue #15](https://github.com/btq-ag/keelung/issues/15): Allow users to use any field they like.
+* Compilation of chained conjunection (more than 3) on `UInt`s.
+
 ## [v0.10.0]
 
 ### Added

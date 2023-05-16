@@ -13,7 +13,6 @@ module Keelung
     -- run,
     compile,
     compileO0,
-    compileOld,
     compileWithOpts,
     rtsoptProf,
     rtsoptMemory,
@@ -71,9 +70,9 @@ compile = compileWithOpts 1 [] []
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 = compileWithOpts 0 [] []
 
--- | Compile a program to a 'R1CS' constraint system with optimization level 2.
-compileOld :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
-compileOld = compileWithOpts 2 [] []
+-- -- | Compile a program to a 'R1CS' constraint system with optimization level 2.
+-- compileOld :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+-- compileOld = compileWithOpts 2 [] []
 
 -- | Compile a program to a 'R1CS' constraint system with optimization level and RTS options as arguments.
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
@@ -419,7 +418,7 @@ keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ ".
   where
     -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
     keelungVersion_ :: (Int, Int, Int)
-    keelungVersion_ = (0, 10, 0)
+    keelungVersion_ = (0, 11, 0)
 
 --------------------------------------------------------------------------------
 
