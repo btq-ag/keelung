@@ -1,6 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
+
+{-# HLINT ignore "Replace case with fromMaybe" #-}
 
 module Keelung.Syntax.Counters
   ( Counters (..),
@@ -8,27 +12,31 @@ module Keelung.Syntax.Counters
     VarSort (..),
     reindex,
     getCount,
-    getCountBySort,
-    getCountByType,
     getTotalCount,
     addCount,
-    -- for constraint generation
-    getOutputVarRange,
+    -- | for constraint generation
     getOutputBinRepRange,
-    getPublicInputVarRange,
-    getPrivateInputVarRange,
     getBinReps,
-    getBooleanConstraintSize,
+    getBooleanConstraintCount,
     getBooleanConstraintRanges,
-    -- for parsing raw inputs
+    -- | for parsing raw inputs
     getPublicInputSequence,
     getPrivateInputSequence,
-    -- workaround for variable renumbering
+    -- | workaround for variable renumbering
     setReducedCount,
-    -- for pretty printing
+    -- | for pretty printing
     prettyConstraints,
     prettyVariables,
     prettyBooleanConstraints,
+    -- | for querying the counts and ranges of variables
+    getCounts,
+    getRanges,
+    enumerate,
+    Ranges,
+    inRanges,
+    AccessCounters,
+    Category (..),
+    Type (..),
   )
 where
 
@@ -104,8 +112,6 @@ instance Semigroup Counters where
 instance Monoid Counters where
   mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty mempty 0
 
---------------------------------------------------------------------------------
-
 -- | Get the current count for a variable of the given type and sort.
 getCount :: VarSort -> VarType -> Counters -> Int
 getCount sort typ (Counters o i1 i2 x _ _ _) =
@@ -122,24 +128,6 @@ getCount sort typ (Counters o i1 i2 x _ _ _) =
         OfBoolean -> b
         OfUIntBinRep w -> w * IntMap.findWithDefault 0 w u
         OfUInt w -> IntMap.findWithDefault 0 w u
-
--- | Get the current count for a variable group of the given sort.
-getCountBySort :: VarSort -> Counters -> Int
-getCountBySort sort (Counters o i1 i2 x _ _ _) =
-  case sort of
-    OfOutput -> smallCounterSize o
-    OfPublicInput -> smallCounterSize i1
-    OfPrivateInput -> smallCounterSize i2
-    OfIntermediate -> smallCounterSize x
-
--- | Get the current count for a variable group of the given type.
-getCountByType :: VarType -> Counters -> Int
-getCountByType typ (Counters o i1 i2 x _ _ _) =
-  case typ of
-    OfField -> structF o + structF i1 + structF i2 + structF x
-    OfBoolean -> structB o + structB i1 + structB i2 + structB x
-    OfUIntBinRep _ -> binRepSize (structU o) + binRepSize (structU i1) + binRepSize (structU i2) + binRepSize (structU x)
-    OfUInt _ -> uIntSize (structU o) + uIntSize (structU i1) + uIntSize (structU i2) + uIntSize (structU x)
 
 setReducedCount :: Int -> Counters -> Counters
 setReducedCount n (Counters o i1 i2 x s1 s2 _) = Counters o i1 i2 x s1 s2 n
@@ -219,26 +207,11 @@ offsetOfType (Struct f b u) (OfUInt width) index =
 
 --------------------------------------------------------------------------------
 
-getOutputVarRange :: Counters -> (Int, Int)
-getOutputVarRange counters = (offsetOfSort counters OfOutput, offsetOfSort counters OfPublicInput)
-
 getOutputBinRepRange :: Counters -> (Int, Int)
 getOutputBinRepRange counters =
   let start = offsetOfSort counters OfOutput + getCount OfOutput OfField counters + getCount OfOutput OfBoolean counters
       size = binRepSize (structU (countOutput counters))
    in (start, start + size)
-
-getPublicInputVarRange :: Counters -> (Int, Int)
-getPublicInputVarRange counters =
-  let inputOffset = offsetOfSort counters OfPublicInput
-      inputSize = getCountBySort OfPublicInput counters
-   in (inputOffset, inputOffset + inputSize)
-
-getPrivateInputVarRange :: Counters -> (Int, Int)
-getPrivateInputVarRange counters =
-  let inputOffset = offsetOfSort counters OfPrivateInput
-      inputSize = getCountBySort OfPrivateInput counters
-   in (inputOffset, inputOffset + inputSize)
 
 getBinReps :: Counters -> [BinRep]
 getBinReps counters@(Counters o i1 i2 x _ _ _) =
@@ -256,34 +229,18 @@ getBinReps counters@(Counters o i1 i2 x _ _ _) =
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
 --    2. UInt BinReps output variables
---    3. Boolean input variables
---    4. UInt BinReps input variables
-getBooleanConstraintSize :: Counters -> Int
-getBooleanConstraintSize (Counters o i1 i2 _ _ _ _) = f o + f i1 + f i2
-  where
-    f (Struct _ b u) = b + binRepSize u
+--    3. Boolean private input variables
+--    4. UInt BinReps private input variables
+--    5. Boolean public input variables
+--    6. UInt BinReps public input variables
+booleanConstraintCategories :: [(Category, Type)]
+booleanConstraintCategories = [(Output, Bool), (Output, AllBits), (PublicInput, Bool), (PublicInput, AllBits), (PrivateInput, Bool), (PrivateInput, AllBits)]
 
--- | Variables that needed to be constrained to be Boolean
---    1. Boolean output variables
---    2. UInt BinReps output variables
---    3. Boolean input variables
---    4. UInt BinReps input variables
+getBooleanConstraintCount :: Counters -> Int
+getBooleanConstraintCount counters = sum $ getCounts counters booleanConstraintCategories
+
 getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters@(Counters o i1 i2 _ _ _ _) =
-  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfPublicInput i1, booleanVarRange OfPrivateInput i2]
-  where
-    booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
-    booleanVarRange sort (Struct _ b u) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize u)
-
-    mergeSegments :: [(Int, Int)] -> [(Int, Int)]
-    mergeSegments [] = []
-    mergeSegments [(start, end)]
-      | end == start = []
-      | otherwise = [(start, end)]
-    mergeSegments ((start, end) : (start', end') : xs)
-      | end == start = mergeSegments ((start', end') : xs)
-      | end == start' = mergeSegments ((start, end') : xs)
-      | otherwise = (start, end) : mergeSegments ((start', end') : xs)
+getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
 
 --------------------------------------------------------------------------------
 
@@ -326,7 +283,7 @@ prettyConstraints counters cs binReps =
   where
     -- sizes of constraint groups
     totalBinRepConstraintSize = length binReps
-    booleanConstraintSize = getBooleanConstraintSize counters
+    booleanConstraintSize = getBooleanConstraintCount counters
     ordinaryConstraintSize = length cs
 
     -- summary of constraint groups
@@ -394,3 +351,116 @@ prettyBooleanConstraints counters =
 
     showBooleanConstraint :: Int -> String
     showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
+
+--------------------------------------------------------------------------------
+
+type Range = (Int, Int)
+
+type Ranges = IntMap Int
+
+data Type = Field | Bool | AllBits | AllUInt | Bits Width | UInt Width
+
+data Category = Output | PrivateInput | PublicInput | Intermediate
+
+class AccessCounters selector where
+  getCountTemp :: Counters -> selector -> Int
+  getOffset :: Counters -> selector -> Int
+
+-- | Access Counters of a given category.
+instance AccessCounters Category where
+  getCountTemp counters category =
+    getCountTemp counters (category, Field)
+      + getCountTemp counters (category, Bool)
+      + getCountTemp counters (category, AllBits)
+      + getCountTemp counters (category, AllUInt)
+
+  getOffset _ Output = 0
+  getOffset counters PublicInput = getCountTemp counters Output
+  getOffset counters PrivateInput = getCountTemp counters Output + getCountTemp counters PublicInput
+  getOffset counters Intermediate = getCountTemp counters Output + getCountTemp counters PublicInput + getCountTemp counters PrivateInput
+
+-- | Access Counters of a given type in a given category.
+instance AccessCounters (Category, Type) where
+  getCountTemp counters (category, typ) =
+    let selector = case category of
+          Output -> countOutput
+          PublicInput -> countPublicInput
+          PrivateInput -> countPrivateInput
+          Intermediate -> countIntermediate
+     in case typ of
+          Field -> structF (selector counters)
+          Bool -> structB (selector counters)
+          AllBits -> binRepSize (structU (selector counters))
+          AllUInt -> uIntSize (structU (selector counters))
+          Bits w -> case IntMap.lookup w (structU (selector counters)) of
+            Nothing -> 0
+            Just n -> n * w
+          UInt w -> case IntMap.lookup w (structU (selector counters)) of
+            Nothing -> 0
+            Just n -> n
+
+  getOffset counters (category, typ) =
+    let selector = case category of
+          Output -> countOutput
+          PublicInput -> countPublicInput
+          PrivateInput -> countPrivateInput
+          Intermediate -> countIntermediate
+     in getOffset counters category + case typ of
+          Field -> 0
+          Bool -> structF (selector counters)
+          AllBits -> structF (selector counters) + structB (selector counters)
+          AllUInt -> structF (selector counters) + structB (selector counters) + binRepSize (structU (selector counters))
+          Bits w ->
+            structF (selector counters)
+              + structB (selector counters)
+              + sum
+                ( IntMap.mapWithKey
+                    ( \width count -> if w > width then count * width else 0
+                    )
+                    (structU (selector counters))
+                )
+          UInt w ->
+            structF (selector counters)
+              + structB (selector counters)
+              + binRepSize (structU (selector counters))
+              + sum
+                ( IntMap.filterWithKey
+                    ( \width _ -> w > width
+                    )
+                    (structU (selector counters))
+                )
+
+-- | Given a list of categories,  get the total number of variables in each category
+getCounts :: AccessCounters selector => Counters -> [selector] -> [Int]
+getCounts = map . getCountTemp
+
+-- | Given a list of categories, get the ranges of variables in each category
+getRanges :: AccessCounters selector => Counters -> [selector] -> Ranges
+getRanges counters categories = buildRanges $ map (\category -> (getOffset counters category, getCountTemp counters category)) categories
+
+enumerate :: Ranges -> [Int]
+enumerate ranges = concatMap (\(start, size) -> [start .. start + size - 1]) (IntMap.toList ranges)
+
+-- | Merge overlapping segments into a list of non-overlapping segments
+buildRanges :: [Range] -> Ranges
+buildRanges = foldr build mempty
+  where
+    build :: Range -> Ranges -> Ranges
+    build (_, 0) ranges = ranges
+    build (start, size) ranges =
+      case IntMap.lookupLE start ranges of -- find the segment that starts before the inserted segment
+        Just (previous, previousSize) ->
+          if start < previous + previousSize -- see if the inserted segment overlaps with the previous segment
+            then IntMap.insert previous (max (start + size - previous) previousSize) ranges -- merge it with the previous segment
+            else IntMap.insert start size ranges -- insert it as a new segment
+        Nothing -> case IntMap.lookupGT start ranges of -- find the segment that starts after the inserted segment
+          Just (next, nextSize) ->
+            if next < start + size -- see if the inserted segment overlaps with the next segment
+              then IntMap.insert start (max (next + nextSize - start) size) (IntMap.delete next ranges) -- merge it with the next segment
+              else IntMap.insert start size ranges -- insert it as a new segment
+          Nothing -> IntMap.insert start size ranges -- insert it as a new segment
+
+inRanges :: Ranges -> Int -> Bool
+inRanges ranges index = case IntMap.lookupLE index ranges of
+  Nothing -> False
+  Just (start, size) -> index < start + size
