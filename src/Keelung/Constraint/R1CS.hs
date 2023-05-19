@@ -10,11 +10,11 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.BinRep (BinRep (..))
+import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field (FieldType)
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Data.Polynomial (Poly)
 
 --------------------------------------------------------------------------------
 
@@ -26,6 +26,7 @@ data R1CS n = R1CS
     r1csConstraints :: [R1C n],
     -- | List of binary representations
     r1csBinReps :: [BinRep],
+    -- r1csBinReps :: ([BinRep], IntMap Int),
     -- | Variable bookkeeping
     r1csCounters :: Counters,
     -- | Hints for generating witnesses of EqZero constraints

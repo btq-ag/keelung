@@ -18,6 +18,8 @@ module Keelung.Data.Polynomial
     view,
     renumberVars,
     evaluate,
+    addConstant,
+    multiplyBy,
     --
     delete,
     merge,
@@ -165,8 +167,10 @@ delete :: (Num n, Eq n) => Var -> Poly n -> Maybe (Poly n)
 delete x (Poly c xs) = buildMaybe c (IntMap.delete x xs)
 
 -- | Merge two polynomials.
-merge :: (Num n, Eq n) => Poly n -> Poly n -> Maybe (Poly n)
-merge (Poly c xs) (Poly d ys) = buildMaybe (c + d) (mergeCoeffs xs ys)
+merge :: (Num n, Eq n) => Poly n -> Poly n -> Either n (Poly n)
+merge (Poly c xs) (Poly d ys) = case buildEither' (c + d) (IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys) of
+  Left n -> Left n
+  Right xs' -> Right xs'
 
 -- | Negate a polynomial.
 negate :: (Num n, Eq n) => Poly n -> Poly n
@@ -209,3 +213,10 @@ substWithIntMap (Poly c xs) bindings =
           (c, mempty)
           xs
    in buildEither' c' xs'
+
+addConstant :: Num n => n -> Poly n -> Poly n
+addConstant d (Poly c xs) = Poly (c + d) xs
+
+multiplyBy :: (Eq n, Num n) => n -> Poly n -> Either n (Poly n)
+multiplyBy 0 (Poly _ _) = Left 0
+multiplyBy d (Poly c xs) = Right (Poly (c * d) (fmap (* d) xs))

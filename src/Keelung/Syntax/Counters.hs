@@ -75,8 +75,8 @@ smallCounterSize (Struct f b u) =
 
 data Counters = Counters
   { countOutput :: !SmallCounters, -- counters for output variables
-    countPublicInput :: !SmallCounters, -- counters for input variables
-    countPrivateInput :: !SmallCounters, -- counters for input variables
+    countPublicInput :: !SmallCounters, -- counters for public input variables
+    countPrivateInput :: !SmallCounters, -- counters for private input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
     countPublicInputSequence :: !(Seq VarType), -- Sequence of public input variables
     countPrivateInputSequence :: !(Seq VarType), -- Sequence of private input variables
@@ -268,12 +268,27 @@ getBooleanConstraintSize (Counters o i1 i2 _ _ _ _) = f o + f i1 + f i2
 --    2. UInt BinReps output variables
 --    3. Boolean input variables
 --    4. UInt BinReps input variables
+--    5. UInt BinRep intermediate variables
 getBooleanConstraintRanges :: Counters -> [(Int, Int)]
 getBooleanConstraintRanges counters@(Counters o i1 i2 _ _ _ _) =
-  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfPublicInput i1, booleanVarRange OfPrivateInput i2]
+  mergeSegments [booleanVarRange OfOutput o, booleanVarRange OfPublicInput i1, booleanVarRange OfPrivateInput i2] 
+  -- <> uintIntermediateBooleanVarRange x
   where
     booleanVarRange :: VarSort -> SmallCounters -> (Int, Int)
     booleanVarRange sort (Struct _ b u) = (reindex counters sort OfBoolean 0, reindex counters sort OfBoolean 0 + b + binRepSize u)
+
+    -- uintIntermediateBooleanVarRange :: SmallCounters -> (Int, Int)
+    -- uintIntermediateBooleanVarRange (Struct _ b u) =
+    --   let start = reindex counters OfIntermediate OfBoolean 0 + b
+    --    in (start, start + binRepSize u)
+
+    -- uintIntermediateBooleanVarRange :: SmallCounters -> [(Int, Int)]
+    -- uintIntermediateBooleanVarRange (Struct _ _ u) = concatMap fromPair (IntMap.toList u)
+    --   where
+    --     fromPair :: (Width, Int) -> [(Int, Int)]
+    --     fromPair (width, count) =
+    --       let binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) 0
+    --        in [(binRepOffset + width * index + 1, binRepOffset + width * index + width) | index <- [0 .. count - 1]]
 
     mergeSegments :: [(Int, Int)] -> [(Int, Int)]
     mergeSegments [] = []
