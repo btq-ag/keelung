@@ -169,8 +169,8 @@ data InputAccess
 freshVarF :: Comp Var
 freshVarF = do
   counters <- gets compCounters
-  let index = getCount OfIntermediate OfField counters
-  modifyCounter $ addCount OfIntermediate OfField 1
+  let index = getCount counters (Intermediate, ReadField)
+  modifyCounter $ addCount (Intermediate, WriteField) 1
   return index
 
 -- | Allocate a fresh 'Boolean' variable.
@@ -179,8 +179,8 @@ freshVarF = do
 freshVarB :: Comp Var
 freshVarB = do
   counters <- gets compCounters
-  let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  let index = getCount counters (Intermediate, ReadBool)
+  modifyCounter $ addCount (Intermediate, WriteBool) 1
   return index
 
 -- | Allocate a fresh 'UInt' variable.
@@ -189,22 +189,22 @@ freshVarB = do
 freshVarU :: Width -> Comp Var
 freshVarU width = do
   counters <- gets compCounters
-  let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  let index = getCount counters (Intermediate, ReadUInt width)
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return index
 
 -- | Allocate a fresh input variable.
-freshInputVar :: InputAccess -> VarType -> Int -> Comp Var
-freshInputVar acc vt n = do
+freshInputVar :: InputAccess -> ReadType -> WriteType -> Int -> Comp Var
+freshInputVar acc readType writeType n = do
   counters <- gets compCounters
   case acc of
     Public -> do
-      let index = getCount OfPublicInput vt counters
-      modifyCounter $ addCount OfPublicInput vt n
+      let index = getCount counters (PublicInput, readType)
+      modifyCounter $ addCount (PublicInput, writeType) n
       return index
     Private -> do
-      let index = getCount OfPrivateInput vt counters
-      modifyCounter $ addCount OfPrivateInput vt n
+      let index = getCount counters (PrivateInput, readType)
+      modifyCounter $ addCount (PrivateInput, writeType) n
       return index
 
 --------------------------------------------------------------------------------
@@ -236,7 +236,7 @@ instance Proper Field where
 
   -- \| Specialized implementation for Field
   inputList acc size = do
-    start <- freshInputVar acc OfField size
+    start <- freshInputVar acc ReadField WriteField size
     return $ case acc of
       Public -> map VarFI [start .. start + size - 1]
       Private -> map VarFP [start .. start + size - 1]
@@ -250,7 +250,7 @@ instance Proper Boolean where
 
   -- \| Specialized implementation for Boolean
   inputList acc size = do
-    start <- freshInputVar acc OfBoolean size
+    start <- freshInputVar acc ReadBool WriteBool size
     return $ case acc of
       Public -> map VarBI [start .. start + size - 1]
       Private -> map VarBP [start .. start + size - 1]
@@ -264,7 +264,7 @@ instance KnownNat w => Proper (UInt w) where
 
   -- \| Specialized implementation for UInt
   inputList acc size = do
-    start <- freshInputVar acc (OfUInt width) size
+    start <- freshInputVar acc (ReadUInt width) (WriteUInt width) size
     return $ case acc of
       Public -> map VarUI [start .. start + size - 1]
       Private -> map VarUP [start .. start + size - 1]
@@ -279,19 +279,19 @@ instance KnownNat w => Proper (UInt w) where
 
 -- | Requests a fresh 'Field' input variable
 inputField :: InputAccess -> Comp Field
-inputField Public = VarFI <$> freshInputVar Public OfField 1
-inputField Private = VarFP <$> freshInputVar Private OfField 1
+inputField Public = VarFI <$> freshInputVar Public ReadField WriteField 1
+inputField Private = VarFP <$> freshInputVar Private ReadField WriteField 1
 
 -- | Requests a fresh 'Boolean' input variable
 inputBool :: InputAccess -> Comp Boolean
-inputBool Public = VarBI <$> freshInputVar Public OfBoolean 1
-inputBool Private = VarBP <$> freshInputVar Private OfBoolean 1
+inputBool Public = VarBI <$> freshInputVar Public ReadBool WriteBool 1
+inputBool Private = VarBP <$> freshInputVar Private ReadBool WriteBool 1
 
 -- | Requests a fresh 'UInt' input variable of some bit width
 inputUInt :: forall w. KnownNat w => InputAccess -> Comp (UInt w)
 inputUInt acc = case acc of
-  Public -> VarUI <$> freshInputVar acc (OfUInt width) 1
-  Private -> VarUP <$> freshInputVar acc (OfUInt width) 1
+  Public -> VarUI <$> freshInputVar acc (ReadUInt width) (WriteUInt width) 1
+  Private -> VarUP <$> freshInputVar acc (ReadUInt width) (WriteUInt width) 1
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 

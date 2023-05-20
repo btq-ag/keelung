@@ -8,14 +8,8 @@
 
 module Keelung.Syntax.Counters
   ( Counters (..),
-    VarType (..),
-    VarSort (..),
-    reindex,
-    getCount,
     getTotalCount,
-    addCount,
     -- | for constraint generation
-    getOutputBinRepRange,
     getBinReps,
     getBooleanConstraintCount,
     getBooleanConstraintRanges,
@@ -28,15 +22,21 @@ module Keelung.Syntax.Counters
     prettyConstraints,
     prettyVariables,
     prettyBooleanConstraints,
-    -- | for querying the counts and ranges of variables
-    getCounts,
-    getRanges,
-    enumerate,
-    Ranges,
-    inRanges,
-    AccessCounters,
+    -- | for reading the counts and ranges of variables
     Category (..),
-    Type (..),
+    ReadCounters,
+    ReadType (..),
+    getCount,
+    Ranges,
+    getRanges,
+    getRange,
+    enumerate,
+    -- | for writing the counts and ranges of variables
+    WriteType (..),
+    addCount,
+    -- | other helpers
+    reindex,
+    inRanges,
   )
 where
 
@@ -55,15 +55,6 @@ import Keelung.Data.Struct (Struct (..))
 type Var = Int
 
 type Width = Int
-
--- | "Types" of variables.
-data VarType = OfField | OfBoolean | OfUIntBinRep Width | OfUInt Width
-  deriving (Generic, NFData, Eq, Show)
-
-instance Serialize VarType
-
--- | "Sorts" of variables.
-data VarSort = OfOutput | OfPublicInput | OfPrivateInput | OfIntermediate
 
 ------------------------------------------------------------------------------
 
@@ -86,8 +77,8 @@ data Counters = Counters
     countPublicInput :: !SmallCounters, -- counters for input variables
     countPrivateInput :: !SmallCounters, -- counters for input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
-    countPublicInputSequence :: !(Seq VarType), -- Sequence of public input variables
-    countPrivateInputSequence :: !(Seq VarType), -- Sequence of private input variables
+    countPublicInputSequence :: !(Seq WriteType), -- Sequence of public input variables
+    countPrivateInputSequence :: !(Seq WriteType), -- Sequence of private input variables
     countReducedVarHack :: !Int -- HACK, keep track of the number of variables reduced after renumbering
   }
   deriving (Generic, NFData, Eq, Show)
@@ -112,23 +103,6 @@ instance Semigroup Counters where
 instance Monoid Counters where
   mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty mempty 0
 
--- | Get the current count for a variable of the given type and sort.
-getCount :: VarSort -> VarType -> Counters -> Int
-getCount sort typ (Counters o i1 i2 x _ _ _) =
-  case sort of
-    OfOutput -> go o
-    OfPublicInput -> go i1
-    OfPrivateInput -> go i2
-    OfIntermediate -> go x
-  where
-    go :: SmallCounters -> Int
-    go (Struct f b u) =
-      case typ of
-        OfField -> f
-        OfBoolean -> b
-        OfUIntBinRep w -> w * IntMap.findWithDefault 0 w u
-        OfUInt w -> IntMap.findWithDefault 0 w u
-
 setReducedCount :: Int -> Counters -> Counters
 setReducedCount n (Counters o i1 i2 x s1 s2 _) = Counters o i1 i2 x s1 s2 n
 
@@ -138,92 +112,35 @@ getTotalCount (Counters o i1 i2 x _ _ reduced) =
   -- 'countReducedVarHack' should only have effect on intermediate variables
   (smallCounterSize o + smallCounterSize i1 + smallCounterSize i2) + (0 `max` (smallCounterSize x - reduced))
 
--- | Set the current count for a variable of the given type and sort.
-addCount :: VarSort -> VarType -> Int -> Counters -> Counters
-addCount sort typ n (Counters o i1 i2 x s1 s2 r) =
-  case sort of
-    OfOutput -> Counters (adjustSmallCounters o) i1 i2 x s1 s2 r
-    OfPublicInput -> Counters o (adjustSmallCounters i1) i2 x (s1 <> newInputSequence) s2 r
-    OfPrivateInput -> Counters o i1 (adjustSmallCounters i2) x s1 (s2 <> newInputSequence) r
-    OfIntermediate -> Counters o i1 i2 (adjustSmallCounters x) s1 s2 r
-  where
-    adjustSmallCounters :: SmallCounters -> SmallCounters
-    adjustSmallCounters (Struct f b u) =
-      case typ of
-        OfField -> Struct (f + n) b u
-        OfBoolean -> Struct f (b + n) u
-        OfUIntBinRep _ -> error "[ panic ] Should use `OfUInt` to adjust the counter instead"
-        OfUInt w -> Struct f b (IntMap.insertWith (+) w n u)
-
-    newInputSequence :: Seq VarType
-    newInputSequence = Seq.fromList $ replicate n typ
-
 -- | For parsing raw inputs
-getPublicInputSequence :: Counters -> Seq VarType
+getPublicInputSequence :: Counters -> Seq WriteType
 getPublicInputSequence = countPublicInputSequence
 
-getPrivateInputSequence :: Counters -> Seq VarType
+getPrivateInputSequence :: Counters -> Seq WriteType
 getPrivateInputSequence = countPrivateInputSequence
 
 --------------------------------------------------------------------------------
 
 -- | Re-index variables of different sorts and types
-reindex :: Counters -> VarSort -> VarType -> Var -> Var
-reindex counters sort typ index = offsetOfSort counters sort + offsetOfType (choose sort counters) typ index
-  where
-    choose :: VarSort -> Counters -> SmallCounters
-    choose OfOutput = countOutput
-    choose OfPublicInput = countPublicInput
-    choose OfPrivateInput = countPrivateInput
-    choose OfIntermediate = countIntermediate
-
-offsetOfSort :: Counters -> VarSort -> Int
-offsetOfSort _ OfOutput = 0
-offsetOfSort counters OfPublicInput = smallCounterSize (countOutput counters)
-offsetOfSort counters OfPrivateInput = smallCounterSize (countOutput counters) + smallCounterSize (countPublicInput counters)
-offsetOfSort counters OfIntermediate = smallCounterSize (countOutput counters) + smallCounterSize (countPublicInput counters) + smallCounterSize (countPrivateInput counters)
-
-offsetOfType :: SmallCounters -> VarType -> Int -> Int
-offsetOfType _ OfField index = index
-offsetOfType (Struct f _ _) OfBoolean index = f + index
-offsetOfType (Struct f b u) (OfUIntBinRep width) index =
-  f
-    + b
-    + sum
-      ( IntMap.mapWithKey
-          ( \width' count -> case compare width width' of
-              LT -> 0
-              EQ -> index * width
-              GT -> width' * count
-          )
-          u
-      )
-offsetOfType (Struct f b u) (OfUInt width) index =
-  f
-    + b
-    + binRepSize u
-    + sum (IntMap.filterWithKey (\width' _ -> width' < width) u)
-    + index
+reindex :: Counters -> Category -> ReadType -> Var -> Var
+reindex counters category typ index =
+  getOffset counters (category, typ) + case typ of
+    ReadBits width -> index * width
+    _ -> index
 
 --------------------------------------------------------------------------------
 
-getOutputBinRepRange :: Counters -> (Int, Int)
-getOutputBinRepRange counters =
-  let start = offsetOfSort counters OfOutput + getCount OfOutput OfField counters + getCount OfOutput OfBoolean counters
-      size = binRepSize (structU (countOutput counters))
-   in (start, start + size)
-
 getBinReps :: Counters -> [BinRep]
 getBinReps counters@(Counters o i1 i2 x _ _ _) =
-  fromSmallCounter OfOutput o ++ fromSmallCounter OfPublicInput i1 ++ fromSmallCounter OfPrivateInput i2 ++ fromSmallCounter OfIntermediate x
+  fromSmallCounter Output o ++ fromSmallCounter PublicInput i1 ++ fromSmallCounter PrivateInput i2 ++ fromSmallCounter Intermediate x
   where
-    fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-    fromSmallCounter sort (Struct _ _ u) = concatMap (fromPair sort) (IntMap.toList u)
+    fromSmallCounter :: Category -> SmallCounters -> [BinRep]
+    fromSmallCounter category (Struct _ _ u) = concatMap (fromPair category) (IntMap.toList u)
 
-    fromPair :: VarSort -> (Width, Int) -> [BinRep]
-    fromPair sort (width, count) =
-      let varOffset = reindex counters sort (OfUInt width) 0
-          binRepOffset = reindex counters sort (OfUIntBinRep width) 0
+    fromPair :: Category -> (Width, Int) -> [BinRep]
+    fromPair category (width, count) =
+      let varOffset = reindex counters category (ReadUInt width) 0
+          binRepOffset = reindex counters category (ReadBits width) 0
        in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
 -- | Variables that needed to be constrained to be Boolean
@@ -233,11 +150,11 @@ getBinReps counters@(Counters o i1 i2 x _ _ _) =
 --    4. UInt BinReps private input variables
 --    5. Boolean public input variables
 --    6. UInt BinReps public input variables
-booleanConstraintCategories :: [(Category, Type)]
-booleanConstraintCategories = [(Output, Bool), (Output, AllBits), (PublicInput, Bool), (PublicInput, AllBits), (PrivateInput, Bool), (PrivateInput, AllBits)]
+booleanConstraintCategories :: [(Category, ReadType)]
+booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits)]
 
 getBooleanConstraintCount :: Counters -> Int
-getBooleanConstraintCount counters = sum $ getCounts counters booleanConstraintCategories
+getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
 
 getBooleanConstraintRanges :: Counters -> [(Int, Int)]
 getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
@@ -246,9 +163,9 @@ getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters boolean
 
 prettyVariables :: Counters -> String
 prettyVariables counters@(Counters o i1 i2 _ _ _ _) =
-  let publicInputOffset = offsetOfSort counters OfPublicInput
-      privateInputOffset = offsetOfSort counters OfPrivateInput
-      outputOffset = offsetOfSort counters OfOutput
+  let publicInputOffset = getOffset counters PublicInput
+      privateInputOffset = getOffset counters PrivateInput
+      outputOffset = getOffset counters Output
       totalSize = getTotalCount counters
 
       outputVars = case smallCounterSize o of
@@ -358,44 +275,55 @@ type Range = (Int, Int)
 
 type Ranges = IntMap Int
 
-data Type = Field | Bool | AllBits | AllUInt | Bits Width | UInt Width
-
 data Category = Output | PrivateInput | PublicInput | Intermediate
+  deriving (Generic, NFData, Eq, Show)
 
-class AccessCounters selector where
-  getCountTemp :: Counters -> selector -> Int
+data ReadType = ReadField | ReadBool | ReadAllBits | ReadAllUInt | ReadBits Width | ReadUInt Width
+  deriving (Generic, NFData, Eq, Show)
+
+instance Serialize ReadType
+
+data WriteType = WriteField | WriteBool | WriteUInt Width
+  deriving (Generic, NFData, Eq, Show)
+
+instance Serialize WriteType
+
+class ReadCounters selector where
+  -- | get the total number of variables in that category
+  getCount :: Counters -> selector -> Int
+
   getOffset :: Counters -> selector -> Int
 
 -- | Access Counters of a given category.
-instance AccessCounters Category where
-  getCountTemp counters category =
-    getCountTemp counters (category, Field)
-      + getCountTemp counters (category, Bool)
-      + getCountTemp counters (category, AllBits)
-      + getCountTemp counters (category, AllUInt)
+instance ReadCounters Category where
+  getCount counters category =
+    getCount counters (category, ReadField)
+      + getCount counters (category, ReadBool)
+      + getCount counters (category, ReadAllBits)
+      + getCount counters (category, ReadAllUInt)
 
   getOffset _ Output = 0
-  getOffset counters PublicInput = getCountTemp counters Output
-  getOffset counters PrivateInput = getCountTemp counters Output + getCountTemp counters PublicInput
-  getOffset counters Intermediate = getCountTemp counters Output + getCountTemp counters PublicInput + getCountTemp counters PrivateInput
+  getOffset counters PublicInput = getCount counters Output
+  getOffset counters PrivateInput = getCount counters Output + getCount counters PublicInput
+  getOffset counters Intermediate = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
 -- | Access Counters of a given type in a given category.
-instance AccessCounters (Category, Type) where
-  getCountTemp counters (category, typ) =
+instance ReadCounters (Category, ReadType) where
+  getCount counters (category, typ) =
     let selector = case category of
           Output -> countOutput
           PublicInput -> countPublicInput
           PrivateInput -> countPrivateInput
           Intermediate -> countIntermediate
      in case typ of
-          Field -> structF (selector counters)
-          Bool -> structB (selector counters)
-          AllBits -> binRepSize (structU (selector counters))
-          AllUInt -> uIntSize (structU (selector counters))
-          Bits w -> case IntMap.lookup w (structU (selector counters)) of
+          ReadField -> structF (selector counters)
+          ReadBool -> structB (selector counters)
+          ReadAllBits -> binRepSize (structU (selector counters))
+          ReadAllUInt -> uIntSize (structU (selector counters))
+          ReadBits w -> case IntMap.lookup w (structU (selector counters)) of
             Nothing -> 0
             Just n -> n * w
-          UInt w -> case IntMap.lookup w (structU (selector counters)) of
+          ReadUInt w -> case IntMap.lookup w (structU (selector counters)) of
             Nothing -> 0
             Just n -> n
 
@@ -406,11 +334,11 @@ instance AccessCounters (Category, Type) where
           PrivateInput -> countPrivateInput
           Intermediate -> countIntermediate
      in getOffset counters category + case typ of
-          Field -> 0
-          Bool -> structF (selector counters)
-          AllBits -> structF (selector counters) + structB (selector counters)
-          AllUInt -> structF (selector counters) + structB (selector counters) + binRepSize (structU (selector counters))
-          Bits w ->
+          ReadField -> 0
+          ReadBool -> structF (selector counters)
+          ReadAllBits -> structF (selector counters) + structB (selector counters)
+          ReadAllUInt -> structF (selector counters) + structB (selector counters) + binRepSize (structU (selector counters))
+          ReadBits w ->
             structF (selector counters)
               + structB (selector counters)
               + sum
@@ -419,7 +347,7 @@ instance AccessCounters (Category, Type) where
                     )
                     (structU (selector counters))
                 )
-          UInt w ->
+          ReadUInt w ->
             structF (selector counters)
               + structB (selector counters)
               + binRepSize (structU (selector counters))
@@ -430,13 +358,30 @@ instance AccessCounters (Category, Type) where
                     (structU (selector counters))
                 )
 
--- | Given a list of categories,  get the total number of variables in each category
-getCounts :: AccessCounters selector => Counters -> [selector] -> [Int]
-getCounts = map . getCountTemp
+addCount :: (Category, WriteType) -> Int -> Counters -> Counters
+addCount (category, typ) n counters =
+  -- (Counters o i1 i2 x s1 s2 r)
+  case category of
+    Output -> counters {countOutput = adjustSmallCounters (countOutput counters)}
+    PublicInput -> counters {countPublicInput = adjustSmallCounters (countPublicInput counters), countPublicInputSequence = countPublicInputSequence counters <> newInputSequence}
+    PrivateInput -> counters {countPrivateInput = adjustSmallCounters (countPrivateInput counters), countPrivateInputSequence = countPrivateInputSequence counters <> newInputSequence}
+    Intermediate -> counters {countIntermediate = adjustSmallCounters (countIntermediate counters)}
+  where
+    adjustSmallCounters :: SmallCounters -> SmallCounters
+    adjustSmallCounters (Struct f b u) = case typ of
+      WriteField -> Struct (f + n) b u
+      WriteBool -> Struct f (b + n) u
+      WriteUInt w -> Struct f b (IntMap.insertWith (+) w n u)
+
+    newInputSequence :: Seq WriteType
+    newInputSequence = Seq.fromList $ replicate n typ
 
 -- | Given a list of categories, get the ranges of variables in each category
-getRanges :: AccessCounters selector => Counters -> [selector] -> Ranges
-getRanges counters categories = buildRanges $ map (\category -> (getOffset counters category, getCountTemp counters category)) categories
+getRanges :: ReadCounters selector => Counters -> [selector] -> Ranges
+getRanges counters = buildRanges . map (\category -> (getOffset counters category, getCount counters category))
+
+getRange :: ReadCounters selector => Counters -> selector -> Range
+getRange counters selector = (getOffset counters selector, getCount counters selector)
 
 enumerate :: Ranges -> [Int]
 enumerate ranges = concatMap (\(start, size) -> [start .. start + size - 1]) (IntMap.toList ranges)
