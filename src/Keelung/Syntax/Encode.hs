@@ -1,5 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Module for encoding Keelung syntax
 module Keelung.Syntax.Encode
@@ -15,6 +18,7 @@ import Control.Monad.Reader
 import Data.Array.Unboxed qualified as Array
 import Data.IntMap qualified as IntMap
 import GHC.TypeLits (KnownNat)
+import GHC.Generics hiding (UInt)
 import Keelung.Heap
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax qualified as Syntax
@@ -88,6 +92,9 @@ instance KnownNat w => Encode' (Syntax.UInt w) UInt where
 class Encode a where
   encode :: a -> HeapM Expr
 
+  default encode :: (Generic a, GEncode (Rep a)) => a -> HeapM Expr
+  encode a = gencode (from a)
+
 instance Encode Syntax.Boolean where
   encode expr = Boolean <$> encode' expr
 
@@ -113,6 +120,37 @@ instance (Encode a, Encode b) => Encode (a, b) where
     a' <- encode a
     b' <- encode b
     return $ Array $ Array.listArray (0, 1) [a', b']
+
+-- | Generic Encode
+class GEncode f where
+  gencode :: f a -> HeapM Expr
+
+instance GEncode U1 where
+  gencode U1 = return Unit
+
+instance (GEncode a, GEncode b) => GEncode (a :+: b) where
+  gencode (L1 x) = gencode x
+  gencode (R1 x) = gencode x
+
+-- flatten all elements into 1-d array
+instance (GEncode a, GEncode b) => GEncode (a :*: b) where
+  gencode (a :*: b) = do
+    a' <- gencode a
+    b' <- gencode b
+    return $ case (a', b') of
+      (Array as, Array bs) -> let as' = Array.elems as
+                                  bs' = Array.elems bs
+                                  is  = Array.indices as ++ Array.indices bs
+                               in Array $ Array.listArray (0, length is) (as' ++ bs')
+      (Array as, _) -> Array $ Array.listArray (0, length (Array.indices as) + 1) (Array.elems as ++ [b'])
+      (_, Array bs) -> Array $ Array.listArray (0, length (Array.indices bs) + 1) (a' : Array.elems bs)
+      (_, _) -> Array $ Array.listArray (0, 1) [a', b']
+
+instance (GEncode a) => GEncode (M1 i c a) where
+  gencode (M1 x) = gencode x
+
+instance (Encode a) => GEncode (K1 i a) where
+  gencode (K1 x) = encode x
 
 --------------------------------------------------------------------------------
 
