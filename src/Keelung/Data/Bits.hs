@@ -56,7 +56,7 @@ shiftL = shift
 
 -- | Opposite of 'shiftL'
 shiftR :: Bits a => a -> Int -> a
-shiftR x i = shiftR x (-i)
+shiftR x i = shiftL x (-i)
 
 -- | Infix version of 'shiftR'.
 (.>>.) :: (Bits a) => a -> Int -> a
