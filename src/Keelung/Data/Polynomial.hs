@@ -201,18 +201,19 @@ substWithVector (Poly c xs) bindings =
    in buildEither' c' xs'
 
 -- | Substitute variables in a 'Poly' with an 'IntMap' of values.
-substWithIntMap :: (Num n, Eq n) => Poly n -> IntMap n -> Either n (Poly n)
+--   Returns a boolean indicating whether the substitution changed the polynomial.
+substWithIntMap :: (Num n, Eq n) => Poly n -> IntMap n -> (Either n (Poly n), Bool)
 substWithIntMap (Poly c xs) bindings =
-  let (c', xs') =
+  let (c', xs', changed) =
         IntMap.foldlWithKey'
-          ( \(is, us) var coeff ->
+          ( \(is, us, flag) var coeff ->
               case IntMap.lookup var bindings of
-                Nothing -> (is, IntMap.insert var coeff us)
-                Just val -> ((coeff * val) + is, us)
+                Nothing -> (is, IntMap.insert var coeff us, flag)
+                Just val -> ((coeff * val) + is, us, True)
           )
-          (c, mempty)
+          (c, mempty, False)
           xs
-   in buildEither' c' xs'
+   in (buildEither' c' xs', changed)
 
 addConstant :: Num n => n -> Poly n -> Poly n
 addConstant d (Poly c xs) = Poly (c + d) xs
