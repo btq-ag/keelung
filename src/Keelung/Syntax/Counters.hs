@@ -395,12 +395,12 @@ buildRanges = foldr build mempty
     build (start, size) ranges =
       case IntMap.lookupLE start ranges of -- find the segment that starts before the inserted segment
         Just (previous, previousSize) ->
-          if start < previous + previousSize -- see if the inserted segment overlaps with the previous segment
+          if start <= previous + previousSize -- see if the inserted segment overlaps with the previous segment
             then IntMap.insert previous (max (start + size - previous) previousSize) ranges -- merge it with the previous segment
             else IntMap.insert start size ranges -- insert it as a new segment
-        Nothing -> case IntMap.lookupGT start ranges of -- find the segment that starts after the inserted segment
+        Nothing -> case IntMap.lookupGE start ranges of -- find the segment that starts after the inserted segment
           Just (next, nextSize) ->
-            if next < start + size -- see if the inserted segment overlaps with the next segment
+            if next <= start + size -- see if the inserted segment overlaps with the next segment
               then IntMap.insert start (max (next + nextSize - start) size) (IntMap.delete next ranges) -- merge it with the next segment
               else IntMap.insert start size ranges -- insert it as a new segment
           Nothing -> IntMap.insert start size ranges -- insert it as a new segment
