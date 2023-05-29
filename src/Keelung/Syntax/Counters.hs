@@ -247,8 +247,8 @@ prettyBooleanConstraints counters =
   concatMap showSegment (getBooleanConstraintRanges counters)
   where
     showSegment :: (Int, Int) -> [String]
-    showSegment (start, end) =
-      case end - start of
+    showSegment (start, count) =
+      case count of
         0 -> []
         1 -> [showBooleanConstraint start]
         2 ->
@@ -263,7 +263,7 @@ prettyBooleanConstraints counters =
         _ ->
           [ showBooleanConstraint start,
             "  ...",
-            showBooleanConstraint (end - 1)
+            showBooleanConstraint (start + count - 1)
           ]
 
     showBooleanConstraint :: Int -> String
