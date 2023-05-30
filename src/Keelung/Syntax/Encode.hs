@@ -138,12 +138,10 @@ instance (GEncode a, GEncode b) => GEncode (a :*: b) where
     a' <- gencode a
     b' <- gencode b
     return $ case (a', b') of
-      (Array as, Array bs) -> let as' = Array.elems as
-                                  bs' = Array.elems bs
-                                  is  = Array.indices as ++ Array.indices bs
-                               in Array $ Array.listArray (0, length is) (as' ++ bs')
-      (Array as, _) -> Array $ Array.listArray (0, length (Array.indices as) + 1) (Array.elems as ++ [b'])
-      (_, Array bs) -> Array $ Array.listArray (0, length (Array.indices bs) + 1) (a' : Array.elems bs)
+      (Array as, Array bs) -> let arr = Array.elems as ++ Array.elems bs
+                               in Array $ Array.listArray (0, length arr - 1) arr
+      (Array as, _) -> Array $ Array.listArray (0, length as) (Array.elems as ++ [b'])
+      (_, Array bs) -> Array $ Array.listArray (0, length bs) (a' : Array.elems bs)
       (_, _) -> Array $ Array.listArray (0, 1) [a', b']
 
 instance (GEncode a) => GEncode (M1 i c a) where
