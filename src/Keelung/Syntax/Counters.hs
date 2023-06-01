@@ -37,6 +37,7 @@ module Keelung.Syntax.Counters
     -- | other helpers
     reindex,
     inRanges,
+    getUIntMap
   )
 where
 
@@ -409,3 +410,10 @@ inRanges :: Ranges -> Int -> Bool
 inRanges ranges index = case IntMap.lookupLE index ranges of
   Nothing -> False
   Just (start, size) -> index < start + size
+
+
+getUIntMap :: Counters -> Category -> IntMap Int
+getUIntMap counters Output = structU (countOutput counters)
+getUIntMap counters PublicInput = structU (countPublicInput counters)
+getUIntMap counters PrivateInput = structU (countPrivateInput counters)
+getUIntMap counters Intermediate = structU (countIntermediate counters)
