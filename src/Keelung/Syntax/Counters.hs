@@ -37,7 +37,7 @@ module Keelung.Syntax.Counters
     -- | other helpers
     reindex,
     inRanges,
-    getUIntMap
+    getUIntMap,
   )
 where
 
@@ -163,24 +163,32 @@ getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters boolean
 --------------------------------------------------------------------------------
 
 prettyVariables :: Counters -> String
-prettyVariables counters@(Counters o i1 i2 _ _ _ _) =
-  let publicInputOffset = getOffset counters PublicInput
-      privateInputOffset = getOffset counters PrivateInput
-      outputOffset = getOffset counters Output
-      totalSize = getTotalCount counters
+prettyVariables counters =
+  let totalSize = getTotalCount counters
+      (outputStart, outputCount) = getRange counters Output
+      outputVars = case outputCount of
+        0 -> ""
+        1 -> "    Output variable : $" <> show outputStart <> "\n"
+        _ -> "    Output variables: $" <> show outputStart <> " ... $" <> show (outputStart + outputCount - 1) <> "\n"
 
-      outputVars = case smallCounterSize o of
+      (publicInputStart, publicInputCount) = getRange counters PublicInput
+      publicInputVars = case publicInputCount of
         0 -> ""
-        1 -> "    Output variable : $" <> show outputOffset <> "\n"
-        n -> "    Output variables: $" <> show outputOffset <> " ... $" <> show (outputOffset + n - 1) <> "\n"
-      publicInputVars = case smallCounterSize i1 of
+        1 -> "    Public Input variable : $" <> show publicInputStart <> "\n"
+        _ -> "    Public Input variables: $" <> show publicInputStart <> " ... $" <> show (publicInputCount + publicInputCount - 1) <> "\n"
+
+      (privateInputStart, privateInputCount) = getRange counters PrivateInput
+      privateInputVars = case privateInputCount of
         0 -> ""
-        1 -> "    Public Input variable : $" <> show publicInputOffset <> "\n"
-        n -> "    Public Input variables: $" <> show publicInputOffset <> " ... $" <> show (publicInputOffset + n - 1) <> "\n"
-      privateInputVars = case smallCounterSize i2 of
+        1 -> "    Private Input variable : $" <> show privateInputStart <> "\n"
+        _ -> "    Private Input variables: $" <> show privateInputStart <> " ... $" <> show (privateInputCount + privateInputCount - 1) <> "\n"
+
+      (otherStart, otherCount) = getRange counters Intermediate
+      otherVars = case otherCount of
         0 -> ""
-        1 -> "    Private Input variable : $" <> show privateInputOffset <> "\n"
-        n -> "    Private Input variables: $" <> show privateInputOffset <> " ... $" <> show (privateInputOffset + n - 1) <> "\n"
+        1 -> "    Other variable : $" <> show otherStart <> "\n"
+        _ -> "    Other variables: $" <> show otherStart <> " ... $" <> show (otherStart + otherCount - 1) <> "\n"
+      
    in if totalSize == 0
         then ""
         else
@@ -190,6 +198,7 @@ prettyVariables counters@(Counters o i1 i2 _ _ _ _) =
             <> outputVars
             <> publicInputVars
             <> privateInputVars
+            <> otherVars
             <> "\n"
 
 prettyConstraints :: Show constraint => Counters -> [constraint] -> [BinRep] -> String
@@ -394,7 +403,6 @@ inRanges :: Ranges -> Int -> Bool
 inRanges ranges index = case IntMap.lookupLE index ranges of
   Nothing -> False
   Just (start, size) -> index < start + size
-
 
 getUIntMap :: Counters -> Category -> IntMap Int
 getUIntMap counters Output = structU (countOutput counters)
