@@ -126,7 +126,7 @@ getPrivateInputSequence = countPrivateInputSequence
 reindex :: Counters -> Category -> ReadType -> Var -> Var
 reindex counters category typ index =
   getOffset counters (category, typ) + case typ of
-    ReadBits width -> index * width
+    ReadUInt width -> index * width
     _ -> index
 
 --------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ getBinReps counters@(Counters o i1 i2 x _ _ _) =
     fromPair :: Category -> (Width, Int) -> [BinRep]
     fromPair category (width, count) =
       let varOffset = reindex counters category (ReadUInt width) 0
-          binRepOffset = reindex counters category (ReadBits width) 0
+          binRepOffset = reindex counters category (ReadUInt width) 0
        in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
 -- | Variables that needed to be constrained to be Boolean
@@ -152,7 +152,7 @@ getBinReps counters@(Counters o i1 i2 x _ _ _) =
 --    5. Boolean public input variables
 --    6. UInt BinReps public input variables
 booleanConstraintCategories :: [(Category, ReadType)]
-booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits)]
+booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
 
 getBooleanConstraintCount :: Counters -> Int
 getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
@@ -279,7 +279,7 @@ type Ranges = IntMap Int
 data Category = Output | PrivateInput | PublicInput | Intermediate
   deriving (Generic, NFData, Eq, Show)
 
-data ReadType = ReadField | ReadBool | ReadAllBits | ReadAllUInt | ReadBits Width | ReadUInt Width
+data ReadType = ReadField | ReadBool | ReadAllUInts | ReadUInt Width
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize ReadType
@@ -300,8 +300,7 @@ instance ReadCounters Category where
   getCount counters category =
     getCount counters (category, ReadField)
       + getCount counters (category, ReadBool)
-      + getCount counters (category, ReadAllBits)
-      + getCount counters (category, ReadAllUInt)
+      + getCount counters (category, ReadAllUInts)
 
   getOffset _ Output = 0
   getOffset counters PublicInput = getCount counters Output
@@ -319,11 +318,7 @@ instance ReadCounters (Category, ReadType) where
      in case typ of
           ReadField -> structF (selector counters)
           ReadBool -> structB (selector counters)
-          ReadAllBits -> binRepSize (structU (selector counters))
-          ReadAllUInt -> uIntSize (structU (selector counters))
-          ReadBits w -> case IntMap.lookup w (structU (selector counters)) of
-            Nothing -> 0
-            Just n -> n * w
+          ReadAllUInts -> binRepSize (structU (selector counters))
           ReadUInt w -> case IntMap.lookup w (structU (selector counters)) of
             Nothing -> 0
             Just n -> n
@@ -337,24 +332,13 @@ instance ReadCounters (Category, ReadType) where
      in getOffset counters category + case typ of
           ReadField -> 0
           ReadBool -> structF (selector counters)
-          ReadAllBits -> structF (selector counters) + structB (selector counters)
-          ReadAllUInt -> structF (selector counters) + structB (selector counters) + binRepSize (structU (selector counters))
-          ReadBits w ->
+          ReadAllUInts -> structF (selector counters) + structB (selector counters)
+          ReadUInt w ->
             structF (selector counters)
               + structB (selector counters)
               + sum
                 ( IntMap.mapWithKey
                     ( \width count -> if w > width then count * width else 0
-                    )
-                    (structU (selector counters))
-                )
-          ReadUInt w ->
-            structF (selector counters)
-              + structB (selector counters)
-              + binRepSize (structU (selector counters))
-              + sum
-                ( IntMap.filterWithKey
-                    ( \width _ -> w > width
                     )
                     (structU (selector counters))
                 )
