@@ -46,3 +46,24 @@ ghc-options:
   - -Wall
   - -Werror=incomplete-patterns
   - -fno-warn-orphans
+
+tests:
+  keelung-test:
+    main: Main.hs
+    source-dirs:
+      - test/
+      - src/
+    dependencies:
+    - keelung
+    # - keelung-examples
+    - hspec
+    - hspec-expectations-lifted
+    - HUnit
+    - QuickCheck
+    - quickcheck-transformer
+
+
+    ghc-options:
+      - -Wall
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
