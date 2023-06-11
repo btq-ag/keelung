@@ -233,7 +233,7 @@ genInputsDefault = genInputs "inputs.jsonl"
 --------------------------------------------------------------------------------
 
 -- | Interpret a program
-interpret_ :: (Serialize n, Integral n, Encode t) => FieldType -> Comp t -> [n] -> [n] -> IO (Either Error [n])
+interpret_ :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
 interpret_ fieldType prog publicInput privateInput = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
   wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
@@ -251,18 +251,6 @@ printErrorInstead (Right values) = return values
 -- | Interpret a program with public and private inputs
 interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
-
--- -- | A specialized version of 'interpret' that outputs numbers as 'N GF181'
--- gf181 :: Encode t => Comp t -> [GF181] -> [GF181] -> IO [N GF181]
--- gf181 prog publicInput privateInput = map N <$> (interpret_ GF181 prog publicInput privateInput >>= printErrorInstead)
-
--- -- | A specialized version of 'interpret' that outputs numbers as 'N B64'
--- b64 :: Encode t => Comp t -> [B64] -> [B64] -> IO [N B64]
--- b64 prog publicInput privateInput = map N <$> (interpret_ B64 prog publicInput privateInput >>= printErrorInstead)
-
--- -- | A specialized version of 'interpret' that outputs numbers as 'N BN128'
--- bn128 :: Encode t => Comp t -> [BN128] -> [BN128] -> IO [N BN128]
--- bn128 prog publicInput privateInput = map N <$> (interpret_ BN128 prog publicInput privateInput >>= printErrorInstead)
 
 --------------------------------------------------------------------------------
 

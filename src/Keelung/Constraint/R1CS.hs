@@ -32,9 +32,9 @@ data R1CS n = R1CS
     -- | Hints for generating witnesses of EqZero constraints
     r1csEqZeros :: [(Poly n, Var)],
     -- | Hints for generating witnesses of DivMod constraints
-    r1csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
+    r1csDivMods :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer))],
     -- | Hints for generating witnesses of ModInv constraints
-    r1csModInvs :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)]
+    r1csModInvs :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), Integer)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
