@@ -32,6 +32,7 @@ library
       Keelung.Constraint.R1CS
       Keelung.Data.BinRep
       Keelung.Data.Bits
+      Keelung.Data.FieldInfo
       Keelung.Data.N
       Keelung.Data.Polynomial
       Keelung.Data.Struct
@@ -80,6 +81,7 @@ test-suite keelung-test
       Keelung.Constraint.R1CS
       Keelung.Data.BinRep
       Keelung.Data.Bits
+      Keelung.Data.FieldInfo
       Keelung.Data.N
       Keelung.Data.Polynomial
       Keelung.Data.Struct

@@ -12,16 +12,16 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Field (FieldType)
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Keelung.Data.FieldInfo (FieldInfo)
 
 --------------------------------------------------------------------------------
 
 -- | Rank-1 Constraint System
 data R1CS n = R1CS
-  { -- | (Field type, characteristic, degree)
-    r1csField :: (FieldType, Integer, Integer),
+  { -- | Info about the field
+    r1csField :: FieldInfo,
     -- | List of constraints
     r1csConstraints :: [R1C n],
     -- | List of binary representations
