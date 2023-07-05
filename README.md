@@ -4,6 +4,10 @@ Keelung is a domain-specific language (DSL) embedded in Haskell that is designed
 
 <img width="1268" alt="keelung5" src="https://user-images.githubusercontent.com/97019448/219329651-d30c0134-f153-4755-979f-c5b77d6d2724.png">
 
+## The Keelung Compiler
+
+If you want to write Keelung programs, you have to install [the Keelung compiler](https://github.com/btq-ag/keelung-compiler).
+
 ## Documentation
 
 Check out our [GitBook](https://btq.gitbook.io/keelung/) for more information.
