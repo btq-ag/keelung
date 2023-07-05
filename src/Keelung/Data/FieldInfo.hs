@@ -28,9 +28,9 @@ instance Serialize FieldInfo
 
 caseFieldType ::
   FieldType ->
-  (forall n. KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()) ->
-  (forall n. KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()) ->
-  IO ()
+  (forall n. KnownNat n => Proxy (Prime n) -> FieldInfo -> IO a) ->
+  (forall n. KnownNat n => Proxy (Binary n) -> FieldInfo -> IO a) ->
+  IO a
 caseFieldType (Prime n) funcPrime _ = case someNatVal n of
   Just (SomeNat (_ :: Proxy n)) -> do
     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
@@ -42,7 +42,7 @@ caseFieldType (Prime n) funcPrime _ = case someNatVal n of
               fieldDeg = fromIntegral (deg fieldNumber),
               fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
             }
-  Nothing -> return ()
+  Nothing -> error "[ panic ] caseFieldType: someNatVal failure"
 caseFieldType (Binary n) _ funcBinary = case someNatVal n of
   Just (SomeNat (_ :: Proxy n)) ->
     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
@@ -54,4 +54,4 @@ caseFieldType (Binary n) _ funcBinary = case someNatVal n of
               fieldDeg = fromIntegral (deg fieldNumber),
               fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
             }
-  Nothing -> return ()
+  Nothing -> error "[ panic ] caseFieldType: someNatVal failure"
