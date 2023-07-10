@@ -34,7 +34,7 @@ module Keelung
     elaborateAndEncode,
     Encode,
     GaloisField,
-    keelungVersion,
+    keelungVersion
   )
 where
 
@@ -59,6 +59,17 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+
+
+-- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
+keelungCompilerVersion :: (Int, Int)
+keelungCompilerVersion = (0, 12)
+
+compilerPatchVersion :: Int
+compilerPatchVersion = 2
+
+keelungVersion :: String
+keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keelungCompilerVersion), ".", show compilerPatchVersion]
 
 --------------------------------------------------------------------------------
 
@@ -378,7 +389,7 @@ readKeelungVersion cmd args = do
 
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if major == 0 && minor >= 11 && minor < 12 && patch >= 0
+  if (major, minor) == keelungCompilerVersion && patch >= 0
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
@@ -397,16 +408,6 @@ checkCmd cmd =
     whichCmd = case System.Info.os of
       "mingw32" -> "where" -- Windows uses "where"
       _ -> "which" -- Unix uses "which"
-
---------------------------------------------------------------------------------
-
--- | String of Keelung version exposed to the user
-keelungVersion :: String
-keelungVersion = let (major, minor, patch) = keelungVersion_ in show major ++ "." ++ show minor ++ "." ++ show patch
-  where
-    -- \| The version of Keelung is a triple of three numbers, we're not going full semver yet
-    keelungVersion_ :: (Int, Int, Int)
-    keelungVersion_ = (0, 11, 0)
 
 --------------------------------------------------------------------------------
 
