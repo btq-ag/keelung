@@ -10,7 +10,6 @@ module Keelung.Syntax.Counters
   ( Counters (..),
     getTotalCount,
     -- | for constraint generation
-    getBinReps,
     getBooleanConstraintCount,
     getBooleanConstraintRanges,
     -- | for parsing raw inputs
@@ -48,7 +47,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Struct (Struct (..))
 
 ------------------------------------------------------------------------------
@@ -131,19 +129,6 @@ reindex counters category typ index =
 
 --------------------------------------------------------------------------------
 
-getBinReps :: Counters -> [BinRep]
-getBinReps counters@(Counters o i1 i2 x _ _ _) =
-  fromSmallCounter Output o ++ fromSmallCounter PublicInput i1 ++ fromSmallCounter PrivateInput i2 ++ fromSmallCounter Intermediate x
-  where
-    fromSmallCounter :: Category -> SmallCounters -> [BinRep]
-    fromSmallCounter category (Struct _ _ u) = concatMap (fromPair category) (IntMap.toList u)
-
-    fromPair :: Category -> (Width, Int) -> [BinRep]
-    fromPair category (width, count) =
-      let varOffset = reindex counters category (ReadUInt width) 0
-          binRepOffset = reindex counters category (ReadUInt width) 0
-       in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
-
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
 --    2. UInt BinReps output variables
@@ -188,7 +173,6 @@ prettyVariables counters =
         0 -> ""
         1 -> "    Other variable : $" <> show otherStart <> "\n"
         _ -> "    Other variables: $" <> show otherStart <> " ... $" <> show (otherStart + otherCount - 1) <> "\n"
-      
    in if totalSize == 0
         then ""
         else
@@ -201,22 +185,20 @@ prettyVariables counters =
             <> otherVars
             <> "\n"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> [BinRep] -> String
-prettyConstraints counters cs binReps =
+prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints
     <> showBooleanConstraints
-    <> showBinRepConstraints
   where
     -- sizes of constraint groups
-    totalBinRepConstraintSize = length binReps
     booleanConstraintSize = getBooleanConstraintCount counters
     ordinaryConstraintSize = length cs
 
     -- summary of constraint groups
     showConstraintSummary =
       "  Constriant ("
-        <> show (ordinaryConstraintSize + booleanConstraintSize + totalBinRepConstraintSize)
+        <> show (ordinaryConstraintSize + booleanConstraintSize)
         <> "): \n"
 
     -- Ordinary constraints
@@ -239,17 +221,6 @@ prettyConstraints counters cs binReps =
             <> show booleanConstraintSize
             <> "):\n\n"
             <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
-            <> "\n"
-
-    -- BinRep constraints
-    showBinRepConstraints =
-      if null binReps
-        then ""
-        else
-          "    Binary representation constraints ("
-            <> show (length binReps)
-            <> "):\n\n"
-            <> unlines (map (("      " <>) . show) binReps)
             <> "\n"
 
 prettyBooleanConstraints :: Counters -> [String]

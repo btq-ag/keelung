@@ -30,7 +30,6 @@ library
       Keelung
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
-      Keelung.Data.BinRep
       Keelung.Data.Bits
       Keelung.Data.FieldInfo
       Keelung.Data.N
@@ -79,7 +78,6 @@ test-suite keelung-test
       Keelung
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
-      Keelung.Data.BinRep
       Keelung.Data.Bits
       Keelung.Data.FieldInfo
       Keelung.Data.N
