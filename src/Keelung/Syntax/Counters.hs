@@ -15,8 +15,6 @@ module Keelung.Syntax.Counters
     -- | for parsing raw inputs
     getPublicInputSequence,
     getPrivateInputSequence,
-    -- | workaround for variable renumbering
-    setReducedCount,
     -- | for pretty printing
     prettyConstraints,
     prettyVariables,
@@ -77,15 +75,14 @@ data Counters = Counters
     countPrivateInput :: !SmallCounters, -- counters for private input variables
     countIntermediate :: !SmallCounters, -- counters for intermediate variables
     countPublicInputSequence :: !(Seq WriteType), -- Sequence of public input variables
-    countPrivateInputSequence :: !(Seq WriteType), -- Sequence of private input variables
-    countReducedVarHack :: !Int -- HACK, keep track of the number of variables reduced after renumbering
+    countPrivateInputSequence :: !(Seq WriteType) -- Sequence of private input variables
   }
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 cRed1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 cRed2 =
+  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 =
     Counters
       (addSmallCounters cOut1 cOut2)
       (addSmallCounters cPubIn1 cPubIn2)
@@ -93,23 +90,18 @@ instance Semigroup Counters where
       (addSmallCounters cInt1 cInt2)
       (cPubInSeq1 <> cPubInSeq2)
       (cPrivInSeq1 <> cPrivInSeq2)
-      (cRed1 + cRed2)
     where
       addSmallCounters :: SmallCounters -> SmallCounters -> SmallCounters
       addSmallCounters (Struct f1 b1 u1) (Struct f2 b2 u2) =
         Struct (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
 
 instance Monoid Counters where
-  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty mempty 0
-
-setReducedCount :: Int -> Counters -> Counters
-setReducedCount n (Counters o i1 i2 x s1 s2 _) = Counters o i1 i2 x s1 s2 n
+  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty mempty
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i1 i2 x _ _ reduced) =
-  -- 'countReducedVarHack' should only have effect on intermediate variables
-  (smallCounterSize o + smallCounterSize i1 + smallCounterSize i2) + (0 `max` (smallCounterSize x - reduced))
+getTotalCount (Counters o i1 i2 x _ _) =
+  smallCounterSize o + smallCounterSize i1 + smallCounterSize i2 + smallCounterSize x
 
 -- | For parsing raw inputs
 getPublicInputSequence :: Counters -> Seq WriteType
