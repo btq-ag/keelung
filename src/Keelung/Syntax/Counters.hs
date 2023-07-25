@@ -49,6 +49,18 @@ import Keelung.Data.Struct (Struct (..))
 
 ------------------------------------------------------------------------------
 
+-- | Variables in Keelung are ordered as follows:
+--    1. output variables
+--    2. public input variables
+--    3. private input variables
+--    4. intermediate variables
+--   Each of these categories has these different types of variables:
+--    1. field variables
+--    2. Boolean variables
+--    3. unsigned integer bit variables
+
+------------------------------------------------------------------------------
+
 type Var = Int
 
 type Width = Int
@@ -60,12 +72,9 @@ type SmallCounters = Struct Int Int Int
 binRepSize :: IntMap Int -> Int
 binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
 
-uIntSize :: IntMap Int -> Int
-uIntSize = sum
-
 smallCounterSize :: SmallCounters -> Int
 smallCounterSize (Struct f b u) =
-  f + b + binRepSize u + uIntSize u
+  f + b + binRepSize u
 
 --------------------------------------------------------------------------------
 
@@ -123,11 +132,11 @@ reindex counters category typ index =
 
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
---    2. UInt BinReps output variables
---    3. Boolean private input variables
---    4. UInt BinReps private input variables
---    5. Boolean public input variables
---    6. UInt BinReps public input variables
+--    2. UInt output bit variables
+--    3. Boolean public input variables
+--    4. UInt public input bit variables
+--    5. Boolean private input variables
+--    6. UInt private input bit variables
 booleanConstraintCategories :: [(Category, ReadType)]
 booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
 
