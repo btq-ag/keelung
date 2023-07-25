@@ -132,13 +132,21 @@ reindex counters category typ index =
 
 -- | Variables that needed to be constrained to be Boolean
 --    1. Boolean output variables
---    2. UInt output bit variables
---    3. Boolean public input variables
---    4. UInt public input bit variables
---    5. Boolean private input variables
---    6. UInt private input bit variables
+--    2. Boolean public input variables
+--    3. Boolean private input variables
+--    4. all UInt variables
 booleanConstraintCategories :: [(Category, ReadType)]
-booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
+booleanConstraintCategories =
+  [ (Output, ReadBool),
+    (PublicInput, ReadBool),
+    (PrivateInput, ReadBool),
+    (Output, ReadAllUInts),
+    (PublicInput, ReadAllUInts),
+    (PrivateInput, ReadAllUInts),
+    (Intermediate, ReadAllUInts)
+  ]
+
+-- [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
 
 getBooleanConstraintCount :: Counters -> Int
 getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
