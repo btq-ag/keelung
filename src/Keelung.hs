@@ -63,10 +63,10 @@ import Text.Read (readMaybe)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 12)
+keelungCompilerVersion = (0, 13)
 
 compilerPatchVersion :: Int
-compilerPatchVersion = 2
+compilerPatchVersion = 0
 
 keelungVersion :: String
 keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keelungCompilerVersion), ".", show compilerPatchVersion]
