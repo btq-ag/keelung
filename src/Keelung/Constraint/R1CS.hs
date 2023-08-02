@@ -9,11 +9,11 @@ import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Data.FieldInfo (FieldInfo)
 
 --------------------------------------------------------------------------------
 
@@ -23,7 +23,6 @@ data R1CS n = R1CS
     r1csField :: FieldInfo,
     -- | List of constraints
     r1csConstraints :: [R1C n],
-    -- r1csBinReps :: ([BinRep], IntMap Int),
     -- | Variable bookkeeping
     r1csCounters :: Counters,
     -- | Hints for generating witnesses of EqZero constraints
@@ -64,39 +63,3 @@ toR1Cs (R1CS _ ordinaryConstraints counters _ _ _) =
               )
               [start .. end - 1]
        in concatMap generate (getBooleanConstraintRanges counters)
-
--- binRepConstraints =
---   map
---     ( \(BinRep fVar width bVar) ->
---         R1C
---           (Poly.buildEither 0 [(bVar + i, 2 ^ i) | i <- [0 .. width - 1]])
---           (Left 1)
---           (Right (Poly.singleVar fVar))
---     )
---     (getBinReps counters)
-
--- --------------------------------------------------------------------------------
--- -- The encoding for constraint @x != y = out@ and some @m@ is:
--- --
--- --  > (x - y) * m = out
--- --  > (x - y) * (1 - out) = 0
--- data CNEQ n
---   = CNEQ
---       Var
---       -- ^ @x@: always a variable
---       (Either Var n)
---       -- ^ @y@: could be a variable or a constant
---       Var
---       -- ^ @m@: a constant
---   deriving
---     ( Generic,
---       Eq,
---       NFData,
---       Functor
---     )
-
--- instance Serialize n => Serialize (CNEQ n)
-
--- instance Show n => Show (CNEQ n) where
---   show (CNEQ x (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
---   show (CNEQ x (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
