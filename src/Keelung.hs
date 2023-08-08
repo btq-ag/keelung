@@ -21,6 +21,7 @@ module Keelung
     verify,
     verifyDefault,
     genCircuit,
+    genCircuitBin,
     genCircuitDefault,
     genWitness,
     genWitnessDefault,
@@ -211,6 +212,12 @@ genCircuit fp fieldType prog = do
   --   GF181 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS GF181))
   --   BN128 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS BN128))
   --   B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
+
+genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
+genCircuitBin fp fieldType prog = runM $ do
+  elab <- liftEither (elaborateAndEncode prog)
+  _ <- wrapper ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  return "Success"
 
 genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuitDefault = genCircuit "aurora/circuit.jsonl"
