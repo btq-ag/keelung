@@ -66,7 +66,7 @@ keelungCompilerVersion :: (Int, Int)
 keelungCompilerVersion = (0, 13)
 
 compilerPatchVersion :: Int
-compilerPatchVersion = 0
+compilerPatchVersion = 1
 
 keelungVersion :: String
 keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keelungCompilerVersion), ".", show compilerPatchVersion]
@@ -387,6 +387,8 @@ readKeelungVersion cmd args = do
         _ -> Nothing
       (,,) <$> readMaybe major <*> readMaybe minor <*> readMaybe patch
 
+-- | Check if the compiler version matches the version of this library
+--   patch number can be different
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
   if (major, minor) == keelungCompilerVersion && patch >= 0
