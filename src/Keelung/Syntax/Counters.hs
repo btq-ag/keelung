@@ -162,26 +162,26 @@ prettyVariables counters =
       (outputStart, outputCount) = getRange counters Output
       outputVars = case outputCount of
         0 -> ""
-        1 -> "    Output variable : $" <> show outputStart <> "\n"
-        _ -> "    Output variables: $" <> show outputStart <> " ... $" <> show (outputStart + outputCount - 1) <> "\n"
+        1 -> "    Output variable:        $" <> show outputStart <> "\n"
+        _ -> "    Output variables:       $" <> show outputStart <> " ... $" <> show (outputStart + outputCount - 1) <> "\n"
 
       (publicInputStart, publicInputCount) = getRange counters PublicInput
       publicInputVars = case publicInputCount of
         0 -> ""
-        1 -> "    Public Input variable : $" <> show publicInputStart <> "\n"
-        _ -> "    Public Input variables: $" <> show publicInputStart <> " ... $" <> show (publicInputCount + publicInputCount - 1) <> "\n"
+        1 -> "    Public input variable:  $" <> show publicInputStart <> "\n"
+        _ -> "    Public input variables: $" <> show publicInputStart <> " ... $" <> show (publicInputStart + publicInputCount - 1) <> "\n"
 
       (privateInputStart, privateInputCount) = getRange counters PrivateInput
       privateInputVars = case privateInputCount of
         0 -> ""
-        1 -> "    Private Input variable : $" <> show privateInputStart <> "\n"
-        _ -> "    Private Input variables: $" <> show privateInputStart <> " ... $" <> show (privateInputCount + privateInputCount - 1) <> "\n"
+        1 -> "    Private input variable:  $" <> show privateInputStart <> "\n"
+        _ -> "    Private input variables: $" <> show privateInputStart <> " ... $" <> show (privateInputStart + privateInputCount - 1) <> "\n"
 
       (otherStart, otherCount) = getRange counters Intermediate
       otherVars = case otherCount of
         0 -> ""
-        1 -> "    Other variable : $" <> show otherStart <> "\n"
-        _ -> "    Other variables: $" <> show otherStart <> " ... $" <> show (otherStart + otherCount - 1) <> "\n"
+        1 -> "    Other variable:         $" <> show otherStart <> "\n"
+        _ -> "    Other variables:        $" <> show otherStart <> " ... $" <> show (otherStart + otherCount - 1) <> "\n"
    in if totalSize == 0
         then ""
         else
