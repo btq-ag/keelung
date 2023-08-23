@@ -6,8 +6,6 @@
 module Keelung.Data.Polynomial
   ( Poly,
     buildEither,
-    buildEither',
-    buildMaybe,
     singleVar,
     bind,
     vars,
@@ -24,8 +22,6 @@ module Keelung.Data.Polynomial
     delete,
     merge,
     negate,
-    substWithPoly,
-    substWithVector,
     substWithIntMap,
   )
 where
@@ -35,8 +31,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.Serialize (Serialize)
-import Data.Vector (Vector)
-import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
 import Keelung.Syntax (Var)
 import Prelude hiding (negate)
@@ -175,30 +169,6 @@ merge (Poly c xs) (Poly d ys) = case buildEither' (c + d) (IntMap.filter (0 /=) 
 -- | Negate a polynomial.
 negate :: (Num n, Eq n) => Poly n -> Poly n
 negate (Poly c xs) = Poly (-c) (fmap Prelude.negate xs)
-
--- | Substitute a variable in a polynomial with another polynomial.
-substWithPoly :: (Num n, Eq n) => Poly n -> Var -> Poly n -> Maybe (Poly n)
-substWithPoly (Poly c xs) var (Poly d ys) =
-  if IntMap.member var xs
-    then do
-      let xs' = ys <> IntMap.delete var xs
-      buildMaybe (c + d) xs'
-    else return $ Poly c xs
-
--- | Substitute variables in a 'Poly' with a 'Vector' of values.
-substWithVector :: (Num n, Eq n) => Poly n -> Vector (Maybe n) -> Either n (Poly n)
-substWithVector (Poly c xs) bindings =
-  let (c', xs') =
-        IntMap.foldlWithKey'
-          ( \(is, us) var coeff ->
-              case bindings Vector.!? var of
-                Nothing -> (is, IntMap.insert var coeff us)
-                Just Nothing -> (is, IntMap.insert var coeff us)
-                Just (Just val) -> ((coeff * val) + is, us)
-          )
-          (c, mempty)
-          xs
-   in buildEither' c' xs'
 
 -- | Substitute variables in a 'Poly' with an 'IntMap' of values.
 --   Returns a boolean indicating whether the substitution changed the polynomial.
