@@ -10,7 +10,7 @@ module Keelung
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
-    -- run,
+    keelung,
     compile,
     compileO0,
     compileWithOpts,
@@ -27,15 +27,11 @@ module Keelung
     genWitnessDefault,
     genInputs,
     genInputsDefault,
-    interpret_,
     interpret,
-    -- gf181,
-    -- bn128,
-    -- b64,
     elaborateAndEncode,
     Encode,
     GaloisField,
-    keelungVersion
+    keelungVersion,
   )
 where
 
@@ -56,11 +52,11 @@ import Keelung.Syntax
 import Keelung.Syntax.Encode
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
+import System.Environment qualified
 import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
-
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
@@ -74,6 +70,20 @@ keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keel
 
 --------------------------------------------------------------------------------
 
+keelung :: Encode t => Comp t -> IO ()
+keelung program = do
+  -- replace with beefier option parser
+  args <- System.Environment.getArgs
+  case args of
+    ["compile", "gf181"] -> compile gf181 program >>= printResult
+    ["compile", _] -> putStrLn "Error: unknown field type"
+    _ -> putStrLn "Usage: stack exec compile <field type>"
+  where
+    printResult (Left err) = print err
+    printResult (Right result) = print result
+
+--------------------------------------------------------------------------------
+
 -- | Compile a program to a 'R1CS' constraint system.
 compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile = compileWithOpts 1 [] []
@@ -82,24 +92,15 @@ compile = compileWithOpts 1 [] []
 compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 = compileWithOpts 0 [] []
 
--- -- | Compile a program to a 'R1CS' constraint system with optimization level 2.
--- compileOld :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
--- compileOld = compileWithOpts 2 [] []
-
 -- | Compile a program to a 'R1CS' constraint system with optimization level and RTS options as arguments.
 compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
-  let opts' = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
-  wrapper opts' (fieldType, elab) :: M (R1CS Integer)
+  let options = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
+  callKeelungc options (fieldType, elab) :: M (R1CS Integer)
   where
     optOptimize :: Int -> String
     optOptimize i = "O" <> show i
-
--- echo :: Comp Field
--- echo = do 
---   x <- input Public 
---   return $ recip x
 
 -- | Default RTS options for profiling
 rtsoptProf :: [String]
@@ -116,7 +117,7 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
 generate_ ::
-  (Serialize n, Integral n, Encode t) =>
+  Encode t =>
   FilePath ->
   FilePath ->
   FilePath ->
@@ -124,8 +125,8 @@ generate_ ::
   FilePath ->
   FieldType ->
   Comp t ->
-  [n] ->
-  [n] ->
+  [Integer] ->
+  [Integer] ->
   IO (Either Error (FilePath, String))
 generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
   (cmd, args) <- findAuroraProver
@@ -207,26 +208,22 @@ verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/par
 genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
 genCircuit fp fieldType prog = do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
-  -- case fieldType of
-  --   GF181 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS GF181))
-  --   BN128 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS BN128))
-  --   B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
+  callKeelungc ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
 
 genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
 genCircuitBin fp fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
-  _ <- wrapper ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
   return "Success"
 
 genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 genCircuitDefault = genCircuit "aurora/circuit.jsonl"
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
-genWitness_ :: (Serialize n, Integral n, Encode t) => FilePath -> FieldType -> Comp t -> [n] -> [n] -> M [n]
+genWitness_ :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> M [Integer]
 genWitness_ fp fieldType prog publicInput privateInput = do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "genWitness", "--filepath", fp] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
+  callKeelungc ["protocol", "genWitness", "--filepath", fp] (fieldType, elab, publicInput, privateInput)
 
 -- | Generate parameters for a program and write them to parameter.json.
 genParameters :: FilePath -> M ()
@@ -240,21 +237,15 @@ genWitnessDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -
 genWitnessDefault = genWitness "aurora/witness.jsonl"
 
 -- | For generating inputs.jsonl
-genInputs :: (Integral n) => FilePath -> [n] -> M ()
+genInputs :: FilePath -> [Integer] -> M ()
 genInputs fp inputs = do
-  let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show . toInteger) inputs
+  let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show) inputs
   lift $ BS.writeFile fp $ fromString $ "{\"inputs\":[" ++ inputs' ++ "]}"
 
-genInputsDefault :: (Integral n) => [n] -> M ()
+genInputsDefault :: [Integer] -> M ()
 genInputsDefault = genInputs "inputs.jsonl"
 
 --------------------------------------------------------------------------------
-
--- | Interpret a program
-interpret_ :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
-interpret_ fieldType prog publicInput privateInput = runM $ do
-  elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
 
 printErrorInstead :: Show e => Either e [a] -> IO [a]
 printErrorInstead (Left err) = do
@@ -263,12 +254,14 @@ printErrorInstead (Left err) = do
 printErrorInstead (Right values) = return values
 
 -- | Interpret a program with public and private inputs
--- run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
--- run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
-
--- | Interpret a program with public and private inputs
 interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
+interpret fieldType prog publicInput privateInput =
+  runM
+    ( do
+        elab <- liftEither (elaborateAndEncode prog)
+        callKeelungc ["protocol", "interpret"] (fieldType, elab, publicInput, privateInput)
+    )
+    >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
@@ -300,8 +293,8 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
 --------------------------------------------------------------------------------
 
 -- | Internal function for handling data serialization
-wrapper :: (Serialize a, Serialize b) => [String] -> a -> M b
-wrapper args' payload = do
+callKeelungc :: (Serialize a, Serialize b) => [String] -> a -> M b
+callKeelungc args' payload = do
   (cmd, args) <- findKeelungc
   version <- readKeelungVersion cmd args
   checkCompilerVersion version
@@ -428,10 +421,6 @@ runM = runExceptT
 -- | Handle 'IO' Exceptions in the 'M' Monad
 catchIOError :: Error -> IO a -> M a
 catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left err)))) >>= liftEither
-
--- | Prettify and convert all field elements to 'Integer' in a 'R1CS'
--- convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
--- convertFieldElement = fmap (fmap (toInteger . N))
 
 --------------------------------------------------------------------------------
 
