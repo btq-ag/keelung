@@ -39,6 +39,7 @@ library
       Keelung.Field
       Keelung.Heap
       Keelung.Monad
+      Keelung.Options
       Keelung.Prof
       Keelung.Syntax
       Keelung.Syntax.Counters
@@ -63,6 +64,7 @@ library
     , galois-field
     , groups
     , mtl
+    , optparse-applicative
     , process
     , random
     , semirings
@@ -87,6 +89,7 @@ test-suite keelung-test
       Keelung.Field
       Keelung.Heap
       Keelung.Monad
+      Keelung.Options
       Keelung.Prof
       Keelung.Syntax
       Keelung.Syntax.Counters
@@ -115,6 +118,7 @@ test-suite keelung-test
     , hspec-expectations-lifted
     , keelung
     , mtl
+    , optparse-applicative
     , process
     , quickcheck-transformer
     , random

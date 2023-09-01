@@ -48,11 +48,11 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Heap
 import Keelung.Monad
+import Keelung.Options
 import Keelung.Syntax
 import Keelung.Syntax.Encode
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
-import System.Environment qualified
 import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
@@ -66,18 +66,19 @@ compilerPatchVersion :: Int
 compilerPatchVersion = 0
 
 keelungVersion :: String
-keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keelungCompilerVersion), ".", show compilerPatchVersion]
+keelungVersion = intercalate "." [show (fst keelungCompilerVersion), show (snd keelungCompilerVersion), show compilerPatchVersion]
 
 --------------------------------------------------------------------------------
 
+-- | Entry point for the Keelung command line interface
 keelung :: Encode t => Comp t -> IO ()
 keelung program = do
   -- replace with beefier option parser
-  args <- System.Environment.getArgs
-  case args of
-    ["compile", "gf181"] -> compile gf181 program >>= printResult
-    ["compile", _] -> putStrLn "Error: unknown field type"
-    _ -> putStrLn "Usage: stack exec compile <field type>"
+  options <- getOptions
+  case options of
+    Compile fieldType -> compile fieldType program >>= printResult
+    Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
+    Version -> putStrLn keelungVersion
   where
     printResult (Left err) = print err
     printResult (Right result) = print result

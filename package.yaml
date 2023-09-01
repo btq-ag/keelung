@@ -30,6 +30,7 @@ dependencies:
   - galois-field
   - groups
   - mtl
+  - optparse-applicative
   - process
   - random
   - semirings
@@ -54,14 +55,13 @@ tests:
       - test/
       - src/
     dependencies:
-    - keelung
-    # - keelung-examples
-    - hspec
-    - hspec-expectations-lifted
-    - HUnit
-    - QuickCheck
-    - quickcheck-transformer
-
+      - keelung
+      # - keelung-examples
+      - hspec
+      - hspec-expectations-lifted
+      - HUnit
+      - QuickCheck
+      - quickcheck-transformer
 
     ghc-options:
       - -Wall
