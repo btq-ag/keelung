@@ -6,6 +6,7 @@ import Options.Applicative
 data Options
   = Compile FieldType
   | Interpret FieldType [Integer] [Integer]
+  | Witness FieldType [Integer] [Integer] (Maybe FilePath)
   | Version
   deriving (Show)
 
@@ -33,14 +34,29 @@ options =
         <> command
           "interpret"
           ( info
-              (Interpret <$> parseFieldType <*> parseInputs "List of public inputs" <*> parseInputs "List of pricate inputs")
+              (Interpret <$> parseFieldType <*> parseInputs "List of public inputs" <*> parseInputs "List of private inputs")
               (fullDesc <> progDesc "Interpret Keelung programs")
+          )
+        <> command
+          "witness"
+          ( info
+              (Witness <$> parseFieldType <*> parseInputs "List of public inputs" <*> parseInputs "List of private inputs" <*> parseFilePath)
+              (fullDesc <> progDesc "Generate witness of Keelung programs with inputs")
           )
     )
     <|> flag' Version (long "version" <> short 'v' <> help "Show version")
 
 parseInputs :: String -> Parser [Integer]
 parseInputs msg = argument auto (help msg <> metavar "[Integer]")
+
+parseFilePath :: Parser (Maybe FilePath)
+parseFilePath =
+  optional $
+    strOption
+      ( long "output"
+          <> short 'o'
+          <> metavar "FilePath"
+      )
 
 parseFieldType :: Parser FieldType
 parseFieldType =

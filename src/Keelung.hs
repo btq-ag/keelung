@@ -78,6 +78,10 @@ keelung program = do
   case options of
     Compile fieldType -> compile fieldType program >>= printResult
     Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
+    Witness fieldType publicInputs privateInputs outputFilePath -> do
+      case outputFilePath of
+        Nothing -> genWitnessDefault fieldType program publicInputs privateInputs >>= print
+        Just filePath -> genWitness filePath fieldType program publicInputs privateInputs >>= print
     Version -> putStrLn keelungVersion
   where
     printResult (Left err) = print err
