@@ -13,8 +13,14 @@ data Options
       [Integer]
       FilePath -- Circuit input filepath
       FilePath -- Witness input filepath
-      FilePath -- Parameter input filepath
       FilePath -- Proof output filepath
+  | Verify
+      FieldType
+      [Integer]
+      [Integer]
+      FilePath -- Circuit input filepath
+      FilePath -- Witness input filepath
+      FilePath -- Proof input filepath
   | Version
   deriving (Show)
 
@@ -37,13 +43,13 @@ options =
           "compile"
           ( info
               (Compile <$> parseFieldType)
-              (fullDesc <> progDesc "Compile Keelung programs")
+              (fullDesc <> progDesc "Compile Keelung program")
           )
         <> command
           "interpret"
           ( info
               (Interpret <$> parseFieldType <*> parseInputs "List of public inputs" <*> parseInputs "List of private inputs")
-              (fullDesc <> progDesc "Interpret Keelung programs")
+              (fullDesc <> progDesc "Interpret Keelung program")
           )
         <> command
           "witness"
@@ -52,9 +58,9 @@ options =
                   <$> parseFieldType
                   <*> parseInputs "List of public inputs"
                   <*> parseInputs "List of private inputs"
-                  <*> parseFilePath "output" 'o' "aurora/witness.jsonl"
+                  <*> parseFilePath "witness" 'w' "aurora/witness.jsonl"
               )
-              (fullDesc <> progDesc "Generate witness of Keelung programs with inputs")
+              (fullDesc <> progDesc "Generate witness of Keelung program with inputs")
           )
         <> command
           "prove"
@@ -65,10 +71,22 @@ options =
                   <*> parseInputs "List of private inputs"
                   <*> parseFilePath "circuit" 'c' "aurora/circuit.jsonl"
                   <*> parseFilePath "witness" 'w' "aurora/witness.jsonl"
-                  <*> parseFilePath "param" 'p' "aurora/parameter.json"
-                  <*> parseFilePath "output" 'o' "aurora/proof"
+                  <*> parseFilePath "proof" 'p' "aurora/proof"
               )
-              (fullDesc <> progDesc "Generate proof of Keelung programs with inputs and witnesses")
+              (fullDesc <> progDesc "Generate a proof of Keelung program with inputs and witnesses")
+          )
+        <> command
+          "verify"
+          ( info
+              ( Verify
+                  <$> parseFieldType
+                  <*> parseInputs "List of public inputs"
+                  <*> parseInputs "List of private inputs"
+                  <*> parseFilePath "circuit" 'c' "aurora/circuit.jsonl"
+                  <*> parseFilePath "witness" 'w' "aurora/witness.jsonl"
+                  <*> parseFilePath "proof" 'p' "aurora/proof"
+              )
+              (fullDesc <> progDesc "Verify a proof of Keelung programs with inputs, witnesses")
           )
     )
     <|> flag' Version (long "version" <> short 'v' <> help "Show version")

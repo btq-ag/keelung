@@ -82,8 +82,10 @@ keelung program = do
     Compile fieldType -> compile fieldType program >>= printResult
     Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
     Witness fieldType publicInputs privateInputs outputFilePath -> genWitness outputFilePath fieldType program publicInputs privateInputs >>= print
-    Prove fieldType publicInputs privateInputs circuitPath witnessPath paramPath proofPath ->
-      generate circuitPath witnessPath "aurora/inputs.jsonl" paramPath proofPath fieldType program publicInputs privateInputs
+    Prove fieldType publicInputs privateInputs circuitPath witnessPath proofPath ->
+      generate circuitPath witnessPath "aurora/inputs.jsonl" "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
+    Verify fieldType publicInputs privateInputs circuitPath witnessPath proofPath ->
+      generate circuitPath witnessPath "aurora/inputs.jsonl" "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
     Version -> putStrLn keelungVersion
   where
     printResult (Left err) = print err
