@@ -6,7 +6,15 @@ import Options.Applicative
 data Options
   = Compile FieldType
   | Interpret FieldType [Integer] [Integer]
-  | Witness FieldType [Integer] [Integer] (Maybe FilePath)
+  | Witness FieldType [Integer] [Integer] FilePath
+  | Prove
+      FieldType
+      [Integer]
+      [Integer]
+      FilePath -- Circuit input filepath
+      FilePath -- Witness input filepath
+      FilePath -- Parameter input filepath
+      FilePath -- Proof output filepath
   | Version
   deriving (Show)
 
@@ -40,8 +48,27 @@ options =
         <> command
           "witness"
           ( info
-              (Witness <$> parseFieldType <*> parseInputs "List of public inputs" <*> parseInputs "List of private inputs" <*> parseFilePath)
+              ( Witness
+                  <$> parseFieldType
+                  <*> parseInputs "List of public inputs"
+                  <*> parseInputs "List of private inputs"
+                  <*> parseFilePath "output" 'o' "aurora/witness.jsonl"
+              )
               (fullDesc <> progDesc "Generate witness of Keelung programs with inputs")
+          )
+        <> command
+          "prove"
+          ( info
+              ( Prove
+                  <$> parseFieldType
+                  <*> parseInputs "List of public inputs"
+                  <*> parseInputs "List of private inputs"
+                  <*> parseFilePath "circuit" 'c' "aurora/circuit.jsonl"
+                  <*> parseFilePath "witness" 'w' "aurora/witness.jsonl"
+                  <*> parseFilePath "param" 'p' "aurora/parameter.json"
+                  <*> parseFilePath "output" 'o' "aurora/proof"
+              )
+              (fullDesc <> progDesc "Generate proof of Keelung programs with inputs and witnesses")
           )
     )
     <|> flag' Version (long "version" <> short 'v' <> help "Show version")
@@ -49,14 +76,15 @@ options =
 parseInputs :: String -> Parser [Integer]
 parseInputs msg = argument auto (help msg <> metavar "[Integer]")
 
-parseFilePath :: Parser (Maybe FilePath)
-parseFilePath =
-  optional $
-    strOption
-      ( long "output"
-          <> short 'o'
-          <> metavar "FilePath"
-      )
+parseFilePath :: String -> Char -> FilePath -> Parser FilePath
+parseFilePath longName shortName defaultPath =
+  strOption
+    ( long longName
+        <> short shortName
+        <> showDefault
+        <> value defaultPath
+        <> metavar "FilePath"
+    )
 
 parseFieldType :: Parser FieldType
 parseFieldType =

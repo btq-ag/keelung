@@ -70,6 +70,9 @@ keelungVersion = intercalate "." [show (fst keelungCompilerVersion), show (snd k
 
 --------------------------------------------------------------------------------
 
+-- | Entry point for testing the Keelung command line interface
+-- main = keelung (return ())
+
 -- | Entry point for the Keelung command line interface
 keelung :: Encode t => Comp t -> IO ()
 keelung program = do
@@ -78,10 +81,9 @@ keelung program = do
   case options of
     Compile fieldType -> compile fieldType program >>= printResult
     Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
-    Witness fieldType publicInputs privateInputs outputFilePath -> do
-      case outputFilePath of
-        Nothing -> genWitnessDefault fieldType program publicInputs privateInputs >>= print
-        Just filePath -> genWitness filePath fieldType program publicInputs privateInputs >>= print
+    Witness fieldType publicInputs privateInputs outputFilePath -> genWitness outputFilePath fieldType program publicInputs privateInputs >>= print
+    Prove fieldType publicInputs privateInputs circuitPath witnessPath paramPath proofPath ->
+      generate circuitPath witnessPath "aurora/inputs.jsonl" paramPath proofPath fieldType program publicInputs privateInputs
     Version -> putStrLn keelungVersion
   where
     printResult (Left err) = print err
@@ -151,6 +153,7 @@ generate_ circuit witness _inputs param proofPath fieldType prog publicInput pri
                  "--output_filepath",
                  proofPath
                ]
+    -- print $ "Running: " ++ cmd ++ " " ++ unwords arguments
     msg <- Process.readProcess cmd arguments mempty
     return (proofPath, msg)
 
@@ -168,15 +171,14 @@ generate ::
   [Integer] ->
   IO ()
 generate circuit witness inputs param proof fieldType prog publicInput privateInput = do
+  Path.createDirectoryIfMissing True "aurora"
   result <- generate_ circuit witness inputs param proof fieldType prog publicInput privateInput
   case result of
     Left err -> print err
     Right (_, msg) -> putStr msg
 
 generateDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generateDefault fieldType prog publicInput privateInput = do
-  Path.createDirectoryIfMissing True "aurora"
-  generate "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/inputs.jsonl" "aurora/parameter.json" "aurora/proof" fieldType prog publicInput privateInput
+generateDefault = generate "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/inputs.jsonl" "aurora/parameter.json" "aurora/proof"
 
 -- | Generate and verify a proof given circuit, inputs (witness), paratemer, and proof
 verify_ :: FilePath -> FilePath -> FilePath -> FilePath -> IO (Either Error String)
@@ -211,9 +213,12 @@ verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/par
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
-genCircuit fp fieldType prog = do
+genCircuit filePath fieldType prog = do
+  liftIO $ Path.createDirectoryIfMissing True "aurora"
   elab <- liftEither (elaborateAndEncode prog)
-  callKeelungc ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  r1cs <- callKeelungc ["protocol", "toJSON", "--filepath", filePath] (fieldType, elab) :: M (R1CS Integer)
+  liftIO $ putStrLn $ "Generated circuit file at: " <> filePath
+  return r1cs
 
 genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
 genCircuitBin fp fieldType prog = runM $ do
@@ -226,13 +231,18 @@ genCircuitDefault = genCircuit "aurora/circuit.jsonl"
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> M [Integer]
-genWitness_ fp fieldType prog publicInput privateInput = do
+genWitness_ filePath fieldType prog publicInput privateInput = do
+  liftIO $ Path.createDirectoryIfMissing True "aurora"
   elab <- liftEither (elaborateAndEncode prog)
-  callKeelungc ["protocol", "genWitness", "--filepath", fp] (fieldType, elab, publicInput, privateInput)
+  output <- callKeelungc ["protocol", "genWitness", "--filepath", filePath] (fieldType, elab, publicInput, privateInput)
+  liftIO $ putStrLn $ "Generated witness file at: " <> filePath
+  return output
 
 -- | Generate parameters for a program and write them to parameter.json.
 genParameters :: FilePath -> M ()
-genParameters fp = lift $ BS.writeFile fp "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
+genParameters filePath = do
+  lift $ BS.writeFile filePath "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
+  liftIO $ putStrLn $ "Generated parameter file at: " <> filePath
 
 -- | For generating witness.jsonl
 genWitness :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
