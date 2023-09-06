@@ -15,9 +15,6 @@ data Options
       FilePath -- Witness input filepath
       FilePath -- Proof output filepath
   | Verify
-      FieldType
-      [Integer]
-      [Integer]
       FilePath -- Circuit input filepath
       FilePath -- Witness input filepath
       FilePath -- Proof input filepath
@@ -79,10 +76,7 @@ options =
           "verify"
           ( info
               ( Verify
-                  <$> parseFieldType
-                  <*> parseInputs "List of public inputs"
-                  <*> parseInputs "List of private inputs"
-                  <*> parseFilePath "circuit" 'c' "aurora/circuit.jsonl"
+                  <$> parseFilePath "circuit" 'c' "aurora/circuit.jsonl"
                   <*> parseFilePath "witness" 'w' "aurora/witness.jsonl"
                   <*> parseFilePath "proof" 'p' "aurora/proof"
               )

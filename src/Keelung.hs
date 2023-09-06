@@ -16,15 +16,18 @@ module Keelung
     compileWithOpts,
     rtsoptProf,
     rtsoptMemory,
-    generate,
-    generateDefault,
+    -- witness generation
+    witness,
+    witness',
+    -- proof generation
+    prove,
+    prove',
+    -- proof verification
     verify,
-    verifyDefault,
-    genCircuit,
-    genCircuitBin,
-    genCircuitDefault,
-    genWitness,
-    genWitnessDefault,
+    verify',
+    -- genCircuit,
+    -- genCircuitBin,
+    -- genCircuitDefault,
     genInputs,
     genInputsDefault,
     interpret,
@@ -81,11 +84,11 @@ keelung program = do
   case options of
     Compile fieldType -> compile fieldType program >>= printResult
     Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
-    Witness fieldType publicInputs privateInputs outputFilePath -> genWitness outputFilePath fieldType program publicInputs privateInputs >>= print
+    Witness fieldType publicInputs privateInputs outputFilePath -> witness' outputFilePath fieldType program publicInputs privateInputs >>= print
     Prove fieldType publicInputs privateInputs circuitPath witnessPath proofPath ->
-      generate circuitPath witnessPath "aurora/inputs.jsonl" "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
-    Verify fieldType publicInputs privateInputs circuitPath witnessPath proofPath ->
-      generate circuitPath witnessPath "aurora/inputs.jsonl" "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
+      prove' circuitPath witnessPath "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
+    Verify circuitPath witnessPath proofPath ->
+      verify' circuitPath witnessPath "aurora/parameter.json" proofPath
     Version -> putStrLn keelungVersion
   where
     printResult (Left err) = print err
@@ -125,44 +128,8 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 --------------------------------------------------------------------------------
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
-generate_ ::
+prove' ::
   Encode t =>
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FieldType ->
-  Comp t ->
-  [Integer] ->
-  [Integer] ->
-  IO (Either Error (FilePath, String))
-generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
-  (cmd, args) <- findAuroraProver
-  _ <- genCircuit circuit fieldType prog
-  _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs
-  genParameters param
-  -- genInputs inputs publicInput -- Should generate public inputs only for verifier
-  lift $ do
-    let arguments =
-          args
-            ++ [ "--r1cs_filepath",
-                 circuit,
-                 "--input_filepath",
-                 witness,
-                 "--parameter_filepath",
-                 param,
-                 "--output_filepath",
-                 proofPath
-               ]
-    -- print $ "Running: " ++ cmd ++ " " ++ unwords arguments
-    msg <- Process.readProcess cmd arguments mempty
-    return (proofPath, msg)
-
--- | Generate a proof
-generate ::
-  Encode t =>
-  FilePath ->
   FilePath ->
   FilePath ->
   FilePath ->
@@ -172,46 +139,62 @@ generate ::
   [Integer] ->
   [Integer] ->
   IO ()
-generate circuit witness inputs param proof fieldType prog publicInput privateInput = do
+prove' circuitPath witnessPath paramPath proofPath fieldType prog publicInput privateInput = do
   Path.createDirectoryIfMissing True "aurora"
-  result <- generate_ circuit witness inputs param proof fieldType prog publicInput privateInput
+  result <- runM $ do
+    (cmd, args) <- findAuroraProver
+    _ <- genCircuit circuitPath fieldType prog
+    _ <- genWitness_ witnessPath fieldType prog publicInput privateInput -- Should generate public as well as private inputs
+    genParameters paramPath
+    -- genInputs inputs publicInput -- Should generate public inputs only for verifier
+    lift $ do
+      let arguments =
+            args
+              ++ [ "--r1cs_filepath",
+                   circuitPath,
+                   "--input_filepath",
+                   witnessPath,
+                   "--parameter_filepath",
+                   paramPath,
+                   "--output_filepath",
+                   proofPath
+                 ]
+      -- print $ "Running: " ++ cmd ++ " " ++ unwords arguments
+      msg <- Process.readProcess cmd arguments mempty
+      return (proofPath, msg)
   case result of
     Left err -> print err
     Right (_, msg) -> putStr msg
 
-generateDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generateDefault = generate "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/inputs.jsonl" "aurora/parameter.json" "aurora/proof"
+prove :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+prove = prove' "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
 
--- | Generate and verify a proof given circuit, inputs (witness), paratemer, and proof
-verify_ :: FilePath -> FilePath -> FilePath -> FilePath -> IO (Either Error String)
-verify_ circuit inputs param proof = runM $ do
-  (cmd, args) <- findAuroraVerifier
-  genParameters param
-  lift $ do
-    let arguments =
-          args
-            ++ [ "--r1cs_filepath",
-                 circuit,
-                 "--input_filepath",
-                 inputs,
-                 "--parameter_filepath",
-                 param,
-                 "--proof_filepath",
-                 proof
-               ]
-    Process.readProcess cmd arguments mempty
-
--- | Verify a proof
-verify :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
-verify circuit inputs param proof = do
-  result <- verify_ circuit inputs param proof
+-- | Generate and verify a proof given circuit, witness, paratemer, and proof
+verify' :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
+verify' circuitPath witnessPath paramPath proofPath = do
+  result <- runM $ do
+    (cmd, args) <- findAuroraVerifier
+    genParameters proofPath
+    lift $ do
+      let arguments =
+            args
+              ++ [ "--r1cs_filepath",
+                   circuitPath,
+                   "--input_filepath",
+                   witnessPath,
+                   "--parameter_filepath",
+                   paramPath,
+                   "--proof_filepath",
+                   proofPath
+                 ]
+      Process.readProcess cmd arguments mempty
   case result of
     Left err -> print err
     Right msg -> putStr msg
 
 -- TODO: Verify inputs.jsonl instead
-verifyDefault :: IO ()
-verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
+verify :: IO ()
+verify = verify' "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
 genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
@@ -222,14 +205,14 @@ genCircuit filePath fieldType prog = do
   liftIO $ putStrLn $ "Generated circuit file at: " <> filePath
   return r1cs
 
-genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
-genCircuitBin fp fieldType prog = runM $ do
-  elab <- liftEither (elaborateAndEncode prog)
-  _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
-  return "Success"
+-- genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
+-- genCircuitBin fp fieldType prog = runM $ do
+--   elab <- liftEither (elaborateAndEncode prog)
+--   _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+--   return "Success"
 
-genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
-genCircuitDefault = genCircuit "aurora/circuit.jsonl"
+-- genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
+-- genCircuitDefault = genCircuit "aurora/circuit.jsonl"
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
 genWitness_ :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> M [Integer]
@@ -247,11 +230,11 @@ genParameters filePath = do
   liftIO $ putStrLn $ "Generated parameter file at: " <> filePath
 
 -- | For generating witness.jsonl
-genWitness :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-genWitness fp fieldType prog publicInput privateInput = runM (genWitness_ fp fieldType prog publicInput privateInput) >>= printErrorInstead
+witness' :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+witness' fp fieldType prog publicInput privateInput = runM (genWitness_ fp fieldType prog publicInput privateInput) >>= printErrorInstead
 
-genWitnessDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-genWitnessDefault = genWitness "aurora/witness.jsonl"
+witness :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+witness = witness' "aurora/witness.jsonl"
 
 -- | For generating inputs.jsonl
 genInputs :: FilePath -> [Integer] -> M ()
