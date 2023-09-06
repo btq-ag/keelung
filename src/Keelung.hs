@@ -11,6 +11,10 @@ module Keelung
     module Keelung.Monad,
     module Keelung.Data.Bits,
     keelung,
+    -- interpret
+    interpret,
+    interpretEither,
+    -- compile
     compile,
     compileO0,
     compileWithOpts,
@@ -30,7 +34,6 @@ module Keelung
     -- genCircuitDefault,
     genInputs,
     genInputsDefault,
-    interpret,
     elaborateAndEncode,
     Encode,
     GaloisField,
@@ -255,13 +258,16 @@ printErrorInstead (Right values) = return values
 
 -- | Interpret a program with public and private inputs
 interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-interpret fieldType prog publicInput privateInput =
+interpret fieldType prog publicInput privateInput = interpretEither fieldType prog publicInput privateInput >>= printErrorInstead
+
+-- | Interpret a program with public and private inputs
+interpretEither :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
+interpretEither fieldType prog publicInput privateInput =
   runM
     ( do
         elab <- liftEither (elaborateAndEncode prog)
         callKeelungc ["protocol", "interpret"] (fieldType, elab, publicInput, privateInput)
     )
-    >>= printErrorInstead
 
 --------------------------------------------------------------------------------
 
