@@ -68,16 +68,15 @@ import Text.Read (readMaybe)
 keelungCompilerVersion :: (Int, Int)
 keelungCompilerVersion = (0, 15)
 
+-- | Patch version of this library
 compilerPatchVersion :: Int
 compilerPatchVersion = 0
 
+-- | The version of this library in String
 keelungVersion :: String
 keelungVersion = intercalate "." [show (fst keelungCompilerVersion), show (snd keelungCompilerVersion), show compilerPatchVersion]
 
 --------------------------------------------------------------------------------
-
--- | Entry point for testing the Keelung command line interface
--- main = keelung (return ())
 
 -- | Entry point for the Keelung command line interface
 keelung :: Encode t => Comp t -> IO ()

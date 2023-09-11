@@ -70,6 +70,14 @@ infixl 8 .>>.
 
 infixl 8 .<<.
 
+-- | Synonym for 'rotate'
+rotateL :: Bits a => a -> Int -> a
+rotateL = rotate
+
+-- | Opposite of 'rotateL'
+rotateR :: Bits a => a -> Int -> a
+rotateR x i = rotateL x (-i)
+
 instance Bits Boolean where
   (.&.) = And
   (.|.) = Or
