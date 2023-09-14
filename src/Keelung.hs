@@ -7,7 +7,6 @@
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
-    module Keelung.CircuitFormat,
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
@@ -53,7 +52,6 @@ import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Bits
 import Keelung.Error
 import Keelung.Field
-import Keelung.CircuitFormat
 import Keelung.Heap
 import Keelung.Monad
 import Keelung.Options
