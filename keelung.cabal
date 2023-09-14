@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.CircuitFormat
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
       Keelung.Data.Bits
@@ -78,6 +79,7 @@ test-suite keelung-test
   other-modules:
       Test.VarLayout
       Keelung
+      Keelung.CircuitFormat
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
       Keelung.Data.Bits

@@ -7,6 +7,7 @@
 module Keelung
   ( module Keelung.Syntax,
     module Keelung.Field,
+    module Keelung.CircuitFormat,
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
@@ -30,7 +31,7 @@ module Keelung
     verify,
     verify',
     -- genCircuit,
-    -- genCircuitBin,
+    genCircuitBin,
     -- genCircuitDefault,
     genInputs,
     genInputsDefault,
@@ -52,6 +53,7 @@ import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Bits
 import Keelung.Error
 import Keelung.Field
+import Keelung.CircuitFormat
 import Keelung.Heap
 import Keelung.Monad
 import Keelung.Options
@@ -208,11 +210,11 @@ genCircuit filePath fieldType prog = do
   liftIO $ putStrLn $ "Generated circuit file at: " <> filePath
   return r1cs
 
--- genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
--- genCircuitBin fp fieldType prog = runM $ do
---   elab <- liftEither (elaborateAndEncode prog)
---   _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
---   return "Success"
+genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
+genCircuitBin fp fieldType prog = runM $ do
+  elab <- liftEither (elaborateAndEncode prog)
+  _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  return "Success"
 
 -- genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
 -- genCircuitDefault = genCircuit "aurora/circuit.jsonl"
