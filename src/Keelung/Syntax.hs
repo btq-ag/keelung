@@ -8,6 +8,7 @@ module Keelung.Syntax
   ( Field (..),
     Boolean (..),
     UInt (..),
+    (.*.),
     HasWidth (..),
     EQ (..),
     gt,
@@ -118,6 +119,8 @@ data UInt (w :: Nat)
     SubU (UInt w) (UInt w)
   | -- | Multiplication
     MulU (UInt w) (UInt w)
+  | -- | Carry-less Multiplication
+    CLMulU (UInt w) (UInt w)
   | -- | Modular multiplicatie inverse
     MMIU (UInt w) Integer
   | -- | Bitwise conjunction
@@ -149,6 +152,7 @@ instance KnownNat w => Show (UInt w) where
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    CLMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
@@ -190,10 +194,11 @@ instance KnownNat w => Num (UInt w) where
 
   fromInteger n = UInt (fromIntegral n)
 
--- -- | Make UInt an instance of Fractional
--- instance KnownNat w => Fractional (UInt w) where
---   fromRational = UInt . round . toRational
---   recip = InvU
+-- | Carry-less multiplication
+(.*.) :: KnownNat w => UInt w -> UInt w -> UInt w
+(.*.) = CLMulU
+
+infixl 8 .*.
 
 --------------------------------------------------------------------------------
 

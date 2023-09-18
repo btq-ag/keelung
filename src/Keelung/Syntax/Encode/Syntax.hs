@@ -141,6 +141,8 @@ data UInt
     SubU Width UInt UInt
   | -- | Multiplication
     MulU Width UInt UInt
+  | -- | Carry-less Multiplication
+    CLMulU Width UInt UInt
   | -- | Modular multiplicative inverse
     MMIU Width UInt Integer
   | -- | Bitwise conjunction
@@ -174,6 +176,7 @@ instance Show UInt where
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    CLMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y

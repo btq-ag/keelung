@@ -11,9 +11,6 @@ import Keelung.Syntax
 
 -- | Bitwise operations on Keelung values
 class Bits a where
-  -- {-# MINIMAL bitWidth #-}
-  -- bitWidth :: a -> Int
-
   -- | Bitwise \"and\"
   (.&.) :: a -> a -> a
 
