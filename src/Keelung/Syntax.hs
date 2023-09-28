@@ -57,6 +57,7 @@ data Field
     IfF Boolean Field Field
   | -- | Conversion from Booleans to Field elements
     BtoF Boolean
+  deriving (Ord)
 
 instance Eq Field where
   Integer x == Integer y = x == y
@@ -141,7 +142,7 @@ data UInt (w :: Nat)
     IfU Boolean (UInt w) (UInt w)
   | -- | Conversion from Booleans to Unsigned integers
     BtoU Boolean
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance KnownNat w => Show (UInt w) where
   showsPrec prec expr = case expr of
@@ -200,6 +201,13 @@ instance KnownNat w => Num (UInt w) where
 
 infixl 8 .*.
 
+instance KnownNat w => Enum (UInt w) where
+  toEnum = UInt . toInteger
+  fromEnum = error "[ panic ] Enum.fromEnum: undefined for UInt"
+
+instance KnownNat w => Real (UInt w) where
+  toRational = error "[ panic ] Real.toRational: undefined for UInt"
+
 --------------------------------------------------------------------------------
 
 -- | Typeclass for deriving the bit width of an expression
@@ -248,6 +256,70 @@ data Boolean
     IfB Boolean Boolean Boolean
   | -- | Bit test on Unsigned integers
     forall w. KnownNat w => BitU (UInt w) Int
+
+-- Manually implement Ord instance for Boolean
+instance Ord Boolean where
+  compare (Boolean x) (Boolean y) = compare x y
+  compare (VarB x) (VarB y) = compare x y
+  compare (VarBI x) (VarBI y) = compare x y
+  compare (And x1 x2) (And y1 y2) = compare (x1, x2) (y1, y2)
+  compare (Or x1 x2) (Or y1 y2) = compare (x1, x2) (y1, y2)
+  compare (Xor x1 x2) (Xor y1 y2) = compare (x1, x2) (y1, y2)
+  compare (EqB x1 x2) (EqB y1 y2) = compare (x1, x2) (y1, y2)
+  compare (EqF x1 x2) (EqF y1 y2) = compare (x1, x2) (y1, y2)
+  compare (EqU x1 x2) (EqU y1 y2) = case sameNat x1 y1 of
+    Just Refl -> case sameNat x1 y2 of
+      Just Refl -> compare (x1, x2) (y1, y2)
+      Nothing -> error "[ panic ] Boolean.EqU: cannot compare UInts of different widths"
+    Nothing -> error "[ panic ] Boolean.EqU: cannot compare UInts of different widths"
+  compare (GTEU x1 x2) (GTEU y1 y2) =
+    case sameNat x1 y1 of
+      Just Refl -> case sameNat x2 y2 of
+        Just Refl -> compare (x1, x2) (y1, y2)
+        Nothing -> error "[ panic ] Boolean. : cannot compare UInts of different widths"
+      Nothing -> error "[ panic ] Boolean. : cannot compare UInts of different widths"
+  compare (GTU x1 x2) (GTU y1 y2) =
+    case sameNat x1 y1 of
+      Just Refl -> case sameNat x2 y2 of
+        Just Refl -> compare (x1, x2) (y1, y2)
+        Nothing -> error "[ panic ] Boolean.GTU : cannot compare UInts of different widths"
+      Nothing -> error "[ panic ] Boolean.GTU : cannot compare UInts of different widths"
+  compare (LTEU x1 x2) (LTEU y1 y2) =
+    case sameNat x1 y1 of
+      Just Refl -> case sameNat x2 y2 of
+        Just Refl -> compare (x1, x2) (y1, y2)
+        Nothing -> error "[ panic ] Boolean.LTEU : cannot compare UInts of different widths"
+      Nothing -> error "[ panic ] Boolean.LTEU : cannot compare UInts of different widths"
+  compare (LTU x1 x2) (LTU y1 y2) =
+    case sameNat x1 y1 of
+      Just Refl -> case sameNat x2 y2 of
+        Just Refl -> compare (x1, x2) (y1, y2)
+        Nothing -> error "[ panic ] Boolean.LTU : cannot compare UInts of different widths"
+      Nothing -> error "[ panic ] Boolean.LTU : cannot compare UInts of different widths"
+  compare (IfB x1 x2 x3) (IfB y1 y2 y3) = compare (x1, x2, x3) (y1, y2, y3)
+  compare (BitU x1 x2) (BitU y1 y2) = case sameNat x1 y1 of
+    Just Refl -> compare x2 y2
+    Nothing -> error "[ panic ] Boolean.BitU: cannot compare UInts of different widths"
+  compare x y = compare (tag x) (tag y)
+    where
+      tag :: Boolean -> Int
+      tag (Boolean _) = 0
+      tag (VarB _) = 1
+      tag (VarBI _) = 2
+      tag (VarBP _) = 3
+      tag (And _ _) = 4
+      tag (Or _ _) = 5
+      tag (Xor _ _) = 6
+      tag (Not _) = 7
+      tag (EqB _ _) = 8
+      tag (EqF _ _) = 9
+      tag (EqU _ _) = 10
+      tag (GTEU _ _) = 11
+      tag (GTU _ _) = 12
+      tag (LTEU _ _) = 13
+      tag (LTU _ _) = 14
+      tag (IfB {}) = 15
+      tag (BitU _ _) = 16
 
 instance Eq Boolean where
   Boolean x == Boolean y = x == y
