@@ -13,6 +13,7 @@ module Keelung.Monad
     assert,
     performDivMod,
     assertDivMod,
+    performCLDivMod,
     assertLTE,
     assertLT,
     assertGTE,
@@ -644,6 +645,42 @@ assertDivMod dividend divisor quotient remainder = do
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
+-- | Computes carry-less the quotient and remainder of two 'UInt' arguments: the dividend and the divisor.
+--
+--   Note that because 'performCLDivMod' is a statement, it can only be executed in the 'Comp' context, as shown in the example below:
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input
+--     divisor <- input
+--     (quotient, remainder) <- performCLDivMod dividend divisor
+--     return quotient
+--   @
+--
+--   @since 0.17.0
+performCLDivMod ::
+  forall w.
+  KnownNat w =>
+  -- | The dividend
+  UInt w ->
+  -- | The devisor
+  UInt w ->
+  -- | The quotient and remainder
+  Comp (UInt w, UInt w)
+performCLDivMod dividend divisor = do
+  remainder <- freshVarU width
+  quotient <- freshVarU width
+  -- 
+  heap <- gets compHeap
+  let encoded = runHeapM heap $ CLDivMod width <$> encode' dividend <*> encode' divisor <*> encode' (VarU quotient :: UInt w) <*> encode' (VarU remainder :: UInt w)
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  return (VarU quotient, VarU remainder)
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))
+
 --------------------------------------------------------------------------------
 
 -- | Assert that a 'UInt' is lesser than or equal to a given bound.
@@ -730,6 +767,7 @@ data SideEffect
   | AssignmentB Var Boolean
   | AssignmentU Width Var Encoding.UInt
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
+  | CLDivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | AssertLTE Width Encoding.UInt Integer
   | AssertLT Width Encoding.UInt Integer
   | AssertGTE Width Encoding.UInt Integer

@@ -296,6 +296,7 @@ data SideEffect
   | AssignmentB Var Boolean
   | AssignmentU Width Var UInt
   | DivMod Width UInt UInt UInt UInt
+  | CLDivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
   | AssertLT Width UInt Integer
   | AssertGTE Width UInt Integer
@@ -309,6 +310,7 @@ instance Show SideEffect where
   show (AssignmentB var val) = show (VarB var) <> " := " <> show val
   show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
   show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
+  show (CLDivMod _ x y q r) = show x <> " = " <> show q <> " .*. " <> show y <> " .^. " <> show r
   show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n
   show (AssertLT _ x n) = "assert " <> show x <> " < " <> show n
   show (AssertGTE _ x n) = "assert " <> show x <> " ≥ " <> show n

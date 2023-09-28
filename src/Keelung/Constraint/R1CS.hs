@@ -29,6 +29,8 @@ data R1CS n = R1CS
     r1csEqZeros :: [(Poly n, Var)],
     -- | Hints for generating witnesses of DivMod constraints
     r1csDivMods :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer))],
+    -- | Hints for generating witnesses of carry-less DivMod constraints
+    r1csCLDivMods :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer))],
     -- | Hints for generating witnesses of ModInv constraints
     r1csModInvs :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), Integer)]
   }
@@ -37,7 +39,7 @@ data R1CS n = R1CS
 instance Serialize n => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
-  show (R1CS _ cs counters _ _ _) =
+  show (R1CS _ cs counters _ _ _ _) =
     "R1CS {\n"
       <> prettyConstraints counters cs
       <> prettyVariables counters
@@ -48,7 +50,7 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
-toR1Cs (R1CS _ ordinaryConstraints counters _ _ _) =
+toR1Cs (R1CS _ ordinaryConstraints counters _ _ _ _) =
   ordinaryConstraints
     <> booleanInputVarConstraints
   where

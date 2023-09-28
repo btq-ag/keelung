@@ -300,6 +300,7 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
     encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
     encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
     encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
+    encodeSideEffect (CLDivMod width a b q r) = return $ Encoding.DivMod width a b q r
     encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b
     encodeSideEffect (AssertLT width a b) = return $ Encoding.AssertLT width a b
     encodeSideEffect (AssertGTE width a b) = return $ Encoding.AssertGTE width a b
