@@ -645,7 +645,7 @@ assertDivMod dividend divisor quotient remainder = do
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
--- | Computes carry-less the quotient and remainder of two 'UInt' arguments: the dividend and the divisor.
+-- | Computes carry-less quotient and remainder of two 'UInt' arguments: the dividend and the divisor.
 --
 --   Note that because 'performCLDivMod' is a statement, it can only be executed in the 'Comp' context, as shown in the example below:
 --
@@ -673,11 +673,44 @@ performCLDivMod ::
 performCLDivMod dividend divisor = do
   remainder <- freshVarU width
   quotient <- freshVarU width
-  -- 
-  heap <- gets compHeap
-  let encoded = runHeapM heap $ CLDivMod width <$> encode' dividend <*> encode' divisor <*> encode' (VarU quotient :: UInt w) <*> encode' (VarU remainder :: UInt w)
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  assertCLDivMod dividend divisor (VarU quotient) (VarU remainder)
   return (VarU quotient, VarU remainder)
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))
+
+-- | Instead of computing the carry-less quotient and remainder from the dividend and divisor with 'performCLDivMod',
+--   we can enforce a relation between the dividend, divisor, quotient, and remainder in Keelung.
+--
+--   For example, we can enforce the dividend to be an even number and obtain the quotient at
+--   the same time, as shown below:
+--
+--   /Example/
+--
+--   @
+-- assertEven :: UInt 32 -> Comp (UInt 32)
+-- assertEven dividend = do
+--     quotient <- freshVarUInt
+--     assertCLDivMod dividend 2 quotient 0
+--     return quotient
+--   @
+--
+--   @since 0.17.0
+assertCLDivMod ::
+  forall w.
+  KnownNat w =>
+  -- | The dividend
+  UInt w ->
+  -- | The divisor
+  UInt w ->
+  -- | The quotient
+  UInt w ->
+  -- | The remainder
+  UInt w ->
+  Comp ()
+assertCLDivMod dividend divisor quotient remainder = do
+  heap <- gets compHeap
+  let encoded = runHeapM heap $ CLDivMod width <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
