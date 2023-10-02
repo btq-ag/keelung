@@ -14,6 +14,7 @@ module Keelung.Monad
     performDivMod,
     assertDivMod,
     performCLDivMod,
+    assertCLDivMod,
     assertLTE,
     assertLT,
     assertGTE,
