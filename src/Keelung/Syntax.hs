@@ -20,6 +20,7 @@ module Keelung.Syntax
     setBit,
     modInv,
     pow,
+    aesMul,
     Var,
     Width,
   )
@@ -120,6 +121,8 @@ data UInt (w :: Nat)
     SubU (UInt w) (UInt w)
   | -- | Multiplication
     MulU (UInt w) (UInt w)
+  | -- | Hardcoded GF(256) Multiplication for AES
+    AESMulU (UInt w) (UInt w)
   | -- | Carry-less Multiplication
     CLMulU (UInt w) (UInt w)
   | -- | Modular multiplicatie inverse
@@ -153,6 +156,7 @@ instance KnownNat w => Show (UInt w) where
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    AESMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
     CLMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
@@ -410,6 +414,12 @@ lte = LTEU
 --   @since 0.11.0
 pow :: Field -> Integer -> Field
 pow = Exp
+
+-- | Hardcoded GF(256) Multiplication for AES
+--
+--   @since 0.17.0
+aesMul :: KnownNat w => UInt w -> UInt w -> UInt w
+aesMul = AESMulU
 
 --------------------------------------------------------------------------------
 
