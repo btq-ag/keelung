@@ -3,7 +3,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
-module Keelung.Data.N where
+module Keelung.Data.N (N (..), isPositive) where
 
 import Control.DeepSeq (NFData)
 import Data.Euclidean (Euclidean, Field, GcdDomain)
@@ -64,10 +64,15 @@ instance (GaloisField n, Integral n) => Integral (N n) where
     where
       (q, r) = quotRem (unN n) (unN m)
   toInteger (N x) =
-    let halfway = fromIntegral (order x `div` 2)
-     in if x >= halfway
-          then negate (toInteger (order x) - toInteger x)
-          else toInteger x
+    if isPositive x
+      then negate (toInteger (order x) - toInteger x)
+      else toInteger x
 
 instance (GaloisField n, Integral n) => Show (N n) where
   show = show . toInteger
+
+-- | Returns true if the given element is in the first half of the field
+isPositive :: (GaloisField n, Integral n) => n -> Bool
+isPositive x = x < halfway
+  where
+    halfway = fromIntegral (order x `div` 2)
