@@ -65,8 +65,8 @@ instance (GaloisField n, Integral n) => Integral (N n) where
       (q, r) = quotRem (unN n) (unN m)
   toInteger (N x) =
     if isPositive x
-      then negate (toInteger (order x) - toInteger x)
-      else toInteger x
+      then toInteger x
+      else negate (toInteger (order x) - toInteger x)
 
 instance (GaloisField n, Integral n) => Show (N n) where
   show = show . toInteger
