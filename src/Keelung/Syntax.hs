@@ -122,7 +122,7 @@ data UInt (w :: Nat)
   | -- | Multiplication
     MulU (UInt w) (UInt w)
   | -- | Hardcoded GF(256) Multiplication for AES
-    AESMulU (UInt w) (UInt w)
+    AESMulU (UInt 8) (UInt 8)
   | -- | Carry-less Multiplication
     CLMulU (UInt w) (UInt w)
   | -- | Modular multiplicatie inverse
@@ -418,7 +418,7 @@ pow = Exp
 -- | Hardcoded GF(256) Multiplication for AES
 --
 --   @since 0.17.0
-aesMul :: KnownNat w => UInt w -> UInt w -> UInt w
+aesMul :: UInt 8 -> UInt 8 -> UInt 8
 aesMul = AESMulU
 
 --------------------------------------------------------------------------------
