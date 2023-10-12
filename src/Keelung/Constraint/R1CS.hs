@@ -12,7 +12,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Syntax (Var)
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
@@ -28,11 +28,11 @@ data R1CS n = R1CS
     -- | Hints for generating witnesses of EqZero constraints
     r1csEqZeros :: [(Poly n, Var)],
     -- | Hints for generating witnesses of DivMod constraints
-    r1csDivMods :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer))],
+    r1csDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
     -- | Hints for generating witnesses of carry-less DivMod constraints
-    r1csCLDivMods :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer))],
+    r1csCLDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
     -- | Hints for generating witnesses of ModInv constraints
-    r1csModInvs :: [((Int, Either Var Integer), (Int, Either Var Integer), (Int, Either Var Integer), Integer)]
+    r1csModInvs :: [(Limbs, Limbs, Limbs, Integer)]
   }
   deriving (Generic, Eq, NFData, Functor)
 
@@ -65,3 +65,8 @@ toR1Cs (R1CS _ ordinaryConstraints counters _ _ _ _) =
               )
               [start .. end - 1]
        in concatMap generate (getBooleanConstraintRanges counters)
+
+--------------------------------------------------------------------------------
+
+-- | A sequence of limbs & constants
+type Limbs = [(Width, Either Var Integer)]
