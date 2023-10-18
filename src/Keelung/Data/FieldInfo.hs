@@ -22,10 +22,11 @@ data FieldInfo = FieldInfo
     fieldDeg :: Int,
     fieldWidth :: Int -- the maximum bit width `w` such that `2^w <= fieldOrder`
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Show, Eq, Generic, NFData)
 
 instance Serialize FieldInfo
 
+-- | Induction on `FieldInfo`
 caseFieldType ::
   FieldType ->
   (forall n. KnownNat n => Proxy (Prime n) -> FieldInfo -> IO a) ->
@@ -48,7 +49,7 @@ caseFieldType (Binary n) _ funcBinary = case someNatVal n of
     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
      in funcBinary (Proxy :: Proxy (Binary n)) $
           FieldInfo
-            { fieldTypeData = Prime n,
+            { fieldTypeData = Binary n,
               fieldOrder = toInteger (order fieldNumber),
               fieldChar = char fieldNumber,
               fieldDeg = fromIntegral (deg fieldNumber),
