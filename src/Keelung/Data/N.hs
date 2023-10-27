@@ -7,11 +7,12 @@ module Keelung.Data.N (N (..), isPositive) where
 
 import Control.DeepSeq (NFData)
 import Data.Euclidean (Euclidean, Field, GcdDomain)
-import Data.Field.Galois (GaloisField (..))
+import Data.Field.Galois (Binary, GaloisField (..))
 import Data.Group (Group)
 import Data.Semiring (Ring, Semiring)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import GHC.TypeLits (KnownNat)
 import System.Random (Random)
 import Test.QuickCheck (Arbitrary)
 import Text.PrettyPrint.Leijen.Text (Pretty)
@@ -68,7 +69,16 @@ instance (GaloisField n, Integral n) => Integral (N n) where
       then toInteger x
       else negate (toInteger (order x) - toInteger x)
 
+instance {-# OVERLAPPING #-} KnownNat n => Integral (N (Binary n)) where
+  quotRem n m = (N q, N r)
+    where
+      (q, r) = quotRem (unN n) (unN m)
+  toInteger (N x) = fromIntegral x
+
 instance (GaloisField n, Integral n) => Show (N n) where
+  show = show . toInteger
+
+instance {-# OVERLAPPING #-} KnownNat n => Show (N (Binary n)) where
   show = show . toInteger
 
 -- | Returns true if the given element is in the first half of the field
