@@ -71,7 +71,7 @@ keelungCompilerVersion = (0, 18)
 
 -- | Patch version of this library
 compilerPatchVersion :: Int
-compilerPatchVersion = 0
+compilerPatchVersion = 1
 
 -- | The version of this library in String
 keelungVersion :: String
