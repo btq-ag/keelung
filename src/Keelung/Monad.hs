@@ -376,10 +376,7 @@ class Mutable t where
 
 instance Mutable Field where
   alloc (VarF var) = return var
-  alloc val = do
-    var <- freshVarF
-    assignF var val
-    return var
+  alloc val = assignF val
 
   typeOf _ = ElemF
 
@@ -388,10 +385,7 @@ instance Mutable Field where
 
 instance Mutable Boolean where
   alloc (VarB var) = return var
-  alloc val = do
-    var <- freshVarB
-    assignB var val
-    return var
+  alloc val = assignB val
 
   typeOf _ = ElemB
 
@@ -402,11 +396,9 @@ instance KnownNat w => Mutable (UInt w) where
   alloc (VarU var) = return var
   alloc val = do
     let width = widthOf val
-    var <- freshVarU width
     heap <- gets compHeap
     let encoded = runHeapM heap (encode' val)
-    assignU width var encoded
-    return var
+    assignU width encoded
 
   typeOf val = ElemU (widthOf val)
 
@@ -522,8 +514,8 @@ mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 --   @
 -- square :: Comp ()
 -- square = do
---     x <- input
---     y <- input
+--     x <- input Public
+--     y <- input Public
 --     -- assert that \'y\' is the square of \'x\'
 --     assert (y `eq` (x * x))
 --   @
@@ -540,22 +532,19 @@ class Reusable t where
 
 instance Reusable Boolean where
   reuse val = do
-    var <- freshVarB
-    assignB var val
+    var <- assignB val
     return (VarB var)
 
 instance Reusable Field where
   reuse val = do
-    var <- freshVarF
-    assignF var val
+    var <- assignF val
     return (VarF var)
 
 instance KnownNat w => Reusable (UInt w) where
   reuse val = do
-    var <- freshVarU (widthOf val)
     heap <- gets compHeap
     let encoded = runHeapM heap (encode' val)
-    assignU (widthOf val) var encoded
+    var <- assignU (widthOf val) encoded
     return (VarU var)
 
 instance (Reusable t, Mutable t) => Reusable (ArrM t) where
@@ -564,14 +553,26 @@ instance (Reusable t, Mutable t) => Reusable (ArrM t) where
 instance (Reusable t, Traversable f) => Reusable (f t) where
   reuse = mapM reuse
 
-assignF :: Var -> Field -> Comp ()
-assignF var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentF var expr}
+-- | Allocate a fresh Field variable and assign it to the given expression.
+assignF :: Field -> Comp Var
+assignF expr = do
+  var <- freshVarF
+  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentF var expr}
+  return var
 
-assignB :: Var -> Boolean -> Comp ()
-assignB var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentB var expr}
+-- | Allocate a fresh Boolean variable and assign it to the given expression.
+assignB :: Boolean -> Comp Var
+assignB expr = do
+  var <- freshVarB
+  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentB var expr}
+  return var
 
-assignU :: Width -> Var -> Encoding.UInt -> Comp ()
-assignU width var expr = modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var expr}
+-- | Allocate a fresh UInt variable and assign it to the given expression.
+assignU :: Width -> Encoding.UInt -> Comp Var
+assignU width expr = do
+  var <- freshVarU width
+  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var expr}
+  return var
 
 --------------------------------------------------------------------------------
 -- Asserting DivMod relations
@@ -586,8 +587,8 @@ assignU width var expr = modify' $ \st -> st {compSideEffects = compSideEffects 
 --   @
 -- program :: Comp (UInt 32)
 -- program = do
---     dividend <- input
---     divisor <- input
+--     dividend <- input Public
+--     divisor <- input Public
 --     (quotient, remainder) <- performDivMod dividend divisor
 --     return quotient
 --   @
@@ -655,8 +656,8 @@ assertDivMod dividend divisor quotient remainder = do
 --   @
 -- program :: Comp (UInt 32)
 -- program = do
---     dividend <- input
---     divisor <- input
+--     dividend <- input Public
+--     divisor <- input Public
 --     (quotient, remainder) <- performCLDivMod dividend divisor
 --     return quotient
 --   @
@@ -724,7 +725,7 @@ assertCLDivMod dividend divisor quotient remainder = do
 --   @
 -- assertLTE3 :: Comp ()
 -- assertLTE3 = do
---     x <- inputUInt
+--     x <- inputUInt Public
 --     assertLTE x 3
 --   @
 --
@@ -743,7 +744,7 @@ assertLTE value bound = do
 --   @
 -- assertLT3 :: Comp ()
 -- assertLT3 = do
---     x <- inputUInt
+--     x <- inputUInt Public
 --     assertLT x 3
 --   @
 --
@@ -762,7 +763,7 @@ assertLT value bound = do
 --   @
 -- assertGTE3 :: Comp ()
 -- assertGTE3 = do
---     x <- inputUInt
+--     x <- inputUInt Public
 --     assertGTE x 3
 --   @
 --
@@ -781,7 +782,7 @@ assertGTE value bound = do
 --   @
 -- assertGT3 :: Comp ()
 -- assertGT3 = do
---     x <- inputUInt
+--     x <- inputUInt Public
 --     assertGT x 3
 --   @
 --
@@ -792,6 +793,22 @@ assertGT value bound = do
   let width = widthOf value
   let encoded = runHeapM heap $ AssertGT width <$> encode' value <*> pure bound
   modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+
+-- | Relates a Field element with some UInt
+--
+--   /Example/
+--
+--   @
+-- example :: Comp ()
+-- example = do
+--     x <- inputField Public
+--     y <- inputUInt @32 Public
+--     relate x y
+--   @
+--
+--   @since 0.19.0
+-- relate :: KnownNat w => UInt w -> Field -> Comp ()
+-- relate (VarU u) (VarF f) = _
 
 --------------------------------------------------------------------------------
 
