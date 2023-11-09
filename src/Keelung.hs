@@ -299,6 +299,7 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
     encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
     encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
     encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
+    encodeSideEffect (RelateUF width a b) = return $ Encoding.RelateUF width a b
     encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
     encodeSideEffect (CLDivMod width a b q r) = return $ Encoding.CLDivMod width a b q r
     encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b

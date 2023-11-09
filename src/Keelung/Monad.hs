@@ -19,6 +19,8 @@ module Keelung.Monad
     assertLT,
     assertGTE,
     assertGT,
+    toUInt,
+    toField,
     SideEffect (..),
 
     -- * Inputs
@@ -394,11 +396,7 @@ instance Mutable Boolean where
 
 instance KnownNat w => Mutable (UInt w) where
   alloc (VarU var) = return var
-  alloc val = do
-    let width = widthOf val
-    heap <- gets compHeap
-    let encoded = runHeapM heap (encode' val)
-    assignU width encoded
+  alloc val = assignU val
 
   typeOf val = ElemU (widthOf val)
 
@@ -542,9 +540,7 @@ instance Reusable Field where
 
 instance KnownNat w => Reusable (UInt w) where
   reuse val = do
-    heap <- gets compHeap
-    let encoded = runHeapM heap (encode' val)
-    var <- assignU (widthOf val) encoded
+    var <- assignU val
     return (VarU var)
 
 instance (Reusable t, Mutable t) => Reusable (ArrM t) where
@@ -568,10 +564,13 @@ assignB expr = do
   return var
 
 -- | Allocate a fresh UInt variable and assign it to the given expression.
-assignU :: Width -> Encoding.UInt -> Comp Var
-assignU width expr = do
+assignU :: KnownNat w => UInt w -> Comp Var
+assignU expr = do
+  heap <- gets compHeap
+  let encoded = runHeapM heap (encode' expr)
+  let width = widthOf expr
   var <- freshVarU width
-  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var expr}
+  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var encoded}
   return var
 
 --------------------------------------------------------------------------------
@@ -794,21 +793,43 @@ assertGT value bound = do
   let encoded = runHeapM heap $ AssertGT width <$> encode' value <*> pure bound
   modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
 
--- | Relates a Field element with some UInt
+-- | Convert a 'Field' to a 'UInt'.
 --
 --   /Example/
 --
 --   @
--- example :: Comp ()
+-- example :: Comp (UInt 8)
 -- example = do
 --     x <- inputField Public
---     y <- inputUInt @32 Public
---     relate x y
+--     toUInt 8 x
 --   @
 --
 --   @since 0.19.0
--- relate :: KnownNat w => UInt w -> Field -> Comp ()
--- relate (VarU u) (VarF f) = _
+toUInt :: KnownNat w => Width -> Field -> Comp (UInt w)
+toUInt width exprF = do
+  varF <- assignF exprF
+  varU <- freshVarU width
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> RelateUF width varU varF})
+  return (VarU varU)
+
+-- | Convert a 'UInt' to a 'Field'.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp Field
+-- example = do
+--     x <- inputUInt @8 Public
+--     toField x
+--   @
+--
+--   @since 0.19.0
+toField :: KnownNat w => UInt w -> Comp Field
+toField exprU = do
+  varU <- assignU exprU
+  varF <- freshVarF
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> RelateUF (widthOf exprU) varU varF})
+  return (VarF varF)
 
 --------------------------------------------------------------------------------
 
@@ -817,6 +838,8 @@ data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
   | AssignmentU Width Var Encoding.UInt
+  | -- | Relate a UInt intermediate variable with a Field intermediate variable
+    RelateUF Width Var Var
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | CLDivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | AssertLTE Width Encoding.UInt Integer
