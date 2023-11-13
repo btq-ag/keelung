@@ -298,7 +298,8 @@ data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
   | AssignmentU Width Var UInt
-  | RelateUF Width Var Var
+  | ToUInt Width Var Var
+  | ToField Width Var Var
   | DivMod Width UInt UInt UInt UInt
   | CLDivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
@@ -313,7 +314,8 @@ instance Show SideEffect where
   show (AssignmentF var val) = show (VarF var) <> " := " <> show val
   show (AssignmentB var val) = show (VarB var) <> " := " <> show val
   show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
-  show (RelateUF w x y) = show (VarU w x) <> " = " <> show (VarF y)
+  show (ToUInt w x y) = show (VarU w x) <> " <- " <> show (VarF y)
+  show (ToField w x y) = show (VarU w x) <> " -> " <> show (VarF y)
   show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
   show (CLDivMod _ x y q r) = show x <> " = " <> show q <> " .*. " <> show y <> " .^. " <> show r
   show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n

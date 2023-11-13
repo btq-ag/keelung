@@ -809,7 +809,7 @@ toUInt :: KnownNat w => Width -> Field -> Comp (UInt w)
 toUInt width exprF = do
   varF <- assignF exprF
   varU <- freshVarU width
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> RelateUF width varU varF})
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> ToUInt width varU varF})
   return (VarU varU)
 
 -- | Convert a 'UInt' to a 'Field'.
@@ -828,7 +828,7 @@ toField :: KnownNat w => UInt w -> Comp Field
 toField exprU = do
   varU <- assignU exprU
   varF <- freshVarF
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> RelateUF (widthOf exprU) varU varF})
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> ToField (widthOf exprU) varU varF})
   return (VarF varF)
 
 --------------------------------------------------------------------------------
@@ -839,7 +839,8 @@ data SideEffect
   | AssignmentB Var Boolean
   | AssignmentU Width Var Encoding.UInt
   | -- | Relate a UInt intermediate variable with a Field intermediate variable
-    RelateUF Width Var Var
+    ToUInt Width Var Var
+  | ToField Width Var Var
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | CLDivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | AssertLTE Width Encoding.UInt Integer
