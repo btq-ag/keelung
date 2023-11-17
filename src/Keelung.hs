@@ -64,6 +64,7 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+import Data.Foldable (toList)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
@@ -301,6 +302,7 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
     encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
     encodeSideEffect (ToUInt width a b) = return $ Encoding.ToUInt width a b
     encodeSideEffect (ToField width a b) = return $ Encoding.ToField width a b
+    encodeSideEffect (BitsToUInt width var vals) = Encoding.BitsToUInt width var <$> mapM encode' (toList vals)
     encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
     encodeSideEffect (CLDivMod width a b q r) = return $ Encoding.CLDivMod width a b q r
     encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b

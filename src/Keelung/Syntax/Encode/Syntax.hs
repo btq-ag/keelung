@@ -300,6 +300,7 @@ data SideEffect
   | AssignmentU Width Var UInt
   | ToUInt Width Var Var
   | ToField Width Var Var
+  | BitsToUInt Width Var [Boolean]
   | DivMod Width UInt UInt UInt UInt
   | CLDivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
@@ -316,6 +317,7 @@ instance Show SideEffect where
   show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
   show (ToUInt w x y) = show (VarU w x) <> " <- " <> show (VarF y)
   show (ToField w x y) = show (VarU w x) <> " -> " <> show (VarF y)
+  show (BitsToUInt w x vals) = show (VarU w x) <> " <- " <> show vals
   show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
   show (CLDivMod _ x y q r) = show x <> " = " <> show q <> " .*. " <> show y <> " .^. " <> show r
   show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n

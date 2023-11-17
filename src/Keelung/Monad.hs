@@ -21,6 +21,7 @@ module Keelung.Monad
     assertGT,
     toUInt,
     toField,
+    pack,
     SideEffect (..),
 
     -- * Inputs
@@ -75,6 +76,7 @@ import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq ((:|>)))
+import Data.Sequence qualified as Seq
 import Data.Traversable (mapAccumL)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vec
@@ -831,6 +833,34 @@ toField exprU = do
   modify' (\st -> st {compSideEffects = compSideEffects st :|> ToField (widthOf exprU) varU varF})
   return (VarF varF)
 
+-- | Packing a list of 'Boolean' as a 'UInt', ordered from least significant bit to most significant bit.
+--   When the length of the list is less than the width of the 'UInt', the remaining bits are filled with 'false'.
+--   When the length of the list is greater than the width of the 'UInt', the extra bits are discarded.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 8)
+-- example = do
+--     b <- inputBool
+--     pack [true, b, b .&. false, true, false]
+--
+--   @
+--
+--   @since 0.19.0
+pack :: forall w. KnownNat w => [Boolean] -> Comp (UInt w)
+pack bs = do
+  -- trim or pad the list of bits to the width of UInt
+  let bs' = case length bs `compare` width of
+        LT -> Seq.fromList bs <> Seq.replicate (width - length bs) false
+        EQ -> Seq.fromList bs
+        GT -> Seq.fromList (take width bs)
+  varU <- freshVarU width
+  modify' (\st -> st {compSideEffects = compSideEffects st :|> BitsToUInt width varU bs'})
+  return (VarU varU)
+  where
+    width = fromIntegral (natVal (Proxy :: Proxy w))
+
 --------------------------------------------------------------------------------
 
 -- | Data type representing the side effects of a computation.
@@ -838,9 +868,9 @@ data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
   | AssignmentU Width Var Encoding.UInt
-  | -- | Relate a UInt intermediate variable with a Field intermediate variable
-    ToUInt Width Var Var
+  | ToUInt Width Var Var
   | ToField Width Var Var
+  | BitsToUInt Width Var (Seq Boolean)
   | DivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | CLDivMod Width Encoding.UInt Encoding.UInt Encoding.UInt Encoding.UInt
   | AssertLTE Width Encoding.UInt Integer
