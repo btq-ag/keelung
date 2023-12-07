@@ -21,9 +21,8 @@ module Keelung.Syntax.Counters
     prettyBooleanConstraints,
     -- | for reading the counts and ranges of variables
     Category (..),
-    ReadCounters,
+    ReadCounters (..),
     ReadType (..),
-    getCount,
     Ranges,
     getRanges,
     getRange,
@@ -194,7 +193,7 @@ prettyVariables counters =
             <> otherVars
             <> "\n"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints :: (Show constraint) => Counters -> [constraint] -> String
 prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints
@@ -351,10 +350,10 @@ addCount (category, typ) n counters =
     newInputSequence = Seq.fromList $ replicate n typ
 
 -- | Given a list of categories, get the ranges of variables in each category
-getRanges :: ReadCounters selector => Counters -> [selector] -> Ranges
+getRanges :: (ReadCounters selector) => Counters -> [selector] -> Ranges
 getRanges counters = buildRanges . map (\category -> (getOffset counters category, getCount counters category))
 
-getRange :: ReadCounters selector => Counters -> selector -> Range
+getRange :: (ReadCounters selector) => Counters -> selector -> Range
 getRange counters selector = (getOffset counters selector, getCount counters selector)
 
 enumerate :: Ranges -> [Int]
