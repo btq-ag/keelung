@@ -6,6 +6,7 @@
 module Keelung.Constraint.R1CS (R1CS (..), toR1Cs) where
 
 import Control.DeepSeq (NFData)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
@@ -36,7 +37,7 @@ data R1CS n = R1CS
   }
   deriving (Generic, Eq, NFData, Functor)
 
-instance Serialize n => Serialize (R1CS n)
+instance (Serialize n) => Serialize (R1CS n)
 
 instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
   show (R1CS _ cs counters _ _ _ _) =
@@ -64,7 +65,7 @@ toR1Cs (R1CS _ ordinaryConstraints counters _ _ _ _) =
                     (Right (Poly.singleVar var))
               )
               [start .. end - 1]
-       in concatMap generate (getBooleanConstraintRanges counters)
+       in IntMap.toList (getBooleanConstraintRanges counters) >>= generate
 
 --------------------------------------------------------------------------------
 

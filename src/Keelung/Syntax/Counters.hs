@@ -32,7 +32,6 @@ module Keelung.Syntax.Counters
     addCount,
     -- | other helpers
     reindex,
-    inRanges,
     getUIntMap,
   )
 where
@@ -145,13 +144,11 @@ booleanConstraintCategories =
     (Intermediate, ReadAllUInts)
   ]
 
--- [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
-
 getBooleanConstraintCount :: Counters -> Int
 getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
 
-getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
+getBooleanConstraintRanges :: Counters -> Ranges
+getBooleanConstraintRanges counters = getRanges counters booleanConstraintCategories
 
 --------------------------------------------------------------------------------
 
@@ -233,7 +230,7 @@ prettyConstraints counters cs =
 
 prettyBooleanConstraints :: Counters -> [String]
 prettyBooleanConstraints counters =
-  concatMap showSegment (getBooleanConstraintRanges counters)
+  IntMap.toList (getBooleanConstraintRanges counters) >>= showSegment
   where
     showSegment :: (Int, Int) -> [String]
     showSegment (start, count) =
@@ -377,11 +374,6 @@ buildRanges = foldr build mempty
               then IntMap.insert start (max (next + nextSize - start) size) (IntMap.delete next ranges) -- merge it with the next segment
               else IntMap.insert start size ranges -- insert it as a new segment
           Nothing -> IntMap.insert start size ranges -- insert it as a new segment
-
-inRanges :: Ranges -> Int -> Bool
-inRanges ranges index = case IntMap.lookupLE index ranges of
-  Nothing -> False
-  Just (start, size) -> index < start + size
 
 getUIntMap :: Counters -> Category -> IntMap Int
 getUIntMap counters Output = structU (countOutput counters)
