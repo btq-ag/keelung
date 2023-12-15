@@ -33,7 +33,6 @@ module Keelung.Syntax.Counters
     WriteType (..),
     addCount,
     -- | other helpers
-    reindex,
     getUIntMap,
   )
 where
@@ -59,8 +58,6 @@ import GHC.Generics (Generic)
 --    3. unsigned integer bit variables
 
 ------------------------------------------------------------------------------
-
-type Var = Int
 
 type Width = Int
 
@@ -151,15 +148,6 @@ getPublicInputSequence = countPublicInputSequence
 
 getPrivateInputSequence :: Counters -> Seq WriteType
 getPrivateInputSequence = countPrivateInputSequence
-
---------------------------------------------------------------------------------
-
--- | Re-index variables of different sorts and types
-reindex :: Counters -> Category -> ReadType -> Var -> Var
-reindex counters category typ index =
-  getOffset counters (category, typ) + case typ of
-    ReadUInt width -> index * width
-    _ -> index
 
 --------------------------------------------------------------------------------
 
