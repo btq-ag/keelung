@@ -34,6 +34,7 @@ module Keelung.Syntax.Counters
     addCount,
     -- | other helpers
     getUIntMap,
+    tempSetFlag,
   )
 where
 
@@ -110,14 +111,15 @@ data Counters = Counters
     countPrivateInput :: !PinnedCounter, -- counters for private input variables
     countIntermediate :: !IntermediateCounter, -- counters for intermediate variables
     countPublicInputSequence :: !(Seq WriteType), -- Sequence of public input variables
-    countPrivateInputSequence :: !(Seq WriteType) -- Sequence of private input variables
+    countPrivateInputSequence :: !(Seq WriteType), -- Sequence of private input variables
+    countUseNewLinker :: !Bool
   }
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 =
+  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 flag1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 flag2 =
     Counters
       (cOut1 <> cOut2)
       (cPubIn1 <> cPubIn2)
@@ -125,13 +127,14 @@ instance Semigroup Counters where
       (cInt1 <> cInt2)
       (cPubInSeq1 <> cPubInSeq2)
       (cPrivInSeq1 <> cPrivInSeq2)
+      (flag1 || flag2)
 
 instance Monoid Counters where
-  mempty = Counters mempty mempty mempty mempty mempty mempty
+  mempty = Counters mempty mempty mempty mempty mempty mempty False
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i1 i2 x _ _) =
+getTotalCount (Counters o i1 i2 x _ _ useNewLinker) =
   pinnedSize o + pinnedSize i1 + pinnedSize i2 + intermediateSize x
   where
     pinnedSize :: PinnedCounter -> Int
@@ -140,7 +143,7 @@ getTotalCount (Counters o i1 i2 x _ _) =
 
     intermediateSize :: IntermediateCounter -> Int
     intermediateSize (IntermediateCounter f b u) =
-      f + b + intermediateUIntSize u
+      f + b + if useNewLinker then newIntermediateUIntSize u else oldIntermediateUIntSize u
 
 -- | For parsing raw inputs
 getPublicInputSequence :: Counters -> Seq WriteType
@@ -341,44 +344,13 @@ instance ReadCounters (Category, ReadType) where
   getCount counters (Intermediate, typ) = case typ of
     ReadField -> fX (countIntermediate counters)
     ReadBool -> bX (countIntermediate counters)
-    ReadAllUInts -> intermediateUIntSize (uX (countIntermediate counters))
+    ReadAllUInts ->
+      if countUseNewLinker counters
+        then newIntermediateUIntSize (uX (countIntermediate counters))
+        else oldIntermediateUIntSize (uX (countIntermediate counters))
     ReadUInt w -> case IntMap.lookup w (uX (countIntermediate counters)) of
       Nothing -> 0
       Just n -> n
-
-  -- getCount counters (category, typ) =
-  --   let selector = case category of
-  --         Output -> countOutput
-  --         PublicInput -> countPublicInput
-  --         PrivateInput -> countPrivateInput
-  --         Intermediate -> countIntermediate
-  --    in case typ of
-  --         ReadField -> structF (selector counters)
-  --         ReadBool -> structB (selector counters)
-  --         ReadAllUInts -> binRepSize (structU (selector counters))
-  --         ReadUInt w -> case IntMap.lookup w (structU (selector counters)) of
-  --           Nothing -> 0
-  --           Just n -> n
-
-  -- getOffset counters (category, typ) =
-  --   let selector = case category of
-  --         Output -> countOutput
-  --         PublicInput -> countPublicInput
-  --         PrivateInput -> countPrivateInput
-  --         Intermediate -> countIntermediate
-  --    in getOffset counters category + case typ of
-  --         ReadField -> 0
-  --         ReadBool -> structF (selector counters)
-  --         ReadAllUInts -> structF (selector counters) + structB (selector counters)
-  --         ReadUInt w ->
-  --           structF (selector counters)
-  --             + structB (selector counters)
-  --             + sum
-  --               ( IntMap.mapWithKey
-  --                   ( \width count -> if w > width then count * width else 0
-  --                   )
-  --                   (structU (selector counters))
-  --               )
 
   getOffset counters (Output, typ) = case typ of
     ReadField -> 0
@@ -498,5 +470,11 @@ getUIntMap counters Intermediate = uX (countIntermediate counters)
 pinnedUIntSize :: IntMap Int -> Int
 pinnedUIntSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
 
-intermediateUIntSize :: IntMap Int -> Int
-intermediateUIntSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
+oldIntermediateUIntSize :: IntMap Int -> Int
+oldIntermediateUIntSize = pinnedUIntSize
+
+newIntermediateUIntSize :: IntMap Int -> Int
+newIntermediateUIntSize = sum
+
+tempSetFlag :: Counters -> Bool -> Counters
+tempSetFlag counters flag = counters {countUseNewLinker = flag}
