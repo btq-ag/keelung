@@ -397,13 +397,28 @@ instance ReadCounters (Category, ReadType) where
     getOffset counters Intermediate + case typ of
       ReadField -> 0
       ReadBool -> fX (countIntermediate counters)
-      ReadAllUInts -> fX (countIntermediate counters) + bX (countIntermediate counters)
+      ReadAllUInts ->
+        fX (countIntermediate counters)
+          + ( if countUseNewLinker counters
+                then 0
+                else bX (countIntermediate counters)
+            )
       ReadUInt w ->
         fX (countIntermediate counters)
-          + bX (countIntermediate counters)
+          + ( if countUseNewLinker counters
+                then 0
+                else bX (countIntermediate counters)
+            )
           + sum
             ( IntMap.mapWithKey
-                ( \width count -> if w > width then count * width else 0
+                ( \width count ->
+                    if w > width
+                      then
+                        ( if countUseNewLinker counters
+                            then count
+                            else count * width
+                        )
+                      else 0
                 )
                 (uX (countIntermediate counters))
             )
