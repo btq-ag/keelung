@@ -32,6 +32,8 @@ module Keelung.Syntax.Counters
     -- | for writing the counts and ranges of variables
     WriteType (..),
     addCount,
+    setCount,
+    setCountOfIntermediateUIntBits,
     -- | other helpers
     getUIntMap,
     tempSetFlag,
@@ -446,6 +448,32 @@ addCount (category, typ) n counters =
 
     newInputSequence :: Seq WriteType
     newInputSequence = Seq.fromList $ replicate n typ
+
+setCount :: (Category, WriteType) -> Int -> Counters -> Counters
+setCount (category, typ) n counters =
+  case category of
+    Output -> counters {countOutput = setPinned (countOutput counters)}
+    PublicInput -> counters {countPublicInput = setPinned (countPublicInput counters), countPublicInputSequence = countPublicInputSequence counters <> newInputSequence}
+    PrivateInput -> counters {countPrivateInput = setPinned (countPrivateInput counters), countPrivateInputSequence = countPrivateInputSequence counters <> newInputSequence}
+    Intermediate -> counters {countIntermediate = setIntermediate (countIntermediate counters)}
+  where
+    setPinned :: PinnedCounter -> PinnedCounter
+    setPinned (PinnedCounter f b u) = case typ of
+      WriteField -> PinnedCounter n b u
+      WriteBool -> PinnedCounter f n u
+      WriteUInt w -> PinnedCounter f b (IntMap.insert w n u)
+
+    setIntermediate :: IntermediateCounter -> IntermediateCounter
+    setIntermediate (IntermediateCounter f b u) = case typ of
+      WriteField -> IntermediateCounter n b u
+      WriteBool -> IntermediateCounter f n u
+      WriteUInt w -> IntermediateCounter f b (IntMap.insert w n u)
+
+    newInputSequence :: Seq WriteType
+    newInputSequence = Seq.fromList $ replicate n typ
+
+setCountOfIntermediateUIntBits :: IntMap Int -> Counters -> Counters
+setCountOfIntermediateUIntBits counts counters = counters {countIntermediate = (countIntermediate counters) {uX = counts}}
 
 -- | Given a list of categories, get the ranges of variables in each category
 getRanges :: (ReadCounters selector) => Counters -> [selector] -> Ranges
