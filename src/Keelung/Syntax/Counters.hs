@@ -401,16 +401,10 @@ instance ReadCounters (Category, ReadType) where
       ReadBool -> fX (countIntermediate counters)
       ReadAllUInts ->
         fX (countIntermediate counters)
-          + ( if countUseNewLinker counters
-                then 0
-                else bX (countIntermediate counters)
-            )
+          + bX (countIntermediate counters)
       ReadUInt w ->
         fX (countIntermediate counters)
-          + ( if countUseNewLinker counters
-                then 0
-                else bX (countIntermediate counters)
-            )
+          + bX (countIntermediate counters)
           + sum
             ( IntMap.mapWithKey
                 ( \width count ->
