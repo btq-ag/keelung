@@ -68,7 +68,7 @@ import Text.Read (readMaybe)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 19)
+keelungCompilerVersion = (0, 20)
 
 -- | Patch version of this library
 compilerPatchVersion :: Int
@@ -410,7 +410,6 @@ readKeelungVersion cmd args = do
 -- | Check if the compiler version matches the version of this library
 --   patch number can be different
 checkCompilerVersion :: (Int, Int, Int) -> M ()
-checkCompilerVersion (0, 19, 0) = throwError (VersionMismatchError 0 19 0) -- special case for v0.19.1 against v0.19.0, should be removed in the future
 checkCompilerVersion (major, minor, patch) = do
   if (major, minor) == keelungCompilerVersion && patch >= 0
     then return ()
