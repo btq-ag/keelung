@@ -25,3 +25,23 @@ Find us on [Discord](https://discord.gg/nTr2kBmW2q)!
 
 ## Codespaces
 Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codespaces` in [Keelung Examples](https://github.com/btq-ag/keelung-examples/)!
+
+## Roadmap 
+
+### Current (v0.21.0)
+
+- A more precise method of reference counting on unsigned integers
+- Renaming of primitive datatype conversions
+- Tons of bug fixes and stability improvements
+
+### Upcoming (v0.22.0)
+
+- Operators for slicing and joining unsigned integers
+- Optimization for the implementation of AES
+- Internal: improvement of representation of polynomials
+
+### Future
+
+- Snarkjs/Circom integration
+- Optimization for the implementation of BLAKE2
+- Speedup compilation of operators on Bytes, Word16, Word32, and Word64
