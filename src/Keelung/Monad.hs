@@ -127,7 +127,7 @@ data Elaborated t = Elaborated
   -- = ElaboratedNum Field Computation
   deriving (Eq)
 
-instance Show t => Show (Elaborated t) where
+instance (Show t) => Show (Elaborated t) where
   show (Elaborated expr comp) =
     "{\n expression: "
       ++ show expr
@@ -265,7 +265,7 @@ instance Proper Boolean where
 
   cond = IfB
 
-instance KnownNat w => Proper (UInt w) where
+instance (KnownNat w) => Proper (UInt w) where
   input = inputUInt
 
   -- \| Specialized implementation for UInt
@@ -294,7 +294,7 @@ inputBool Public = VarBI <$> freshInputVar Public ReadBool WriteBool 1
 inputBool Private = VarBP <$> freshInputVar Private ReadBool WriteBool 1
 
 -- | Requests a fresh 'UInt' input variable of some bit width
-inputUInt :: forall w. KnownNat w => InputAccess -> Comp (UInt w)
+inputUInt :: forall w. (KnownNat w) => InputAccess -> Comp (UInt w)
 inputUInt acc = case acc of
   Public -> VarUI <$> freshInputVar acc (ReadUInt width) (WriteUInt width) 1
   Private -> VarUP <$> freshInputVar acc (ReadUInt width) (WriteUInt width) 1
@@ -310,61 +310,61 @@ freshVarBool :: Comp Boolean
 freshVarBool = freshVar
 
 -- | Requests a fresh 'UInt' variable of some bit width
-freshVarUInt :: KnownNat w => Comp (UInt w)
+freshVarUInt :: (KnownNat w) => Comp (UInt w)
 freshVarUInt = freshVar
 
 --------------------------------------------------------------------------------
 
 -- | Requests a 2D-array of fresh input variables
-inputList2 :: Proper t => InputAccess -> Int -> Int -> Comp [[t]]
+inputList2 :: (Proper t) => InputAccess -> Int -> Int -> Comp [[t]]
 inputList2 acc sizeM sizeN = replicateM sizeM (inputList acc sizeN)
 
 -- | Requests a 3D-array of fresh input variables
-inputList3 :: Proper t => InputAccess -> Int -> Int -> Int -> Comp [[[t]]]
+inputList3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp [[[t]]]
 inputList3 acc sizeM sizeN sizeO = replicateM sizeM (inputList2 acc sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
 -- | Vector version of 'inputList'
-inputVec :: Proper t => InputAccess -> Int -> Comp (Vector t)
+inputVec :: (Proper t) => InputAccess -> Int -> Comp (Vector t)
 inputVec acc size = Vec.fromList <$> inputList acc size
 
 -- | Vector version of 'inputList2'
-inputVec2 :: Proper t => InputAccess -> Int -> Int -> Comp (Vector (Vector t))
+inputVec2 :: (Proper t) => InputAccess -> Int -> Int -> Comp (Vector (Vector t))
 inputVec2 acc sizeM sizeN = Vec.fromList <$> replicateM sizeM (inputVec acc sizeN)
 
 -- | Vector version of 'inputList3'
-inputVec3 :: Proper t => InputAccess -> Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
+inputVec3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
 inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 acc sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
 -- | Convert a mutable array to a Haskell list
-freeze :: Mutable t => ArrM t -> Comp [t]
+freeze :: (Mutable t) => ArrM t -> Comp [t]
 freeze = fromArrayM
 
 -- | Convert a mutable 2D-array to a list of lists
-freeze2 :: Mutable t => ArrM (ArrM t) -> Comp [[t]]
+freeze2 :: (Mutable t) => ArrM (ArrM t) -> Comp [[t]]
 freeze2 xs = do
   xs' <- fromArrayM xs
   mapM freeze xs'
 
 -- | Convert a mutable 3D-array to a list of lists of lists
-freeze3 :: Mutable t => ArrM (ArrM (ArrM t)) -> Comp [[[t]]]
+freeze3 :: (Mutable t) => ArrM (ArrM (ArrM t)) -> Comp [[[t]]]
 freeze3 xs = do
   xs' <- fromArrayM xs
   mapM freeze2 xs'
 
 -- | Convert a Haskell list to a mutable array
-thaw :: Mutable t => [t] -> Comp (ArrM t)
+thaw :: (Mutable t) => [t] -> Comp (ArrM t)
 thaw = toArrayM
 
 -- | Convert a list of lists to a mutable 2D-array
-thaw2 :: Mutable t => [[t]] -> Comp (ArrM (ArrM t))
+thaw2 :: (Mutable t) => [[t]] -> Comp (ArrM (ArrM t))
 thaw2 xs = mapM thaw xs >>= toArrayM
 
 -- | Convert a list of lists of lists to a mutable 3D-array
-thaw3 :: Mutable t => [[[t]]] -> Comp (ArrM (ArrM (ArrM t)))
+thaw3 :: (Mutable t) => [[[t]]] -> Comp (ArrM (ArrM (ArrM t)))
 thaw3 xs = mapM thaw2 xs >>= toArrayM
 
 --------------------------------------------------------------------------------
@@ -396,7 +396,7 @@ instance Mutable Boolean where
   constructElement ElemB elemAddr = VarB elemAddr
   constructElement _ _ = error "expecting element to be of Bool"
 
-instance KnownNat w => Mutable (UInt w) where
+instance (KnownNat w) => Mutable (UInt w) where
   alloc (VarU var) = return var
   alloc val = assignU val
 
@@ -405,7 +405,7 @@ instance KnownNat w => Mutable (UInt w) where
   constructElement (ElemU _) elemAddr = VarU elemAddr
   constructElement _ _ = error "expecting element to be of UInt"
 
-instance Mutable ref => Mutable (ArrM ref) where
+instance (Mutable ref) => Mutable (ArrM ref) where
   alloc xs@((ArrayRef elemType len _)) = do
     elements <- mapM (accessM xs) [0 .. len - 1]
     fst <$> allocArray elemType elements
@@ -417,7 +417,7 @@ instance Mutable ref => Mutable (ArrM ref) where
   constructElement _ _ = error "expecting element to be array"
 
 -- | Converts a list of values to an 1D-array
-toArrayM :: Mutable t => [t] -> Comp (ArrM t)
+toArrayM :: (Mutable t) => [t] -> Comp (ArrM t)
 toArrayM xs = do
   if null xs
     then snd <$> allocArray EmptyArr xs
@@ -426,23 +426,23 @@ toArrayM xs = do
        in snd <$> allocArray kind xs
 
 -- | Convert an array into a list of expressions
-fromArrayM :: Mutable t => ArrM t -> Comp [t]
+fromArrayM :: (Mutable t) => ArrM t -> Comp [t]
 fromArrayM ((ArrayRef _ _ addr)) = readHeapArray addr
 
 -- | Access an element from a 1-D array
-accessM :: Mutable t => ArrM t -> Int -> Comp t
+accessM :: (Mutable t) => ArrM t -> Int -> Comp t
 accessM ((ArrayRef _ _ addr)) i = readHeap (addr, i)
 
 -- | Access an element from a 2-D array
-accessM2 :: Mutable t => ArrM (ArrM t) -> (Int, Int) -> Comp t
+accessM2 :: (Mutable t) => ArrM (ArrM t) -> (Int, Int) -> Comp t
 accessM2 addr (i, j) = accessM addr i >>= flip accessM j
 
 -- | Access an element from a 3-D array
-accessM3 :: Mutable t => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
+accessM3 :: (Mutable t) => ArrM (ArrM (ArrM t)) -> (Int, Int, Int) -> Comp t
 accessM3 addr (i, j, k) = accessM addr i >>= flip accessM j >>= flip accessM k
 
 -- | Update an entry of an array.
-updateM :: Mutable t => ArrM t -> Int -> t -> Comp ()
+updateM :: (Mutable t) => ArrM t -> Int -> t -> Comp ()
 updateM (ArrayRef elemType _ addr) i expr = do
   var <- alloc expr
   writeHeap addr elemType (i, var)
@@ -450,7 +450,7 @@ updateM (ArrayRef elemType _ addr) i expr = do
 --------------------------------------------------------------------------------
 
 -- | Internal helper function for allocating an array with values
-allocArray :: Mutable t => ElemType -> [t] -> Comp (Addr, ArrM u)
+allocArray :: (Mutable t) => ElemType -> [t] -> Comp (Addr, ArrM u)
 allocArray elemType vals = do
   -- allocate a new array for holding the variables of these elements
   addr <- gets compAddrSize
@@ -474,7 +474,7 @@ modifyHeap f = do
   modify (\st -> st {compHeap = heap'})
 
 -- | Internal helper function for accessing an element of an array on the heap
-readHeap :: Mutable t => (Addr, Int) -> Comp t
+readHeap :: (Mutable t) => (Addr, Int) -> Comp t
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -484,7 +484,7 @@ readHeap (addr, i) = do
       Just var -> return $ constructElement elemType var
 
 -- | Internal helper function for accessing an array on the heap
-readHeapArray :: Mutable t => Addr -> Comp [t]
+readHeapArray :: (Mutable t) => Addr -> Comp [t]
 readHeapArray addr = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -494,11 +494,11 @@ readHeapArray addr = do
 --------------------------------------------------------------------------------
 
 -- | An alternative to 'foldM'
-reduce :: Foldable m => t -> m a -> (t -> a -> Comp t) -> Comp t
+reduce :: (Foldable m) => t -> m a -> (t -> a -> Comp t) -> Comp t
 reduce a xs f = foldM f a xs
 
 -- | Map with index, basically @mapi@ in OCaml.
-mapI :: Traversable f => (Int -> a -> b) -> f a -> f b
+mapI :: (Traversable f) => (Int -> a -> b) -> f a -> f b
 mapI f = snd . mapAccumL (\i x -> (i + 1, f i x)) 0
 
 --------------------------------------------------------------------------------
@@ -540,7 +540,7 @@ instance Reusable Field where
     var <- assignF val
     return (VarF var)
 
-instance KnownNat w => Reusable (UInt w) where
+instance (KnownNat w) => Reusable (UInt w) where
   reuse val = do
     var <- assignU val
     return (VarU var)
@@ -566,7 +566,7 @@ assignB expr = do
   return var
 
 -- | Allocate a fresh UInt variable and assign it to the given expression.
-assignU :: KnownNat w => UInt w -> Comp Var
+assignU :: (KnownNat w) => UInt w -> Comp Var
 assignU expr = do
   heap <- gets compHeap
   let encoded = runHeapM heap (encode' expr)
@@ -597,7 +597,7 @@ assignU expr = do
 --   @since 0.8.3.0
 performDivMod ::
   forall w.
-  KnownNat w =>
+  (KnownNat w) =>
   -- | The dividend
   UInt w ->
   -- | The devisor
@@ -631,7 +631,7 @@ performDivMod dividend divisor = do
 --   @since 0.8.3.0
 assertDivMod ::
   forall w.
-  KnownNat w =>
+  (KnownNat w) =>
   -- | The dividend
   UInt w ->
   -- | The divisor
@@ -666,7 +666,7 @@ assertDivMod dividend divisor quotient remainder = do
 --   @since 0.17.0
 performCLDivMod ::
   forall w.
-  KnownNat w =>
+  (KnownNat w) =>
   -- | The dividend
   UInt w ->
   -- | The devisor
@@ -700,7 +700,7 @@ performCLDivMod dividend divisor = do
 --   @since 0.17.0
 assertCLDivMod ::
   forall w.
-  KnownNat w =>
+  (KnownNat w) =>
   -- | The dividend
   UInt w ->
   -- | The divisor
@@ -731,7 +731,7 @@ assertCLDivMod dividend divisor quotient remainder = do
 --   @
 --
 --   @since 0.9.4.0
-assertLTE :: KnownNat w => UInt w -> Integer -> Comp ()
+assertLTE :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertLTE value bound = do
   heap <- gets compHeap
   let width = widthOf value
@@ -750,7 +750,7 @@ assertLTE value bound = do
 --   @
 --
 --   @since 0.9.5.0
-assertLT :: KnownNat w => UInt w -> Integer -> Comp ()
+assertLT :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertLT value bound = do
   heap <- gets compHeap
   let width = widthOf value
@@ -769,7 +769,7 @@ assertLT value bound = do
 --   @
 --
 --   @since 0.9.5.0
-assertGTE :: KnownNat w => UInt w -> Integer -> Comp ()
+assertGTE :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertGTE value bound = do
   heap <- gets compHeap
   let width = widthOf value
@@ -788,7 +788,7 @@ assertGTE value bound = do
 --   @
 --
 --   @since 0.9.5.0
-assertGT :: KnownNat w => UInt w -> Integer -> Comp ()
+assertGT :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertGT value bound = do
   heap <- gets compHeap
   let width = widthOf value
@@ -803,16 +803,20 @@ assertGT value bound = do
 -- example :: Comp (UInt 8)
 -- example = do
 --     x <- inputField Public
---     toUInt 8 x
+--     fromField 8 x
 --   @
 --
 --   @since 0.19.0
-toUInt :: KnownNat w => Width -> Field -> Comp (UInt w)
-toUInt width exprF = do
+fromField :: (KnownNat w) => Width -> Field -> Comp (UInt w)
+fromField width exprF = do
   varF <- assignF exprF
   varU <- freshVarU width
   modify' (\st -> st {compSideEffects = compSideEffects st :|> ToUInt width varU varF})
   return (VarU varU)
+
+{-# WARNING toUInt "will be replaced by `fromField` after v0.22" #-}
+toUInt :: (KnownNat w) => Width -> Field -> Comp (UInt w)
+toUInt = fromField
 
 -- | Convert a 'UInt' to a 'Field'.
 --
@@ -826,14 +830,14 @@ toUInt width exprF = do
 --   @
 --
 --   @since 0.19.0
-toField :: KnownNat w => UInt w -> Comp Field
+toField :: (KnownNat w) => UInt w -> Comp Field
 toField exprU = do
   varU <- assignU exprU
   varF <- freshVarF
   modify' (\st -> st {compSideEffects = compSideEffects st :|> ToField (widthOf exprU) varU varF})
   return (VarF varF)
 
--- | Packing a list of 'Boolean' as a 'UInt', ordered from least significant bit to most significant bit.
+-- | Converting a list of 'Boolean' to a 'UInt', ordered from the least significant bit to the most significant bit.
 --   When the length of the list is less than the width of the 'UInt', the remaining bits are filled with 'false'.
 --   When the length of the list is greater than the width of the 'UInt', the extra bits are discarded.
 --
@@ -843,13 +847,13 @@ toField exprU = do
 -- example :: Comp (UInt 8)
 -- example = do
 --     b <- inputBool
---     pack [true, b, b .&. false, true, false]
+--     fromBools [true, b, b .&. false, true, false]
 --
 --   @
 --
 --   @since 0.19.0
-pack :: forall w. KnownNat w => [Boolean] -> Comp (UInt w)
-pack bs = do
+fromBools :: forall w. (KnownNat w) => [Boolean] -> Comp (UInt w)
+fromBools bs = do
   -- trim or pad the list of bits to the width of UInt
   let bs' = case length bs `compare` width of
         LT -> Seq.fromList bs <> Seq.replicate (width - length bs) false
@@ -860,6 +864,10 @@ pack bs = do
   return (VarU varU)
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
+
+{-# WARNING pack "will be replaced by `fromBools` after v0.22" #-}
+pack :: forall w. (KnownNat w) => [Boolean] -> Comp (UInt w)
+pack = fromBools
 
 --------------------------------------------------------------------------------
 
