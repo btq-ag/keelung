@@ -22,6 +22,8 @@ module Keelung.Monad
     toUInt,
     toField,
     pack,
+    fromBools,
+    fromField,
     SideEffect (..),
 
     -- * Inputs
