@@ -68,11 +68,11 @@ import Text.Read (readMaybe)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 20)
+keelungCompilerVersion = (0, 21)
 
 -- | Patch version of this library
 compilerPatchVersion :: Int
-compilerPatchVersion = 1
+compilerPatchVersion = 0
 
 -- | The version of this library in String
 keelungVersion :: String
