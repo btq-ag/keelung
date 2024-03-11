@@ -28,6 +28,8 @@ Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codes
 
 ## Roadmap 
 
+<img width="2500" alt="Keelung operators" src="https://github.com/btq-ag/keelung/assets/797844/6dc6893f-5d97-428d-80a1-03fae730a81d">
+
 ### Current (v0.21.0)
 
 - A more precise method of reference counting on unsigned integers
@@ -36,12 +38,16 @@ Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codes
 
 ### Upcoming (v0.22.0)
 
-- Operators for slicing and joining unsigned integers
-- Optimization for the implementation of AES
-- Internal: improvement of representation of polynomials
+- Operators for **slicing** and **joining** unsigned integers
+- Internal: improvement of representation of polynomials with our new precise reference counter
 
 ### Future
 
+- Optimization for the implementation of AES
+- Make statement operators (e.g. `performDivMod`, which is only allowed in the `Comp` monad) to pure operators
 - Snarkjs/Circom integration
 - Optimization for the implementation of BLAKE2
 - Speedup compilation of operators on Bytes, Word16, Word32, and Word64
+- Include benchmarking in the CI/CD pipeline
+- Support PLONKish backend compilation
+- Quantitative information flow analysis for measuring privacy leak of programs (working with [Prof. Kohei Suenaga](https://www.fos.kuis.kyoto-u.ac.jp/~ksuenaga/) of Kyoto University)
