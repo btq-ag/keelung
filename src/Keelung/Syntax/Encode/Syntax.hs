@@ -165,6 +165,8 @@ data UInt
     IfU Width Boolean UInt UInt
   | -- | Conversion from Boolean to Unsigned integer
     BtoU Width Boolean
+  | -- | Slice of an Unsigned integer
+    SliceU Width UInt Int Int
   deriving (Generic, Eq, NFData)
 
 instance Serialize UInt
@@ -190,6 +192,7 @@ instance Show UInt where
     SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . shows i . showString "] := " . showsPrec 9 b
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU _ x -> showString "B→U " . showsPrec prec x
+    SliceU _ x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . shows i . showString ":" . shows j . showString "]"
     where
       toSubscript :: Int -> String
       toSubscript = map go . show
@@ -266,7 +269,7 @@ instance Show Elaborated where
           then ""
           else "\n  Other side effects: \n" <> unlines (map (("    " <>) . show) (toList sideEffects))
 
-      prettyList2 :: Show a => Int -> [a] -> String
+      prettyList2 :: (Show a) => Int -> [a] -> String
       prettyList2 n list = case list of
         [] -> "    []"
         [x] -> "    [" <> show x <> "]"

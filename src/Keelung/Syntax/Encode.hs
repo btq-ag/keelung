@@ -87,6 +87,7 @@ instance KnownNat w => Encode' (Syntax.UInt w) UInt where
     Syntax.ShLU w i x -> ShLU w i <$> encode' x
     Syntax.SetU x i b -> SetU (widthOf expr) <$> encode' x <*> pure i <*> encode' b
     Syntax.BtoU n -> BtoU (widthOf expr) <$> encode' n
+    Syntax.SliceU x i j -> SliceU (widthOf expr) <$> encode' x <*> pure i <*> pure j
 
 --------------------------------------------------------------------------------
 

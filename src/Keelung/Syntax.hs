@@ -21,6 +21,7 @@ module Keelung.Syntax
     modInv,
     pow,
     aesMul,
+    slice,
     Var,
     Width,
   )
@@ -145,8 +146,8 @@ data UInt (w :: Nat)
     IfU Boolean (UInt w) (UInt w)
   | -- | Conversion from Booleans to Unsigned integers
     BtoU Boolean
-  -- | -- | Slice of an Unsigned integer
-  --   SliceU (UInt w) Int
+  | -- | Slice of an Unsigned integer
+    forall v. (KnownNat v) => SliceU (UInt v) Int Int
 
 -- | Equality on Unsigned integers
 instance Eq (UInt (w :: Nat)) where
@@ -186,6 +187,7 @@ instance Ord (UInt (w :: Nat)) where
       tag (ShLU {}) = 16
       tag (SetU {}) = 17
       tag (IfU {}) = 18
+      tag (SliceU {}) = 19
 
 instance (KnownNat w) => Show (UInt w) where
   showsPrec prec expr = case expr of
@@ -208,6 +210,7 @@ instance (KnownNat w) => Show (UInt w) where
     SetU x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU x -> showString "B→U " . showsPrec prec x
+    SliceU x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString ":" . showsPrec 9 j . showString "]"
     where
       width :: Width
       width = widthOf expr
@@ -461,6 +464,17 @@ pow = Exp
 --   @since 0.17.0
 aesMul :: UInt 8 -> UInt 8 -> UInt 8
 aesMul = AESMulU
+
+-- | Given an Unsigned integer and a range, return the slice of the integer
+--   The range is inclusive on the left and exclusive on the right
+--   For example: slice x (2, 4) returns the 3rd and 4th bits of x
+--   @since 0.22.0
+slice :: (KnownNat w, KnownNat v) => UInt w -> (Int, Int) -> UInt v
+slice x (i, j)
+  | i < 0 = error "[ panic ] slice: negative starting index"
+  | j < i = error "[ panic ] slice: ending index is less than starting index"
+  | j > widthOf x = error "[ panic ] slice: ending index is greater than the width of the UInt"
+  | otherwise = SliceU x i j
 
 --------------------------------------------------------------------------------
 
