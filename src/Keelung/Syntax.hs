@@ -145,9 +145,49 @@ data UInt (w :: Nat)
     IfU Boolean (UInt w) (UInt w)
   | -- | Conversion from Booleans to Unsigned integers
     BtoU Boolean
-  deriving (Eq, Ord)
+  -- | -- | Slice of an Unsigned integer
+  --   SliceU (UInt w) Int
 
-instance KnownNat w => Show (UInt w) where
+-- | Equality on Unsigned integers
+instance Eq (UInt (w :: Nat)) where
+  UInt x == UInt y = x == y
+  VarU x == VarU y = x == y
+  VarUI x == VarUI y = x == y
+  VarUP x == VarUP y = x == y
+  BtoU x == BtoU y = x == y
+  _ == _ = False
+
+-- | Ord on Unsigned integers, NOTE: not sure if this is the right way to do it
+instance Ord (UInt (w :: Nat)) where
+  compare (UInt x) (UInt y) = compare x y
+  compare (VarU x) (VarU y) = compare x y
+  compare (VarUI x) (VarUI y) = compare x y
+  compare (VarUP x) (VarUP y) = compare x y
+  compare (BtoU x) (BtoU y) = compare x y
+  compare x y = compare (tag x) (tag y)
+    where
+      tag :: UInt w -> Int
+      tag (UInt _) = 0
+      tag (VarU _) = 1
+      tag (VarUI _) = 2
+      tag (VarUP _) = 3
+      tag (BtoU _) = 4
+      tag (AddU _ _) = 5
+      tag (SubU _ _) = 6
+      tag (MulU _ _) = 7
+      tag (AESMulU _ _) = 8
+      tag (CLMulU _ _) = 9
+      tag (MMIU _ _) = 10
+      tag (AndU _ _) = 11
+      tag (OrU _ _) = 12
+      tag (XorU _ _) = 13
+      tag (NotU _) = 14
+      tag (RoLU {}) = 15
+      tag (ShLU {}) = 16
+      tag (SetU {}) = 17
+      tag (IfU {}) = 18
+
+instance (KnownNat w) => Show (UInt w) where
   showsPrec prec expr = case expr of
     UInt n -> showsPrec prec n
     VarU var -> showString "$U" . showString (toSubscript width) . shows var
@@ -188,7 +228,7 @@ instance KnownNat w => Show (UInt w) where
             '9' -> '₉'
             _ -> c
 
-instance KnownNat w => Num (UInt w) where
+instance (KnownNat w) => Num (UInt w) where
   (+) = AddU
   (-) = SubU
   (*) = MulU
@@ -200,16 +240,16 @@ instance KnownNat w => Num (UInt w) where
   fromInteger n = UInt (fromIntegral n)
 
 -- | Carry-less multiplication
-(.*.) :: KnownNat w => UInt w -> UInt w -> UInt w
+(.*.) :: (KnownNat w) => UInt w -> UInt w -> UInt w
 (.*.) = CLMulU
 
 infixl 8 .*.
 
-instance KnownNat w => Enum (UInt w) where
+instance (KnownNat w) => Enum (UInt w) where
   toEnum = UInt . toInteger
   fromEnum = error "[ panic ] Enum.fromEnum: undefined for UInt"
 
-instance KnownNat w => Real (UInt w) where
+instance (KnownNat w) => Real (UInt w) where
   toRational = error "[ panic ] Real.toRational: undefined for UInt"
 
 --------------------------------------------------------------------------------
@@ -219,7 +259,7 @@ class HasWidth a where
   -- | Derive the bit width of an expression
   widthOf :: a -> Int
 
-instance KnownNat w => HasWidth (UInt w) where
+instance (KnownNat w) => HasWidth (UInt w) where
   widthOf _ = fromIntegral $ natVal (Proxy :: Proxy w)
 
 --------------------------------------------------------------------------------
@@ -247,19 +287,19 @@ data Boolean
   | -- | Equality on Field elements
     EqF Field Field
   | -- | Equality on Unsigned integers
-    forall w. KnownNat w => EqU (UInt w) (UInt w)
+    forall w. (KnownNat w) => EqU (UInt w) (UInt w)
   | -- | GTE on Unsigned integers
-    forall w. KnownNat w => GTEU (UInt w) (UInt w)
+    forall w. (KnownNat w) => GTEU (UInt w) (UInt w)
   | -- | GT on Unsigned integers
-    forall w. KnownNat w => GTU (UInt w) (UInt w)
+    forall w. (KnownNat w) => GTU (UInt w) (UInt w)
   | -- | LTE on Unsigned integers
-    forall w. KnownNat w => LTEU (UInt w) (UInt w)
+    forall w. (KnownNat w) => LTEU (UInt w) (UInt w)
   | -- | LT on Unsigned integers
-    forall w. KnownNat w => LTU (UInt w) (UInt w)
+    forall w. (KnownNat w) => LTU (UInt w) (UInt w)
   | -- | Conditional that returns a Boolean
     IfB Boolean Boolean Boolean
   | -- | Bit test on Unsigned integers
-    forall w. KnownNat w => BitU (UInt w) Int
+    forall w. (KnownNat w) => BitU (UInt w) Int
 
 -- Manually implement Ord instance for Boolean
 instance Ord Boolean where
@@ -329,17 +369,18 @@ instance Eq Boolean where
   Boolean x == Boolean y = x == y
   VarB x == VarB y = x == y
   VarBI x == VarBI y = x == y
-  And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
-  Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
-  Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
-  EqB x1 x2 == EqB y1 y2 = x1 == y1 && x2 == y2
-  EqF x1 x2 == EqF y1 y2 = x1 == y1 && x2 == y2
-  EqU x1 x2 == EqU y1 y2 = case sameNat x1 x2 of
-    Just Refl -> case sameNat y1 y2 of
-      Just Refl -> (x1 == x2) == (y1 == y2)
-      Nothing -> False
-    Nothing -> False
-  IfB x1 x2 x3 == IfB y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
+  VarBP x == VarBP y = x == y
+  -- And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
+  -- Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
+  -- Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
+  -- EqB x1 x2 == EqB y1 y2 = x1 == y1 && x2 == y2
+  -- EqF x1 x2 == EqF y1 y2 = x1 == y1 && x2 == y2
+  -- EqU x1 x2 == EqU y1 y2 = case sameNat x1 x2 of
+  --   Just Refl -> case sameNat y1 y2 of
+  --     Just Refl -> (x1 == x2) == (y1 == y2)
+  --     Nothing -> False
+  --   Nothing -> False
+  -- IfB x1 x2 x3 == IfB y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
   BitU x1 x2 == BitU y1 y2 = case sameNat x1 y1 of
     Just Refl -> x2 == y2
     Nothing -> False
@@ -376,37 +417,37 @@ false :: Boolean
 false = Boolean False
 
 -- | Set the i-th bit of a Unsigned integer with a Boolean
-setBit :: KnownNat w => UInt w -> Int -> Boolean -> UInt w
+setBit :: (KnownNat w) => UInt w -> Int -> Boolean -> UInt w
 setBit = SetU
 
 -- | Modular multiplicative inverse of an Unsigned integer with a given modulus
 --
 --   @since 0.9.4.0
-modInv :: KnownNat w => UInt w -> Integer -> UInt w
+modInv :: (KnownNat w) => UInt w -> Integer -> UInt w
 modInv = MMIU
 
 -- | Greater than on Unsigned integers
 --
 --   @since 0.10.0
-gt :: KnownNat w => UInt w -> UInt w -> Boolean
+gt :: (KnownNat w) => UInt w -> UInt w -> Boolean
 gt = GTU
 
 -- | Greater than or equal on Unsigned integers
 --
 --   @since 0.10.0
-gte :: KnownNat w => UInt w -> UInt w -> Boolean
+gte :: (KnownNat w) => UInt w -> UInt w -> Boolean
 gte = GTEU
 
 -- | Less than on Unsigned integers
 --
 --   @since 0.10.0
-lt :: KnownNat w => UInt w -> UInt w -> Boolean
+lt :: (KnownNat w) => UInt w -> UInt w -> Boolean
 lt = LTU
 
 -- | Less than or equal on Unsigned integers
 --
 --   @since 0.10.0
-lte :: KnownNat w => UInt w -> UInt w -> Boolean
+lte :: (KnownNat w) => UInt w -> UInt w -> Boolean
 lte = LTEU
 
 -- | Fast exponentiation
@@ -439,7 +480,7 @@ instance EQ Field where
   eq = EqF
   neq x y = Not (x `eq` y)
 
-instance KnownNat w => EQ (UInt w) where
+instance (KnownNat w) => EQ (UInt w) where
   eq = EqU
   neq x y = Not (x `eq` y)
 
