@@ -474,7 +474,10 @@ slice x (i, j)
   | i < 0 = error "[ panic ] slice: negative starting index"
   | j < i = error "[ panic ] slice: ending index is less than starting index"
   | j > widthOf x = error "[ panic ] slice: ending index is greater than the width of the UInt"
-  | otherwise = SliceU x i j
+  | j - i /= widthOf result = error $ "[ panic ] slice: expecting the width to be " <> show (widthOf result) <> " from the type but got " <> show (j - i) <> " from the range"
+  | otherwise = result
+  where
+    result = SliceU x i j
 
 --------------------------------------------------------------------------------
 
