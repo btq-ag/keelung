@@ -1,8 +1,9 @@
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 -- | Module for encoding Keelung syntax
 module Keelung.Syntax.Encode
@@ -17,8 +18,8 @@ where
 import Control.Monad.Reader
 import Data.Array.Unboxed qualified as Array
 import Data.IntMap qualified as IntMap
-import GHC.TypeLits (KnownNat)
 import GHC.Generics hiding (UInt)
+import GHC.TypeLits (KnownNat)
 import Keelung.Heap
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax qualified as Syntax
@@ -66,7 +67,7 @@ instance Encode' Syntax.Field Field where
     Syntax.IfF p x y -> IfF <$> encode' p <*> encode' x <*> encode' y
     Syntax.BtoF b -> BtoF <$> encode' b
 
-instance KnownNat w => Encode' (Syntax.UInt w) UInt where
+instance (KnownNat w) => Encode' (Syntax.UInt w) UInt where
   encode' expr = case expr of
     Syntax.UInt n -> return $ ValU (widthOf expr) n
     Syntax.VarU var -> return $ VarU (widthOf expr) var
@@ -88,13 +89,13 @@ instance KnownNat w => Encode' (Syntax.UInt w) UInt where
     Syntax.SetU x i b -> SetU (widthOf expr) <$> encode' x <*> pure i <*> encode' b
     Syntax.BtoU n -> BtoU (widthOf expr) <$> encode' n
     Syntax.SliceU x i j -> SliceU (widthOf expr) <$> encode' x <*> pure i <*> pure j
+    Syntax.JoinU x y -> JoinU (widthOf expr) <$> encode' x <*> encode' y
 
 --------------------------------------------------------------------------------
 
 -- | Typeclass for encoding stuff into something Keelung can understand
 class Encode a where
   encode :: a -> HeapM Expr
-
   default encode :: (Generic a, GEncode (Rep a)) => a -> HeapM Expr
   encode a = gencode (from a)
 
@@ -104,18 +105,18 @@ instance Encode Syntax.Boolean where
 instance Encode Syntax.Field where
   encode expr = Field <$> encode' expr
 
-instance KnownNat w => Encode (Syntax.UInt w) where
+instance (KnownNat w) => Encode (Syntax.UInt w) where
   encode expr = UInt <$> encode' expr
 
 instance Encode () where
   encode expr = case expr of
     () -> return Unit
 
-instance Encode t => Encode (ArrM t) where
+instance (Encode t) => Encode (ArrM t) where
   encode expr = case expr of
     ArrayRef _ len addr -> readArray addr len
 
-instance Encode t => Encode [t] where
+instance (Encode t) => Encode [t] where
   encode xs = Array . Array.listArray (0, length xs - 1) <$> mapM encode xs
 
 instance (Encode a, Encode b) => Encode (a, b) where
@@ -141,8 +142,9 @@ instance (GEncode a, GEncode b) => GEncode (a :*: b) where
     a' <- gencode a
     b' <- gencode b
     return $ case (a', b') of
-      (Array as, Array bs) -> let arr = Array.elems as ++ Array.elems bs
-                               in Array $ Array.listArray (0, length arr - 1) arr
+      (Array as, Array bs) ->
+        let arr = Array.elems as ++ Array.elems bs
+         in Array $ Array.listArray (0, length arr - 1) arr
       (Array as, _) -> Array $ Array.listArray (0, length as) (Array.elems as ++ [b'])
       (_, Array bs) -> Array $ Array.listArray (0, length bs) (a' : Array.elems bs)
       (_, _) -> Array $ Array.listArray (0, 1) [a', b']

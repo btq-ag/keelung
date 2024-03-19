@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Syntax of the Keelung language
 module Keelung.Syntax
@@ -22,12 +24,14 @@ module Keelung.Syntax
     pow,
     aesMul,
     slice,
+    join,
     Var,
     Width,
   )
 where
 
 import Data.Data
+import Data.Kind (Type)
 import GHC.TypeNats
 
 --------------------------------------------------------------------------------
@@ -107,47 +111,82 @@ instance Fractional Field where
 
 -- | Unsigned Integers.
 --   The bit width is annotated by a type-level natural that is known at compile time.
-data UInt (w :: Nat)
-  = -- | Unsigned integers values
-    UInt Integer
-  | -- | Unsigned integer variables
-    VarU Var
-  | -- | Unsigned integer public input variables
-    VarUI Var
-  | -- | Unsigned integer private input variables
-    VarUP Var
-  | -- | Addition
-    AddU (UInt w) (UInt w)
-  | -- | Subtraction
-    SubU (UInt w) (UInt w)
-  | -- | Multiplication
-    MulU (UInt w) (UInt w)
-  | -- | Hardcoded GF(256) Multiplication for AES
-    AESMulU (UInt 8) (UInt 8)
-  | -- | Carry-less Multiplication
-    CLMulU (UInt w) (UInt w)
-  | -- | Modular multiplicatie inverse
-    MMIU (UInt w) Integer
-  | -- | Bitwise conjunction
-    AndU (UInt w) (UInt w)
-  | -- | Bitwise disjunction
-    OrU (UInt w) (UInt w)
-  | -- | Bitwise exclusive disjunction
-    XorU (UInt w) (UInt w)
-  | -- | Bitwise complement
-    NotU (UInt w)
-  | -- | Rotate left
-    RoLU Width Int (UInt w)
-  | -- | Shift left
-    ShLU Width Int (UInt w)
-  | -- | Bit set and return the result
-    SetU (UInt w) Int Boolean
-  | -- | Conditional that returns an unsigned integer
-    IfU Boolean (UInt w) (UInt w)
-  | -- | Conversion from Booleans to Unsigned integers
-    BtoU Boolean
-  | -- | Slice of an Unsigned integer
-    forall v. (KnownNat v) => SliceU (UInt v) Int Int
+-- data UInt (w :: Nat)
+--   = -- | Unsigned integers values
+--     UInt Integer
+--   | -- | Unsigned integer variables
+--     VarU Var
+--   | -- | Unsigned integer public input variables
+--     VarUI Var
+--   | -- | Unsigned integer private input variables
+--     VarUP Var
+--   | -- | Addition
+--     AddU (UInt w) (UInt w)
+--   | -- | Subtraction
+--     SubU (UInt w) (UInt w)
+--   | -- | Multiplication
+--     MulU (UInt w) (UInt w)
+--   | -- | Hardcoded GF(256) Multiplication for AES
+--     AESMulU (UInt 8) (UInt 8)
+--   | -- | Carry-less Multiplication
+--     CLMulU (UInt w) (UInt w)
+--   | -- | Modular multiplicatie inverse
+--     MMIU (UInt w) Integer
+--   | -- | Bitwise conjunction
+--     AndU (UInt w) (UInt w)
+--   | -- | Bitwise disjunction
+--     OrU (UInt w) (UInt w)
+--   | -- | Bitwise exclusive disjunction
+--     XorU (UInt w) (UInt w)
+--   | -- | Bitwise complement
+--     NotU (UInt w)
+--   | -- | Rotate left
+--     RoLU Width Int (UInt w)
+--   | -- | Shift left
+--     ShLU Width Int (UInt w)
+--   | -- | Bit set and return the result
+--     SetU (UInt w) Int Boolean
+--   | -- | Conditional that returns an unsigned integer
+--     IfU Boolean (UInt w) (UInt w)
+--   | -- | Conversion from Booleans to Unsigned integers
+--     BtoU Boolean
+--   | -- | Slice of an Unsigned integer
+--     forall v. (KnownNat v) => SliceU (UInt v) Int Int
+--   | -- | Joining of two Unsigned integers
+--     forall v. (KnownNat v) => JoinU (UInt v) (UInt (w - v))
+type UInt :: Nat -> Type
+data UInt w where
+  -- | Constant
+  UInt :: Integer -> UInt w
+  -- | Intermediate variable
+  VarU :: Var -> UInt w
+  -- | Public input variable
+  VarUI :: Var -> UInt w
+  -- | Private input variable
+  VarUP :: Var -> UInt w
+  -- | Arithmetic operations
+  AddU :: UInt w -> UInt w -> UInt w
+  SubU :: UInt w -> UInt w -> UInt w
+  MulU :: UInt w -> UInt w -> UInt w
+  AESMulU :: UInt 8 -> UInt 8 -> UInt 8
+  -- | Carry-less multiplication
+  CLMulU :: UInt w -> UInt w -> UInt w
+  -- | Modular multiplicative inverse
+  MMIU :: UInt w -> Integer -> UInt w
+  -- | Conditionals
+  IfU :: Boolean -> UInt w -> UInt w -> UInt w
+  -- | Bitwise operations
+  AndU :: UInt w -> UInt w -> UInt w
+  OrU :: UInt w -> UInt w -> UInt w
+  XorU :: UInt w -> UInt w -> UInt w
+  NotU :: UInt w -> UInt w
+  -- | Bit manipulation
+  RoLU :: Width -> Int -> UInt w -> UInt w
+  ShLU :: Width -> Int -> UInt w -> UInt w
+  SetU :: UInt w -> Int -> Boolean -> UInt w
+  BtoU :: Boolean -> UInt w
+  SliceU :: (KnownNat v) => UInt v -> Int -> Int -> UInt w
+  JoinU :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
 
 -- | Equality on Unsigned integers
 instance Eq (UInt (w :: Nat)) where
@@ -188,6 +227,7 @@ instance Ord (UInt (w :: Nat)) where
       tag (SetU {}) = 17
       tag (IfU {}) = 18
       tag (SliceU {}) = 19
+      tag (JoinU {}) = 20
 
 instance (KnownNat w) => Show (UInt w) where
   showsPrec prec expr = case expr of
@@ -211,6 +251,7 @@ instance (KnownNat w) => Show (UInt w) where
     IfU p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU x -> showString "B→U " . showsPrec prec x
     SliceU x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString ":" . showsPrec 9 j . showString "]"
+    JoinU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " ++ " . showsPrec 7 y
     where
       width :: Width
       width = widthOf expr
@@ -478,6 +519,11 @@ slice x (i, j)
   | otherwise = result
   where
     result = SliceU x i j
+
+-- | Given two Unsigned integers of width u and v, return the concatenation of the two
+--   @since 0.22.0
+join :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
+join = JoinU
 
 --------------------------------------------------------------------------------
 

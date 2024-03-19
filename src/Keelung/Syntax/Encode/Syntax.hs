@@ -167,6 +167,8 @@ data UInt
     BtoU Width Boolean
   | -- | Slice of an Unsigned integer
     SliceU Width UInt Int Int
+  | -- | Joining of two Unsigned integers
+    JoinU Width UInt UInt
   deriving (Generic, Eq, NFData)
 
 instance Serialize UInt
@@ -193,6 +195,7 @@ instance Show UInt where
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU _ x -> showString "B→U " . showsPrec prec x
     SliceU _ x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . shows i . showString ":" . shows j . showString "]"
+    JoinU _ x y -> showParen (prec > 8) $ showsPrec 9 x . showString " ++ " . showsPrec 9 y
     where
       toSubscript :: Int -> String
       toSubscript = map go . show
