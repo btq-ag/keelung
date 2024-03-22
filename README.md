@@ -27,8 +27,7 @@ Find us on [Discord](https://discord.gg/nTr2kBmW2q)!
 Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codespaces` in [Keelung Examples](https://github.com/btq-ag/keelung-examples/)!
 
 ## Roadmap 
-
-<img width="2500" alt="Keelung operators" src="https://github.com/btq-ag/keelung/assets/797844/6dc6893f-5d97-428d-80a1-03fae730a81d">
+![Roadmap](https://github.com/btq-ag/keelung/assets/797844/ddfedd16-703d-4065-a458-b39ef3105dce)
 
 ### Current (v0.21.0)
 
@@ -40,14 +39,15 @@ Get started using Keelung in GitHub codespaces by navigating to `Code` -> `Codes
 
 - Operators for **slicing** and **joining** unsigned integers
 - Internal: improvement of representation of polynomials with our new precise reference counter
+- Internal: polynomial insertion is now **9x faster**
 
 ### Future
 
-- Optimization for the implementation of AES
-- Make statement operators (e.g. `performDivMod`, which is only allowed in the `Comp` monad) to pure operators
-- Snarkjs/Circom integration
-- Optimization for the implementation of BLAKE2
-- Speedup compilation of operators on Bytes, Word16, Word32, and Word64
-- Include benchmarking in the CI/CD pipeline
-- Support PLONKish backend compilation
-- Quantitative information flow analysis for measuring privacy leak of programs (working with [Prof. Kohei Suenaga](https://www.fos.kuis.kyoto-u.ac.jp/~ksuenaga/) of Kyoto University)
+
+- **Snarkjs/Circom Integration**: _Snarkjs/Circom_ is currently the most popular ZK toolchain. We aim to tap into this ecosystem by integrating Keelung with Snarkjs/Circom.
+- **Standard Library Optimization**: We plan to heavily optimize ciphers and hash functions such as _AES_ and _Blake2_.
+- **PLONKish Backend Compilation Support**: Supporting protocols like _PLONK_ would allow Keelung programs to efficiently manage complex privacy-preserving computations, significantly enhancing their scalability and security across various applications.
+- **Quantitative Information Flow Analysis**: We are working with [Prof. Kohei Suenaga](https://www.fos.kuis.kyoto-u.ac.jp/~ksuenaga/) of Kyoto University to enable privacy leakage analysis of Keelung programs.
+- **DSL Refinement**: We are transitioning statement operators (e.g. `performDivMod`, which is only allowed in the `Comp` monad) to pure operators to make these operations more versatile and easily integrated into different parts of our system.
+- **Performance Improvement**: We aim to speed up the compilation of operators on commonly used types such as Bytes, Word16, Word32, and Word64.
+- **Benchmarking CI/CD**: We plan to include benchmarking in the CI/CD pipeline.
