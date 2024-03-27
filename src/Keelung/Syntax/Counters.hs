@@ -41,6 +41,7 @@ module Keelung.Syntax.Counters
 where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
@@ -218,7 +219,7 @@ prettyVariables counters =
             <> otherVars
             <> "\n"
 
-prettyConstraints :: (Show constraint) => Counters -> [constraint] -> String
+prettyConstraints :: (Show constraint) => Counters -> Seq constraint -> String
 prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints
@@ -242,7 +243,7 @@ prettyConstraints counters cs =
           "    Ordinary constraints ("
             <> show ordinaryConstraintSize
             <> "):\n\n"
-            <> unlines (map (\x -> "      " <> show x) cs)
+            <> unlines (map (\x -> "      " <> show x) (toList cs))
             <> "\n"
 
     -- Boolean constraints
