@@ -49,14 +49,13 @@ instance (Num n, Eq n, Show n, Ord n) => Show (R1CS n) where
 -- | Returns 'R1C's from a 'R1CS', including:
 --   1. ordinary constraints
 --   2. Boolean input variable constraints
---   3. binary representation constraints
 toR1Cs :: (Num n, Eq n) => R1CS n -> [R1C n]
 toR1Cs (R1CS _ ordinaryConstraints counters _ _ _ _) =
   ordinaryConstraints
     <> booleanInputVarConstraints
   where
     booleanInputVarConstraints =
-      let generate (start, end) =
+      let generate (start, size) =
             map
               ( \var ->
                   R1C
@@ -64,7 +63,7 @@ toR1Cs (R1CS _ ordinaryConstraints counters _ _ _ _) =
                     (Right (Poly.singleVar var))
                     (Right (Poly.singleVar var))
               )
-              [start .. end - 1]
+              [start .. start + size - 1]
        in IntMap.toList (getBooleanConstraintRanges counters) >>= generate
 
 --------------------------------------------------------------------------------
