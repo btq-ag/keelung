@@ -816,7 +816,7 @@ fromField width exprF = do
   modify' (\st -> st {compSideEffects = compSideEffects st :|> ToUInt width varU varF})
   return (VarU varU)
 
-{-# WARNING toUInt "will be replaced by `fromField` after v0.22" #-}
+{-# WARNING toUInt "will be replaced by `fromField` after v0.23" #-}
 toUInt :: (KnownNat w) => Width -> Field -> Comp (UInt w)
 toUInt = fromField
 
@@ -867,7 +867,7 @@ fromBools bs = do
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
-{-# WARNING pack "will be replaced by `fromBools` after v0.22" #-}
+{-# WARNING pack "will be replaced by `fromBools` after v0.23" #-}
 pack :: forall w. (KnownNat w) => [Boolean] -> Comp (UInt w)
 pack = fromBools
 

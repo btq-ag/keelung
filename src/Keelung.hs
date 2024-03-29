@@ -71,7 +71,7 @@ import Text.Read (readMaybe)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 21)
+keelungCompilerVersion = (0, 22)
 
 -- | Patch version of this library
 compilerPatchVersion :: Int

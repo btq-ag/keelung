@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.22.0]
+
+### Added
+
+* `slice` operater for splicing a `UInt` into a smaller `UInt`.
+* `join` operator for concatenating two `UInt`s.
+* `solveOutput` and `solveOutputEither` for accessing the R1CS solver.
+
+### Changed
+
+* Lists in fields of the `R1CS` data structure is now represented as `Data.Sequence`s.
+
 ## [v0.21.0]
 
 ### Added

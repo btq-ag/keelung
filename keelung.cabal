@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung
-version:        0.21.0
+version:        0.22.0
 synopsis:       DSL for creating zero-knowledge proofs
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
 category:       Cryptography

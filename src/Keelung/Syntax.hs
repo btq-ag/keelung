@@ -111,49 +111,6 @@ instance Fractional Field where
 
 -- | Unsigned Integers.
 --   The bit width is annotated by a type-level natural that is known at compile time.
--- data UInt (w :: Nat)
---   = -- | Unsigned integers values
---     UInt Integer
---   | -- | Unsigned integer variables
---     VarU Var
---   | -- | Unsigned integer public input variables
---     VarUI Var
---   | -- | Unsigned integer private input variables
---     VarUP Var
---   | -- | Addition
---     AddU (UInt w) (UInt w)
---   | -- | Subtraction
---     SubU (UInt w) (UInt w)
---   | -- | Multiplication
---     MulU (UInt w) (UInt w)
---   | -- | Hardcoded GF(256) Multiplication for AES
---     AESMulU (UInt 8) (UInt 8)
---   | -- | Carry-less Multiplication
---     CLMulU (UInt w) (UInt w)
---   | -- | Modular multiplicatie inverse
---     MMIU (UInt w) Integer
---   | -- | Bitwise conjunction
---     AndU (UInt w) (UInt w)
---   | -- | Bitwise disjunction
---     OrU (UInt w) (UInt w)
---   | -- | Bitwise exclusive disjunction
---     XorU (UInt w) (UInt w)
---   | -- | Bitwise complement
---     NotU (UInt w)
---   | -- | Rotate left
---     RoLU Width Int (UInt w)
---   | -- | Shift left
---     ShLU Width Int (UInt w)
---   | -- | Bit set and return the result
---     SetU (UInt w) Int Boolean
---   | -- | Conditional that returns an unsigned integer
---     IfU Boolean (UInt w) (UInt w)
---   | -- | Conversion from Booleans to Unsigned integers
---     BtoU Boolean
---   | -- | Slice of an Unsigned integer
---     forall v. (KnownNat v) => SliceU (UInt v) Int Int
---   | -- | Joining of two Unsigned integers
---     forall v. (KnownNat v) => JoinU (UInt v) (UInt (w - v))
 type UInt :: Nat -> Type
 data UInt w where
   -- | Constant
@@ -414,17 +371,6 @@ instance Eq Boolean where
   VarB x == VarB y = x == y
   VarBI x == VarBI y = x == y
   VarBP x == VarBP y = x == y
-  -- And x1 x2 == And y1 y2 = x1 == y1 && x2 == y2
-  -- Or x1 x2 == Or y1 y2 = x1 == y1 && x2 == y2
-  -- Xor x1 x2 == Xor y1 y2 = x1 == y1 && x2 == y2
-  -- EqB x1 x2 == EqB y1 y2 = x1 == y1 && x2 == y2
-  -- EqF x1 x2 == EqF y1 y2 = x1 == y1 && x2 == y2
-  -- EqU x1 x2 == EqU y1 y2 = case sameNat x1 x2 of
-  --   Just Refl -> case sameNat y1 y2 of
-  --     Just Refl -> (x1 == x2) == (y1 == y2)
-  --     Nothing -> False
-  --   Nothing -> False
-  -- IfB x1 x2 x3 == IfB y1 y2 y3 = x1 == y1 && x2 == y2 && x3 == y3
   BitU x1 x2 == BitU y1 y2 = case sameNat x1 y1 of
     Just Refl -> x2 == y2
     Nothing -> False
