@@ -20,6 +20,9 @@ module Keelung
     compileWithOpts,
     rtsoptProf,
     rtsoptMemory,
+    -- solve R1CS
+    solveOutput,
+    solveOutputEither,
     -- witness generation
     witness,
     witness',
@@ -277,6 +280,21 @@ interpretEither fieldType prog publicInput privateInput =
     ( do
         elab <- liftEither (elaborateAndEncode prog)
         callKeelungc ["protocol", "interpret"] (fieldType, elab, publicInput, privateInput)
+    )
+
+--------------------------------------------------------------------------------
+
+-- | Solves the R1CS of a Keelung program with given inputs and outputs the result
+solveOutput :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+solveOutput fieldType prog publicInput privateInput = solveOutputEither fieldType prog publicInput privateInput >>= printErrorInstead
+
+-- | Solves the R1CS of a Keelung program with given inputs and outputs the result
+solveOutputEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
+solveOutputEither fieldType prog publicInput privateInput =
+  runM
+    ( do
+        elab <- liftEither (elaborateAndEncode prog)
+        callKeelungc ["protocol", "solveOutput"] (fieldType, elab, publicInput, privateInput)
     )
 
 --------------------------------------------------------------------------------
