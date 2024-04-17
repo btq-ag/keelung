@@ -25,6 +25,8 @@ module Keelung.Syntax
     aesMul,
     slice,
     join,
+    mulD,
+    mulV,
     Var,
     Width,
   )
@@ -125,6 +127,8 @@ data UInt w where
   AddU :: UInt w -> UInt w -> UInt w
   SubU :: UInt w -> UInt w -> UInt w
   MulU :: UInt w -> UInt w -> UInt w
+  MulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
+  MulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
   AESMulU :: UInt 8 -> UInt 8 -> UInt 8
   -- | Carry-less multiplication
   CLMulU :: UInt w -> UInt w -> UInt w
@@ -172,6 +176,8 @@ instance Ord (UInt (w :: Nat)) where
       tag (AddU _ _) = 5
       tag (SubU _ _) = 6
       tag (MulU _ _) = 7
+      tag (MulD _ _) = 7
+      tag (MulV _ _) = 7
       tag (AESMulU _ _) = 8
       tag (CLMulU _ _) = 9
       tag (MMIU _ _) = 10
@@ -195,6 +201,8 @@ instance (KnownNat w) => Show (UInt w) where
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    MulD x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    MulV x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     AESMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
     CLMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
@@ -470,6 +478,19 @@ slice x (i, j)
 --   @since 0.22.0
 join :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
 join = JoinU
+
+-- | UInt multiplication with output that is twice the width of the inputs.
+--   Since the ordinary `(*)` operator truncates the output to the width of the inputs, you may use this function to get the full output.
+--   @since 0.23.0
+mulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
+mulD = MulD
+
+-- | UInt multiplication with variable-width output, where the width is determined by the type signature.
+--   The output will be truncated if the width is less than the double of the width of the inputs.
+--   The output will be zero-extended if the width is greater than the double of the width of the inputs.
+--   @since 0.23.0
+mulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
+mulV = MulV
 
 --------------------------------------------------------------------------------
 
