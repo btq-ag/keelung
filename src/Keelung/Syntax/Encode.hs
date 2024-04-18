@@ -24,6 +24,10 @@ import Keelung.Heap
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax qualified as Syntax
 import Keelung.Syntax.Encode.Syntax
+import Data.List.NonEmpty (NonEmpty)
+import Data.Proxy (Proxy)
+import Data.Semigroup (Max, Min)
+import Data.Complex (Complex)
 
 --------------------------------------------------------------------------------
 
@@ -110,22 +114,9 @@ instance Encode Syntax.Field where
 instance (KnownNat w) => Encode (Syntax.UInt w) where
   encode expr = UInt <$> encode' expr
 
-instance Encode () where
-  encode expr = case expr of
-    () -> return Unit
-
 instance (Encode t) => Encode (ArrM t) where
   encode expr = case expr of
     ArrayRef _ len addr -> readArray addr len
-
-instance (Encode t) => Encode [t] where
-  encode xs = Array . Array.listArray (0, length xs - 1) <$> mapM encode xs
-
-instance (Encode a, Encode b) => Encode (a, b) where
-  encode (a, b) = do
-    a' <- encode a
-    b' <- encode b
-    return $ Array $ Array.listArray (0, 1) [a', b']
 
 -- | Generic Encode
 class GEncode f where
@@ -156,6 +147,25 @@ instance (GEncode a) => GEncode (M1 i c a) where
 
 instance (Encode a) => GEncode (K1 i a) where
   gencode (K1 x) = encode x
+
+-- | Standard encodings for common datatypes
+
+instance Encode ()
+instance Encode Bool
+instance (Encode a) => Encode [a]
+instance (Encode a) => Encode (NonEmpty a)
+instance (Encode a) => Encode (Proxy a)
+instance (Encode a) => Encode (Max a)
+instance (Encode a) => Encode (Min a)
+instance (Encode a) => Encode (Complex a)
+instance (Encode a, Encode b) => Encode (a, b)
+instance (Encode a, Encode b, Encode c) => Encode (a, b, c)
+instance (Encode a, Encode b, Encode c, Encode d) => Encode (a, b, c, d)
+instance (Encode a, Encode b, Encode c, Encode d, Encode e) => Encode (a, b, c, d, e)
+instance (Encode a, Encode b, Encode c, Encode d, Encode e, Encode f) => Encode (a, b, c, d, e, f)
+
+instance (Encode a) => Encode (Maybe a)
+instance (Encode a, Encode b) => Encode (Either a b)
 
 --------------------------------------------------------------------------------
 
