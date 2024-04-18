@@ -137,6 +137,8 @@ data UInt
     VarUP Width Var
   | -- | Addition
     AddU Width UInt UInt
+  | -- | Addition
+    AddV Width [UInt]
   | -- | Subtraction
     SubU Width UInt UInt
   | -- | Multiplication
@@ -180,6 +182,7 @@ instance Show UInt where
     VarUI w var -> showString "$UI" . showString (toSubscript w) . shows var
     VarUP w var -> showString "$UP" . showString (toSubscript w) . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    AddV _ xs -> showParen (prec > 6) $ showsPrec 6 xs
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     AESMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y

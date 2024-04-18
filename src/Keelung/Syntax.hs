@@ -27,6 +27,7 @@ module Keelung.Syntax
     join,
     mulD,
     mulV,
+    addV,
     Var,
     Width,
   )
@@ -125,6 +126,7 @@ data UInt w where
   VarUP :: Var -> UInt w
   -- | Arithmetic operations
   AddU :: UInt w -> UInt w -> UInt w
+  AddV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
   SubU :: UInt w -> UInt w -> UInt w
   MulU :: UInt w -> UInt w -> UInt w
   MulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
@@ -174,6 +176,7 @@ instance Ord (UInt (w :: Nat)) where
       tag (VarUP _) = 3
       tag (BtoU _) = 4
       tag (AddU _ _) = 5
+      tag (AddV _) = 5
       tag (SubU _ _) = 6
       tag (MulU _ _) = 7
       tag (MulD _ _) = 7
@@ -199,6 +202,7 @@ instance (KnownNat w) => Show (UInt w) where
     VarUI var -> showString "$UI" . showString (toSubscript width) . shows var
     VarUP var -> showString "$UP" . showString (toSubscript width) . shows var
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    AddV xs -> showParen (prec > 6) $ showsPrec 6 xs
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     MulD x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -479,18 +483,26 @@ slice x (i, j)
 join :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
 join = JoinU
 
--- | UInt multiplication with output that is twice the width of the inputs.
---   Since the ordinary `(*)` operator truncates the output to the width of the inputs, you may use this function to get the full output.
---   @since 0.23.0
+-- | UInt multiplication that produces an output that is twice the width of the inputs.
+-- | The standard `(*)` operator truncates the output to the width of the inputs. Use `mulD` to obtain the full output.
+-- | @since 0.23.0
 mulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
 mulD = MulD
 
--- | UInt multiplication with variable-width output, where the width is determined by the type signature.
---   The output will be truncated if the width is less than the double of the width of the inputs.
---   The output will be zero-extended if the width is greater than the double of the width of the inputs.
+-- | UInt multiplication with variable-width output.
+-- | The output width is determined by the type signature.
+-- | If the output width is less than twice the width of the inputs, the output will be truncated.
+-- | If the output width is greater than twice the width of the inputs, the output will be zero-extended.
 --   @since 0.23.0
 mulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
 mulV = MulV
+
+-- | Batch addition of UInts with variable-width output.
+--   You can choose how many bits of carry you want to keep by declaring the width of the output in the type signature.
+--   This function allows for adding multiple UInts together in a batch.
+--   @since 0.23.0
+addV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
+addV = AddV
 
 --------------------------------------------------------------------------------
 
