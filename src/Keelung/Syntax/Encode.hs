@@ -75,9 +75,9 @@ instance (KnownNat w) => Encode' (Syntax.UInt w) UInt where
     Syntax.VarUP var -> return $ VarUP (widthOf expr) var
     Syntax.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
     Syntax.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
-    Syntax.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
-    Syntax.MulD x y -> MulD (widthOf expr) <$> encode' x <*> encode' y
-    Syntax.MulV x y -> MulV (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulU x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulD x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulV x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.AESMulU x y -> AESMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.CLMulU x y -> CLMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.MMIU x p -> MMIU (widthOf x) <$> encode' x <*> pure p
