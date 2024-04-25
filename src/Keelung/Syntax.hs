@@ -25,8 +25,9 @@ module Keelung.Syntax
     aesMul,
     slice,
     join,
-    mulD,
+    mul,
     mulV,
+    add,
     addV,
     Var,
     Width,
@@ -126,7 +127,7 @@ data UInt w where
   VarUP :: Var -> UInt w
   -- | Arithmetic operations
   AddU :: UInt w -> UInt w -> UInt w
-  AddV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
+  AddV :: (KnownNat w) => [UInt w] -> UInt v
   SubU :: UInt w -> UInt w -> UInt w
   MulU :: UInt w -> UInt w -> UInt w
   MulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
@@ -486,8 +487,8 @@ join = JoinU
 -- | UInt multiplication that produces an output that is twice the width of the inputs.
 -- | The standard `(*)` operator truncates the output to the width of the inputs. Use `mulD` to obtain the full output.
 -- | @since 0.23.0
-mulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
-mulD = MulD
+mul :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
+mul = MulD
 
 -- | UInt multiplication with variable-width output.
 -- | The output width is determined by the type signature.
@@ -496,6 +497,12 @@ mulD = MulD
 --   @since 0.23.0
 mulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
 mulV = MulV
+
+-- | UInt additoin that produces an output with carry.
+-- | The standard `(+)` operator discards the carry. Use `add` to preserve the carry.
+-- | @since 0.23.0
+add :: (KnownNat w) => UInt w -> UInt w -> UInt (w + 1)
+add x y = AddV [x, y]
 
 -- | Batch addition of UInts with variable-width output.
 --   You can choose how many bits of carry you want to keep by declaring the width of the output in the type signature.
