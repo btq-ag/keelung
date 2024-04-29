@@ -35,11 +35,11 @@ module Keelung.Monad
     inputField,
     inputBool,
     inputUInt,
-    inputList2,
-    inputList3,
-    inputVec,
-    inputVec2,
-    inputVec3,
+    -- inputList2,
+    -- inputList3,
+    -- inputVec,
+    -- inputVec2,
+    -- inputVec3,
 
     -- * Reuse of expressions
     Reusable (..),
@@ -219,20 +219,24 @@ freshInputVar acc readType writeType n = do
 
 -- | Typeclass for operations on base types
 class Proper t where
+  -- | Size of the value of t in question in terms of the number of fields.
+  --   i.e. how many inputs should be requested to represent it.
+  size :: t -> Int
+
   -- | Request a fresh input variable
   --
   --   @since 0.1.0.0
   input :: InputAccess -> Comp t
 
-  -- | Request a fresh variable
+  -- | Request one or more fresh variable to represent the type
   --
   --   @since 0.8.4.0
-  freshVar :: Comp t
+  freshVars :: Comp [t]
 
   -- | Request a list of fresh input variables
   --   default implementation simply applies `replicateM` on `input`
-  inputList :: InputAccess -> Int -> Comp [t]
-  inputList acc size = replicateM size $ input acc
+  -- inputList :: InputAccess -> Int -> Comp [t]
+  -- inputList acc len = replicateM size $ input acc
 
   -- | Conditional clause
   --
@@ -240,50 +244,67 @@ class Proper t where
   cond :: Boolean -> t -> t -> t
 
 instance Proper Field where
+  size = const 1
   input = inputField
 
   -- \| Specialized implementation for Field
-  inputList acc size = do
-    start <- freshInputVar acc ReadField WriteField size
-    return $ case acc of
-      Public -> map VarFI [start .. start + size - 1]
-      Private -> map VarFP [start .. start + size - 1]
+  -- inputList acc len = do
+  --   start <- freshInputVar acc ReadField WriteField len
+  --   return $ case acc of
+  --     Public -> map VarFI [start .. start + len - 1]
+  --     Private -> map VarFP [start .. start + len - 1]
 
-  freshVar = VarF <$> freshVarF
+  freshVars = pure . VarF <$> freshVarF
 
   cond = IfF
 
 instance Proper Boolean where
+  size = const 1
   input = inputBool
 
   -- \| Specialized implementation for Boolean
-  inputList acc size = do
-    start <- freshInputVar acc ReadBool WriteBool size
-    return $ case acc of
-      Public -> map VarBI [start .. start + size - 1]
-      Private -> map VarBP [start .. start + size - 1]
+  -- inputList acc len = do
+  --   start <- freshInputVar acc ReadBool WriteBool len
+  --   return $ case acc of
+  --     Public -> map VarBI [start .. start + len - 1]
+  --     Private -> map VarBP [start .. start + len - 1]
 
-  freshVar = VarB <$> freshVarB
+  freshVars = pure . VarB <$> freshVarB
 
   cond = IfB
 
 instance (KnownNat w) => Proper (UInt w) where
+  size = const 1
   input = inputUInt
 
   -- \| Specialized implementation for UInt
-  inputList acc size = do
-    start <- freshInputVar acc (ReadUInt width) (WriteUInt width) size
-    return $ case acc of
-      Public -> map VarUI [start .. start + size - 1]
-      Private -> map VarUP [start .. start + size - 1]
-    where
-      width = fromIntegral (natVal (Proxy :: Proxy w))
+  -- inputList acc len = do
+  --   start <- freshInputVar acc (ReadUInt width) (WriteUInt width) len
+  --   return $ case acc of
+  --     Public -> map VarUI [start .. start + len - 1]
+  --     Private -> map VarUP [start .. start + len - 1]
+  --   where
+  --     width = fromIntegral (natVal (Proxy :: Proxy w))
 
-  freshVar = VarU <$> freshVarU width
+  freshVars = pure . VarU <$> freshVarU width
     where
       width = fromIntegral (natVal (Proxy :: Proxy w))
 
   cond = IfU
+
+-- instance (Proper t) => Proper [t] where
+--   size = length
+-- 
+--   input len acc = inputList acc len
+-- 
+--   inputList = inputList
+-- 
+--   freshVars = _
+-- 
+--   cond c = zipWith (cond c)
+-- 
+-- instance Proper a => Proper (Maybe a) where
+--   size = _
 
 -- | Requests a fresh 'Field' input variable
 inputField :: InputAccess -> Comp Field
@@ -305,39 +326,39 @@ inputUInt acc = case acc of
 
 -- | Requests a fresh 'Field' variable
 freshVarField :: Comp Field
-freshVarField = freshVar
+freshVarField = head <$> freshVars
 
 -- | Requests a fresh 'Boolean' variable
 freshVarBool :: Comp Boolean
-freshVarBool = freshVar
+freshVarBool = head <$> freshVars
 
 -- | Requests a fresh 'UInt' variable of some bit width
 freshVarUInt :: (KnownNat w) => Comp (UInt w)
-freshVarUInt = freshVar
+freshVarUInt = head <$> freshVars
 
 --------------------------------------------------------------------------------
 
--- | Requests a 2D-array of fresh input variables
-inputList2 :: (Proper t) => InputAccess -> Int -> Int -> Comp [[t]]
-inputList2 acc sizeM sizeN = replicateM sizeM (inputList acc sizeN)
-
--- | Requests a 3D-array of fresh input variables
-inputList3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp [[[t]]]
-inputList3 acc sizeM sizeN sizeO = replicateM sizeM (inputList2 acc sizeN sizeO)
+-- -- | Requests a 2D-array of fresh input variables
+-- inputList2 :: (Proper t) => InputAccess -> Int -> Int -> Comp [[t]]
+-- inputList2 acc sizeM sizeN = replicateM sizeM (inputList acc sizeN)
+-- 
+-- -- | Requests a 3D-array of fresh input variables
+-- inputList3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp [[[t]]]
+-- inputList3 acc sizeM sizeN sizeO = replicateM sizeM (inputList2 acc sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
 -- | Vector version of 'inputList'
-inputVec :: (Proper t) => InputAccess -> Int -> Comp (Vector t)
-inputVec acc size = Vec.fromList <$> inputList acc size
-
--- | Vector version of 'inputList2'
-inputVec2 :: (Proper t) => InputAccess -> Int -> Int -> Comp (Vector (Vector t))
-inputVec2 acc sizeM sizeN = Vec.fromList <$> replicateM sizeM (inputVec acc sizeN)
-
--- | Vector version of 'inputList3'
-inputVec3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
-inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 acc sizeN sizeO)
+-- inputVec :: (Proper t) => InputAccess -> Int -> Comp (Vector t)
+-- inputVec acc size = Vec.fromList <$> inputList acc size
+-- 
+-- -- | Vector version of 'inputList2'
+-- inputVec2 :: (Proper t) => InputAccess -> Int -> Int -> Comp (Vector (Vector t))
+-- inputVec2 acc sizeM sizeN = Vec.fromList <$> replicateM sizeM (inputVec acc sizeN)
+-- 
+-- -- | Vector version of 'inputList3'
+-- inputVec3 :: (Proper t) => InputAccess -> Int -> Int -> Int -> Comp (Vector (Vector (Vector t)))
+-- inputVec3 acc sizeM sizeN sizeO = Vec.fromList <$> replicateM sizeM (inputVec2 acc sizeN sizeO)
 
 --------------------------------------------------------------------------------
 
