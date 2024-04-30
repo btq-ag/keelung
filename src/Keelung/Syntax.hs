@@ -485,21 +485,54 @@ join :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
 join = JoinU
 
 -- | UInt multiplication that produces an output that is twice the width of the inputs.
--- | The standard `(*)` operator truncates the output to the width of the inputs. Use `mulD` to obtain the full output.
+--   The standard `(*)` operator truncates the output to the width of the inputs. Use `mulD` to obtain the full output.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 16)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `mul` y)
+--   @
+--
 -- | @since 0.23.0
 mul :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
 mul = MulD
 
 -- | UInt multiplication with variable-width output.
--- | The output width is determined by the type signature.
--- | If the output width is less than twice the width of the inputs, the output will be truncated.
--- | If the output width is greater than twice the width of the inputs, the output will be zero-extended.
+--   The output width is determined by the type signature.
+--   If the output width is less than twice the width of the inputs, the output will be truncated.
+--   If the output width is greater than twice the width of the inputs, the output will be zero-extended.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 12)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `mulV` y)
+--   @
+--
 --   @since 0.23.0
 mulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
 mulV = MulV
 
 -- | UInt additoin that produces an output with carry.
--- | The standard `(+)` operator discards the carry. Use `add` to preserve the carry.
+--   The standard `(+)` operator discards the carry. Use `add` to preserve the carry.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 9)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `add` y)
+--   @
+--
 -- | @since 0.23.0
 add :: (KnownNat w) => UInt w -> UInt w -> UInt (w + 1)
 add x y = AddV [x, y]
@@ -507,6 +540,17 @@ add x y = AddV [x, y]
 -- | Batch addition of UInts with variable-width output.
 --   You can choose how many bits of carry you want to keep by declaring the width of the output in the type signature.
 --   This function allows for adding multiple UInts together in a batch.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 16)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return $ addV [x, y]
+--   @
+--
 --   @since 0.23.0
 addV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
 addV = AddV
