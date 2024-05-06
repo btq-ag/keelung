@@ -557,24 +557,23 @@ instance (Reusable t, Traversable f) => Reusable (f t) where
 assignF :: Field -> Comp Var
 assignF expr = do
   var <- freshVarF
-  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentF var expr}
+  addSideEffect $ AssignmentF var expr
   return var
 
 -- | Allocate a fresh Boolean variable and assign it to the given expression.
 assignB :: Boolean -> Comp Var
 assignB expr = do
   var <- freshVarB
-  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentB var expr}
+  addSideEffect $ AssignmentB var expr
   return var
 
 -- | Allocate a fresh UInt variable and assign it to the given expression.
 assignU :: (KnownNat w) => UInt w -> Comp Var
 assignU expr = do
-  heap <- gets compHeap
-  let encoded = runHeapM heap (encode' expr)
   let width = widthOf expr
   var <- freshVarU width
-  modify' $ \st -> st {compSideEffects = compSideEffects st :|> AssignmentU width var encoded}
+  encoded <- encodeUInt expr
+  addSideEffect $ AssignmentU width var encoded
   return var
 
 --------------------------------------------------------------------------------
@@ -644,9 +643,8 @@ assertDivMod ::
   UInt w ->
   Comp ()
 assertDivMod dividend divisor quotient remainder = do
-  heap <- gets compHeap
-  let encoded = runHeapM heap $ DivMod width <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  sideEffect <- DivMod width <$> encodeUInt dividend <*> encodeUInt divisor <*> encodeUInt quotient <*> encodeUInt remainder
+  addSideEffect sideEffect
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
@@ -713,9 +711,8 @@ assertCLDivMod ::
   UInt w ->
   Comp ()
 assertCLDivMod dividend divisor quotient remainder = do
-  heap <- gets compHeap
-  let encoded = runHeapM heap $ CLDivMod width <$> encode' dividend <*> encode' divisor <*> encode' quotient <*> encode' remainder
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  sideEffect <- CLDivMod width <$> encodeUInt dividend <*> encodeUInt divisor <*> encodeUInt quotient <*> encodeUInt remainder
+  addSideEffect sideEffect
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
 
@@ -735,10 +732,9 @@ assertCLDivMod dividend divisor quotient remainder = do
 --   @since 0.9.4.0
 assertLTE :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertLTE value bound = do
-  heap <- gets compHeap
   let width = widthOf value
-  let encoded = runHeapM heap $ AssertLTE width <$> encode' value <*> pure bound
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  encoded <- encodeUInt value
+  addSideEffect $ AssertLTE width encoded bound
 
 -- | Assert that a 'UInt' is lesser than a given bound.
 --
@@ -754,10 +750,9 @@ assertLTE value bound = do
 --   @since 0.9.5.0
 assertLT :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertLT value bound = do
-  heap <- gets compHeap
   let width = widthOf value
-  let encoded = runHeapM heap $ AssertLT width <$> encode' value <*> pure bound
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  encoded <- encodeUInt value
+  addSideEffect $ AssertLT width encoded bound
 
 -- | Assert that a 'UInt' is greater than or equal to a given bound.
 --
@@ -773,10 +768,9 @@ assertLT value bound = do
 --   @since 0.9.5.0
 assertGTE :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertGTE value bound = do
-  heap <- gets compHeap
   let width = widthOf value
-  let encoded = runHeapM heap $ AssertGTE width <$> encode' value <*> pure bound
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  encoded <- encodeUInt value
+  addSideEffect $ AssertGTE width encoded bound
 
 -- | Assert that a 'UInt' is greater than a given bound.
 --
@@ -792,10 +786,9 @@ assertGTE value bound = do
 --   @since 0.9.5.0
 assertGT :: (KnownNat w) => UInt w -> Integer -> Comp ()
 assertGT value bound = do
-  heap <- gets compHeap
   let width = widthOf value
-  let encoded = runHeapM heap $ AssertGT width <$> encode' value <*> pure bound
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> encoded})
+  encoded <- encodeUInt value
+  addSideEffect $ AssertGT width encoded bound
 
 -- | Convert a 'Field' to a 'UInt'.
 --
@@ -811,9 +804,9 @@ assertGT value bound = do
 --   @since 0.19.0
 fromField :: (KnownNat w) => Width -> Field -> Comp (UInt w)
 fromField width exprF = do
-  varF <- assignF exprF
   varU <- freshVarU width
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> ToUInt width varU varF})
+  varF <- assignF exprF
+  addSideEffect $ ToUInt width varU varF
   return (VarU varU)
 
 {-# WARNING toUInt "will be replaced by `fromField` after v0.23" #-}
@@ -836,7 +829,7 @@ toField :: (KnownNat w) => UInt w -> Comp Field
 toField exprU = do
   varU <- assignU exprU
   varF <- freshVarF
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> ToField (widthOf exprU) varU varF})
+  addSideEffect $ ToField (widthOf exprU) varU varF
   return (VarF varF)
 
 -- | Converting a list of 'Boolean' to a 'UInt', ordered from the least significant bit to the most significant bit.
@@ -862,7 +855,7 @@ fromBools bs = do
         EQ -> Seq.fromList bs
         GT -> Seq.fromList (take width bs)
   varU <- freshVarU width
-  modify' (\st -> st {compSideEffects = compSideEffects st :|> BitsToUInt width varU bs'})
+  addSideEffect $ BitsToUInt width varU bs'
   return (VarU varU)
   where
     width = fromIntegral (natVal (Proxy :: Proxy w))
@@ -870,6 +863,29 @@ fromBools bs = do
 {-# WARNING pack "will be replaced by `fromBools` after v0.23" #-}
 pack :: forall w. (KnownNat w) => [Boolean] -> Comp (UInt w)
 pack = fromBools
+
+--------------------------------------------------------------------------------
+
+-- -- | Hints for the constraint system solver
+-- class Hint a where
+--   hintWhenKnown :: a -> (n -> Comp ()) -> Comp ()
+
+-- instance (KnownNat w) => Hint (UInt w) where
+--   hintWhenKnown value callback = do
+--     encoded <- encodeUInt value
+--     modify' (\st -> st {compSideEffects = compSideEffects st :|> HintU encoded})
+
+--------------------------------------------------------------------------------
+
+-- | Helper function for encoding a 'UInt' to a 'Encoding.UInt' (to erase type-level information)
+encodeUInt :: (KnownNat w) => UInt w -> Comp Encoding.UInt
+encodeUInt value = do
+  heap <- gets compHeap
+  return $ runHeapM heap (encode' value)
+
+-- | Helper function for adding a side effect to the computation
+addSideEffect :: SideEffect -> Comp ()
+addSideEffect sideEffect = modify' (\st -> st {compSideEffects = compSideEffects st :|> sideEffect})
 
 --------------------------------------------------------------------------------
 
@@ -887,4 +903,8 @@ data SideEffect
   | AssertLT Width Encoding.UInt Integer
   | AssertGTE Width Encoding.UInt Integer
   | AssertGT Width Encoding.UInt Integer
-  deriving (Show, Eq)
+  deriving
+    ( -- | HintU Encoding.UInt
+      Show,
+      Eq
+    )
