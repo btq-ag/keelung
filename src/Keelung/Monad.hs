@@ -1,13 +1,11 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Monad and statements for building Keelung programs
 module Keelung.Monad
   ( -- * Monad
     Comp,
+    elaborateAndEncode,
 
     -- * Statements
     assert,
@@ -76,6 +74,7 @@ import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
 import Data.Data (Proxy (..))
+import Data.Foldable (Foldable (toList))
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq ((:|>)))
 import Data.Sequence qualified as Seq
@@ -87,7 +86,7 @@ import Keelung.Error
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Encode (encode', runHeapM)
+import Keelung.Syntax.Encode (Encode (encode), HeapM, encode', runHeapM)
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
 
 --------------------------------------------------------------------------------
@@ -866,14 +865,15 @@ pack = fromBools
 
 --------------------------------------------------------------------------------
 
--- -- | Hints for the constraint system solver
+-- | Hints for the constraint system solver
 -- class Hint a where
 --   hintWhenKnown :: a -> (n -> Comp ()) -> Comp ()
 
 -- instance (KnownNat w) => Hint (UInt w) where
 --   hintWhenKnown value callback = do
---     encoded <- encodeUInt value
---     modify' (\st -> st {compSideEffects = compSideEffects st :|> HintU encoded})
+--     encodedUInt <- encodeUInt value
+--     let a = elaborateAndEncode callback
+--     addSideEffect $ HintU encodedUInt
 
 --------------------------------------------------------------------------------
 
@@ -886,6 +886,37 @@ encodeUInt value = do
 -- | Helper function for adding a side effect to the computation
 addSideEffect :: SideEffect -> Comp ()
 addSideEffect sideEffect = modify' (\st -> st {compSideEffects = compSideEffects st :|> sideEffect})
+
+--------------------------------------------------------------------------------
+
+-- | Elaborate a program and encode it
+elaborateAndEncode :: (Encode t) => Comp t -> Either Error Encoding.Elaborated
+elaborateAndEncode prog = encodeElaborated <$> elaborate prog
+  where
+    encodeElaborated :: (Encode t) => Elaborated t -> Encoding.Elaborated
+    encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
+      let Computation counters _addrSize _heap assertions sideEffects = comp
+       in Encoding.Elaborated
+            <$> encode expr
+            <*> ( Encoding.Computation
+                    counters
+                    <$> mapM encode assertions
+                    <*> mapM encodeSideEffect sideEffects
+                )
+
+    encodeSideEffect :: SideEffect -> HeapM Encoding.SideEffect
+    encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
+    encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
+    encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
+    encodeSideEffect (ToUInt width a b) = return $ Encoding.ToUInt width a b
+    encodeSideEffect (ToField width a b) = return $ Encoding.ToField width a b
+    encodeSideEffect (BitsToUInt width var vals) = Encoding.BitsToUInt width var <$> mapM encode' (toList vals)
+    encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
+    encodeSideEffect (CLDivMod width a b q r) = return $ Encoding.CLDivMod width a b q r
+    encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b
+    encodeSideEffect (AssertLT width a b) = return $ Encoding.AssertLT width a b
+    encodeSideEffect (AssertGTE width a b) = return $ Encoding.AssertGTE width a b
+    encodeSideEffect (AssertGT width a b) = return $ Encoding.AssertGT width a b
 
 --------------------------------------------------------------------------------
 
@@ -903,8 +934,4 @@ data SideEffect
   | AssertLT Width Encoding.UInt Integer
   | AssertGTE Width Encoding.UInt Integer
   | AssertGT Width Encoding.UInt Integer
-  deriving
-    ( -- | HintU Encoding.UInt
-      Show,
-      Eq
-    )
+  deriving (Show, Eq)

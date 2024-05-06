@@ -1,7 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -38,7 +36,6 @@ module Keelung
     -- genCircuitDefault,
     genInputs,
     genInputsDefault,
-    elaborateAndEncode,
     Encode,
     GaloisField,
     keelungVersion,
@@ -48,7 +45,6 @@ where
 import Control.Monad.Except
 import Data.ByteString.Char8 qualified as BS
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.List (intercalate)
 import Data.Serialize (Serialize)
 import Data.Serialize qualified as Serialize
@@ -62,7 +58,6 @@ import Keelung.Monad
 import Keelung.Options
 import Keelung.Syntax
 import Keelung.Syntax.Encode
-import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
 import System.IO.Error qualified as IO
 import System.Info qualified
@@ -296,37 +291,6 @@ solveOutputEither fieldType prog publicInput privateInput =
         elab <- liftEither (elaborateAndEncode prog)
         callKeelungc ["protocol", "solve"] (fieldType, elab, publicInput, privateInput)
     )
-
---------------------------------------------------------------------------------
-
--- | Elaborate a program and encode it
-elaborateAndEncode :: (Encode t) => Comp t -> Either Error Encoding.Elaborated
-elaborateAndEncode prog = encodeElaborated <$> elaborate prog
-  where
-    encodeElaborated :: (Encode t) => Elaborated t -> Encoding.Elaborated
-    encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap assertions sideEffects = comp
-       in Encoding.Elaborated
-            <$> encode expr
-            <*> ( Encoding.Computation
-                    counters
-                    <$> mapM encode assertions
-                    <*> mapM encodeSideEffect sideEffects
-                )
-
-    encodeSideEffect :: SideEffect -> HeapM Encoding.SideEffect
-    encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
-    encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
-    encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
-    encodeSideEffect (ToUInt width a b) = return $ Encoding.ToUInt width a b
-    encodeSideEffect (ToField width a b) = return $ Encoding.ToField width a b
-    encodeSideEffect (BitsToUInt width var vals) = Encoding.BitsToUInt width var <$> mapM encode' (toList vals)
-    encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
-    encodeSideEffect (CLDivMod width a b q r) = return $ Encoding.CLDivMod width a b q r
-    encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b
-    encodeSideEffect (AssertLT width a b) = return $ Encoding.AssertLT width a b
-    encodeSideEffect (AssertGTE width a b) = return $ Encoding.AssertGTE width a b
-    encodeSideEffect (AssertGT width a b) = return $ Encoding.AssertGT width a b
 
 --------------------------------------------------------------------------------
 
