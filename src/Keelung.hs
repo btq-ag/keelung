@@ -294,7 +294,7 @@ solveOutputEither fieldType prog publicInput privateInput =
   runM
     ( do
         elab <- liftEither (elaborateAndEncode prog)
-        callKeelungc ["protocol", "solveOutput"] (fieldType, elab, publicInput, privateInput)
+        callKeelungc ["protocol", "solve"] (fieldType, elab, publicInput, privateInput)
     )
 
 --------------------------------------------------------------------------------
