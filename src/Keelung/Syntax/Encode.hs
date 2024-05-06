@@ -81,6 +81,8 @@ instance (KnownNat w) => Encode' (Syntax.UInt w) UInt where
     Syntax.AESMulU x y -> AESMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.CLMulU x y -> CLMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.MMIU x p -> MMIU (widthOf x) <$> encode' x <*> pure p
+    Syntax.DivU x y -> DivU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.ModU x y -> ModU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.AndU x y -> AndU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.OrU x y -> OrU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y

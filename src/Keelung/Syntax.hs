@@ -29,6 +29,8 @@ module Keelung.Syntax
     mulV,
     add,
     addV,
+    divU,
+    modU,
     Var,
     Width,
   )
@@ -137,6 +139,9 @@ data UInt w where
   CLMulU :: UInt w -> UInt w -> UInt w
   -- | Modular multiplicative inverse
   MMIU :: UInt w -> Integer -> UInt w
+  -- | Division / Modulus
+  DivU :: UInt w -> UInt w -> UInt w
+  ModU :: UInt w -> UInt w -> UInt w
   -- | Conditionals
   IfU :: Boolean -> UInt w -> UInt w -> UInt w
   -- | Bitwise operations
@@ -177,24 +182,26 @@ instance Ord (UInt (w :: Nat)) where
       tag (VarUP _) = 3
       tag (BtoU _) = 4
       tag (AddU _ _) = 5
-      tag (AddV _) = 5
-      tag (SubU _ _) = 6
-      tag (MulU _ _) = 7
-      tag (MulD _ _) = 7
-      tag (MulV _ _) = 7
-      tag (AESMulU _ _) = 8
-      tag (CLMulU _ _) = 9
-      tag (MMIU _ _) = 10
-      tag (AndU _ _) = 11
-      tag (OrU _ _) = 12
-      tag (XorU _ _) = 13
-      tag (NotU _) = 14
-      tag (RoLU {}) = 15
-      tag (ShLU {}) = 16
-      tag (SetU {}) = 17
-      tag (IfU {}) = 18
-      tag (SliceU {}) = 19
-      tag (JoinU {}) = 20
+      tag (AddV _) = 6
+      tag (SubU _ _) = 7
+      tag (MulU _ _) = 8
+      tag (MulD _ _) = 9
+      tag (MulV _ _) = 10
+      tag (AESMulU _ _) = 11
+      tag (CLMulU _ _) = 12
+      tag (MMIU _ _) = 13
+      tag (DivU _ _) = 14
+      tag (ModU _ _) = 15
+      tag (AndU _ _) = 16
+      tag (OrU _ _) = 17
+      tag (XorU _ _) = 18
+      tag (NotU _) = 19
+      tag (RoLU {}) = 20
+      tag (ShLU {}) = 21
+      tag (SetU {}) = 22
+      tag (IfU {}) = 23
+      tag (SliceU {}) = 24
+      tag (JoinU {}) = 25
 
 instance (KnownNat w) => Show (UInt w) where
   showsPrec prec expr = case expr of
@@ -211,6 +218,8 @@ instance (KnownNat w) => Show (UInt w) where
     AESMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
     CLMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    ModU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " % " . showsPrec 8 y
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
@@ -554,6 +563,38 @@ add x y = AddV [x, y]
 --   @since 0.23.0
 addV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
 addV = AddV
+
+-- | Division of Unsigned integers.
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input Public
+--     divisor <- input Public
+--     return $ dividend `divU` divisor
+--   @
+--
+--   @since 0.24.0
+divU :: UInt w -> UInt w -> UInt w
+divU = DivU
+
+-- | Modulus of Unsigned integers.
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input Public
+--     divisor <- input Public
+--     return $ dividend `modU` divisor
+--   @
+--
+--   @since 0.24.0
+modU :: UInt w -> UInt w -> UInt w
+modU = ModU
 
 --------------------------------------------------------------------------------
 
