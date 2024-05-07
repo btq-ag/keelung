@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -- | Syntax of the Keelung language
 module Keelung.Syntax
@@ -35,6 +36,7 @@ where
 import Data.Data
 import Data.Kind (Type)
 import GHC.TypeNats
+import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
@@ -65,7 +67,7 @@ data Field
     IfF Boolean Field Field
   | -- | Conversion from Booleans to Field elements
     BtoF Boolean
-  deriving (Ord)
+  deriving (Generic, Ord)
 
 instance Eq Field where
   Integer x == Integer y = x == y
