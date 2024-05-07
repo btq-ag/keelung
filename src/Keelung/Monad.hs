@@ -255,10 +255,10 @@ instance (GInput a, GInput b) => GInput (a :*: b) where
     return (a' :*: b')
 
 instance (GInput a) => GInput (M1 i c a) where
-  ginput (M1 x) acc = ginput x acc >> return (M1 x)
+  ginput (M1 x) acc = ginput x acc >>= \y -> return (M1 y)
 
 instance (Input a) => GInput (K1 i a) where
-  ginput (K1 x) acc = inputs x acc >> return (K1 x)
+  ginput (K1 x) acc = inputs x acc >>= \y -> return (K1 y)
 
 -- | Typeclass for operations on base types
 class Input t where
