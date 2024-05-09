@@ -24,6 +24,10 @@ module Keelung.Monad
     fromField,
     SideEffect (..),
 
+    -- * Solver Hints
+    solve,
+    assertHint,
+
     -- * Inputs
     Proper (..),
     freshVarField,
@@ -73,8 +77,10 @@ where
 import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.State.Strict hiding (get, put)
+import Control.Monad.Writer
 import Data.Data (Proxy (..))
 import Data.Foldable (Foldable (toList))
+import Data.IntMap (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq ((:|>)))
 import Data.Sequence qualified as Seq
@@ -101,13 +107,15 @@ data Computation = Computation
     compHeap :: Heap,
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Boolean],
+    -- Hints are expressions for instructing the solver on how to solve the constraints
+    compHints :: Hints,
     -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
     compSideEffects :: Seq SideEffect
   }
   deriving (Eq)
 
 instance Show Computation where
-  show (Computation _ addrSize _ assertions _) =
+  show (Computation _ addrSize _ assertions _ _) =
     "{\n"
       <> "  Address size: "
       <> show addrSize
@@ -147,7 +155,7 @@ type Comp = StateT Computation (Except ElabError)
 -- | Elaborates a Keelung program
 elaborate :: Comp t -> Either Error (Elaborated t)
 elaborate prog = do
-  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty mempty) prog
+  (expr, comp) <- left ElabError $ runComp (Computation mempty 0 mempty mempty emptyHints mempty) prog
   return $ Elaborated expr comp
 
 -- | How to run the 'Comp' monad
@@ -865,15 +873,50 @@ pack = fromBools
 
 --------------------------------------------------------------------------------
 
--- | Hints for the constraint system solver
--- class Hint a where
---   hintWhenKnown :: a -> (n -> Comp ()) -> Comp ()
+-- | Data structure for storing hints
+data Hints = Hints
+  { hintsF :: IntMap (Field, [Boolean]), -- var - hints
+    hintsB :: IntMap (Boolean, [Boolean]), -- var - hints
+    hintsU :: IntMap (IntMap (Encoding.UInt, [Boolean])) -- width - (var - hints)
+  }
+  deriving (Show, Eq)
 
--- instance (KnownNat w) => Hint (UInt w) where
---   hintWhenKnown value callback = do
---     encodedUInt <- encodeUInt value
---     let a = elaborateAndEncode callback
---     addSideEffect $ HintU encodedUInt
+emptyHints :: Hints
+emptyHints = Hints mempty mempty mempty
+
+-- | Typeclass for constructing hints
+class Hint a where
+  solve ::
+    a -> -- target expression
+    (a -> HintM ()) -> -- callback to be invoked when the target expression has been solved
+    Comp ()
+
+-- | For constructing hints in the callback
+assertHint :: Boolean -> HintM ()
+assertHint = tell . pure
+
+type HintM = WriterT [Boolean] Comp
+
+instance Hint Field where
+  solve target callback = do
+    var <- freshVarF
+    hints <- execWriterT (callback (VarF var))
+    modify' $ \st -> st {compHints = (compHints st) {hintsF = IntMap.insert var (target, hints) (hintsF (compHints st))}}
+
+instance Hint Boolean where
+  solve target callback = do
+    var <- freshVarF
+    hints <- execWriterT (callback (VarB var))
+    modify' $ \st -> st {compHints = (compHints st) {hintsB = IntMap.insert var (target, hints) (hintsB (compHints st))}}
+
+instance (KnownNat w) => Hint (UInt w) where
+  solve target callback = do
+    var <- freshVarU width
+    targetEncoded <- encodeUInt target
+    hints <- execWriterT (callback (VarU var))
+    modify' $ \st -> st {compHints = (compHints st) {hintsU = IntMap.insert width (IntMap.insert var (targetEncoded, hints) (IntMap.findWithDefault mempty width (hintsU (compHints st)))) (hintsU (compHints st))}}
+    where
+      width = fromIntegral (natVal (Proxy :: Proxy w))
 
 --------------------------------------------------------------------------------
 
@@ -895,7 +938,7 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where
     encodeElaborated :: (Encode t) => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap assertions sideEffects = comp
+      let Computation counters _addrSize _heap assertions _hints sideEffects = comp
        in Encoding.Elaborated
             <$> encode expr
             <*> ( Encoding.Computation
