@@ -7,10 +7,12 @@ module Keelung.Syntax.Encode.Syntax where
 import Control.DeepSeq (NFData)
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
+-- import Keelung.Data.Struct
+
+import Data.IntMap (IntMap)
 import Data.Sequence (Seq)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
--- import Keelung.Data.Struct
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters (Counters)
 
@@ -300,12 +302,26 @@ data Computation = Computation
     compCounters :: !Counters,
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
+    -- Hints for the constraint solver
+    compHints :: Hints,
     -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
     compSideEffects :: Seq SideEffect
   }
   deriving (Show, Generic, NFData)
 
 instance Serialize Computation
+
+--------------------------------------------------------------------------------
+
+-- | Data structure for storing hints
+data Hints = Hints
+  { hintsF :: IntMap (Field, [Boolean]),
+    hintsB :: IntMap (Boolean, [Boolean]),
+    hintsU :: IntMap (IntMap (UInt, [Boolean]))
+  }
+  deriving (Show, Generic, NFData)
+
+instance Serialize Hints
 
 --------------------------------------------------------------------------------
 

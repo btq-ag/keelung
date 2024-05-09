@@ -11,6 +11,7 @@ module Keelung.Syntax.Encode
     HeapM,
     encode',
     Expr (..),
+    Hints (..),
   )
 where
 

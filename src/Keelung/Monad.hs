@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Monad and statements for building Keelung programs
 module Keelung.Monad
@@ -938,14 +939,22 @@ elaborateAndEncode prog = encodeElaborated <$> elaborate prog
   where
     encodeElaborated :: (Encode t) => Elaborated t -> Encoding.Elaborated
     encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap assertions _hints sideEffects = comp
+      let Computation counters _addrSize _heap assertions hints sideEffects = comp
        in Encoding.Elaborated
             <$> encode expr
             <*> ( Encoding.Computation
                     counters
                     <$> mapM encode assertions
+                    <*> encodeHints hints
                     <*> mapM encodeSideEffect sideEffects
                 )
+
+    encodeHints :: Hints -> HeapM Encoding.Hints
+    encodeHints (Hints fs bs uss) =
+      Encoding.Hints
+        <$> mapM (\(target, hints) -> (,) <$> encode' target <*> mapM encode' hints) fs
+        <*> mapM (\(target, hints) -> (,) <$> encode' target <*> mapM encode' hints) bs
+        <*> mapM (mapM (\(target, hints) -> (target,) <$> mapM encode' hints)) uss
 
     encodeSideEffect :: SideEffect -> HeapM Encoding.SideEffect
     encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
