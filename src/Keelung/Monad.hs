@@ -8,6 +8,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 -- | Monad and statements for building Keelung programs
 module Keelung.Monad
@@ -32,13 +34,16 @@ module Keelung.Monad
     SideEffect (..),
 
     -- * Inputs
-    Input (inputs),
+    Input (..),
+    Inputable (..),
+    Pub,
+    Prv,
+    getVar,
     Proper (..),
     freshVarField,
     freshVarBool,
     freshVarUInt,
     InputAccess (..),
-    input,
     inputField,
     inputBool,
     inputUInt,
@@ -96,7 +101,7 @@ import Keelung.Error
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Encode (encode', runHeapM)
+import Keelung.Syntax.Encode (encode', runHeapM, Encode(..))
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import Data.Kind
 
@@ -227,50 +232,139 @@ freshInputVar acc readType writeType n = do
 
 --------------------------------------------------------------------------------
 
--- data Choice = C | N
--- type Choices = [Choice]
-
--- TODO: Need a chosing scheme for input datatype
-class GInput (f :: Type -> Type) where
-  -- data Become :: f a -> Type
-
-  -- the first f x is for schema only, showing how
-  -- the input should be deconstructed when there are
-  -- more than one ways.
-  -- e.g. For a 
-  ginput :: f x -> InputAccess -> Comp (f x)
-
-instance GInput U1 where
-  ginput U1 _ = return U1
-
-instance (GInput a, GInput b) => GInput (a :+: b) where
-  ginput (L1 res) acc = L1 <$> ginput res acc
-  ginput (R1 res) acc = R1 <$> ginput res acc
-
--- flatten all elements into 1-d array
-instance (GInput a, GInput b) => GInput (a :*: b) where
-  ginput (l :*: r) acc = do
-    a' <- ginput l acc
-    b' <- ginput r acc
-    return (a' :*: b')
-
-instance (GInput a) => GInput (M1 i c a) where
-  ginput (M1 x) acc = ginput x acc >>= \y -> return (M1 y)
-
-instance (Input a) => GInput (K1 i a) where
-  ginput (K1 x) acc = inputs x acc >>= \y -> return (K1 y)
-
+-- -- | TODO: need a chosing scheme for input datatype?
+-- --   pre-determine "shape" of type at compile time
+-- --     -> less flexibility, better optimization
+-- --   Is it possible to have any types as inputs?
+-- class GInput (f :: Type -> Type) where
+--   -- the first f x is for schema only, showing how
+--   -- the input should be deconstructed when there are
+--   -- more than one ways.
+--   ginput :: f x -> InputAccess -> Comp (f x)
+-- 
+-- instance GInput U1 where
+--   ginput U1 _ = return U1
+-- 
+-- instance (GInput a, GInput b) => GInput (a :+: b) where
+--   ginput (L1 res) acc = L1 <$> ginput res acc
+--   ginput (R1 res) acc = R1 <$> ginput res acc
+-- 
+-- -- flatten all elements into 1-d array
+-- instance (GInput a, GInput b) => GInput (a :*: b) where
+--   ginput (l :*: r) acc = do
+--     a' <- ginput l acc
+--     b' <- ginput r acc
+--     return (a' :*: b')
+-- 
+-- instance (GInput a) => GInput (M1 i c a) where
+--   ginput (M1 x) acc = ginput x acc >>= \y -> return (M1 y)
+-- 
+-- instance (Input a) => GInput (K1 i a) where
+--   ginput (K1 x) acc = inputs x acc >>= \y -> return (K1 y)
+-- 
 -- | Typeclass for operations on base types
 class Input t where
   -- | Request a fresh input variable
   --
   --   @since 0.1.0.0
-  inputs :: t -> InputAccess -> Comp t
-  default inputs :: (Generic t, GInput (Rep t)) => t -> InputAccess -> Comp t
-  inputs x acc = to <$> ginput (from x) acc
+  input :: InputAccess -> Comp t
 
-input :: (Input t) => InputAccess -> Comp t
-input = inputs (error "This type needs a dummy value to represent its input structure.")
+-- input :: (Input t) => InputAccess -> Comp t
+-- input = inputs (error "This type needs a dummy value to represent its input structure.")
+
+---- // Experimenting Generalized Datatype as Inputs
+
+data KVar :: (InputAccess -> Type -> Type) where
+  PubVar :: t -> KVar 'Public t
+  PrvVar :: t -> KVar 'Private t
+
+type Pub t = KVar 'Public t
+type Prv t = KVar 'Private t
+
+getVar :: KVar i t -> t
+getVar (PubVar a) = a
+getVar (PrvVar a) = a
+
+-- | functors for KVar's representation
+data IsPub :: Type -> Type -> Type where IsPub :: t -> IsPub t a
+data IsPrv :: Type -> Type -> Type where IsPrv :: t -> IsPrv t a
+
+instance Encode t => Encode (KVar i t) where
+  encode (PubVar a) = encode a
+  encode (PrvVar a) = encode a
+
+instance Generic (KVar 'Public t) where
+  type Rep (KVar 'Public t) = IsPub t
+  from (PubVar t) = IsPub t
+  to (IsPub t) = PubVar t
+
+instance Generic (KVar 'Private t) where
+  type Rep (KVar 'Private t) = IsPrv t
+  from (PrvVar t) = IsPrv t
+  to (IsPrv t) = PrvVar t
+
+class GInputable f where
+  ginput :: Comp (f x)
+
+instance Inputable t => GInputable (IsPub t) where
+  ginput = do
+    a <- input' :: Comp t
+    return (from $ PubVar a)
+
+instance Inputable t => GInputable (IsPrv t) where
+  ginput = do
+    a <- input' :: Comp t
+    return (from $ PrvVar a)
+
+instance GInputable U1 where
+  ginput = return U1
+
+-- flatten all elements into 1-d array
+instance (GInputable a, GInputable b) => GInputable (a :*: b) where
+  ginput = do
+    a' <- ginput
+    b' <- ginput
+    return (a' :*: b')
+
+instance (GInputable a) => GInputable (M1 i c a) where
+  ginput = M1 <$> ginput
+
+instance (Inputable a) => GInputable (K1 i a) where
+  ginput = K1 <$> input'
+
+-- | class for types that are "inputable", i.e., products that contains only base types.
+--   Conditions for inputables:
+--   1. Only product types allowed
+--   2. Every base field must contains accessibility info
+class Inputable a where
+  input' :: Comp a
+  default input' :: (Generic a, GInputable (Rep a)) => Comp a
+  input' = to <$> ginput
+
+instance Inputable (KVar 'Public Field) where
+  input' = PubVar <$> inputField Public
+
+instance Inputable (KVar 'Private Field) where
+  input' = PrvVar <$> inputField Public
+
+instance Inputable (KVar 'Public Boolean) where
+  input' = PubVar <$> inputBool Public
+
+instance Inputable (KVar 'Private Boolean) where
+  input' = PrvVar <$> inputBool Private
+
+instance (KnownNat w) => Inputable (KVar 'Public (UInt w)) where
+  input' = PubVar <$> inputUInt Public
+
+instance (KnownNat w) => Inputable (KVar 'Private (UInt w)) where
+  input' = PrvVar <$> inputUInt Private
+
+----
+
+
+-- | TODO: modify input to not have a choosing scheme - users can decide how it's constructed.
+--   FOR NOW Encoding is not one-to-one, must be fixed before Decoding is possible.
+-- decodeInput :: [Field] -> t
 
 class Proper t where
   -- | Request a fresh variable
@@ -290,7 +384,7 @@ class Proper t where
 
 
 instance Input Field where
-  inputs _ = inputField
+  input = inputField
 
   -- \| Specialized implementation for Field
   -- inputList acc len = do
@@ -305,7 +399,7 @@ instance Proper Field where
   cond = IfF
 
 instance Input Boolean where
-  inputs _ = inputBool
+  input = inputBool
 
 instance Proper Boolean where
   -- \| Specialized implementation for Boolean
@@ -320,7 +414,7 @@ instance Proper Boolean where
   cond = IfB
 
 instance (KnownNat w) => Input (UInt w) where
-  inputs _ = inputUInt
+  input = inputUInt
 
 instance (KnownNat w) => Proper (UInt w) where
   -- \| Specialized implementation for UInt
@@ -338,20 +432,19 @@ instance (KnownNat w) => Proper (UInt w) where
 
   cond = IfU
 
-instance Input ()
-instance Input Bool
-instance (Input a) => Input [a]
-instance (Input a) => Input (Proxy a)
-instance (Input a, Input b) => Input (a, b)
-instance (Input a, Input b, Input c) => Input (a, b, c)
-instance (Input a, Input b, Input c, Input d) => Input (a, b, c, d)
-instance (Input a, Input b, Input c, Input d, Input e) => Input (a, b, c, d, e)
-instance (Input a, Input b, Input c, Input d, Input e, Input f) => Input (a, b, c, d, e, f)
-instance (Input t) => Input (Maybe t) where
-instance (Input a, Input b) => Input (Either a b) where
+instance Inputable ()
+-- instance (Inputable a) => Inputable [a]
+instance (Inputable a) => Inputable (Proxy a)
+instance (Inputable a, Inputable b) => Inputable (a, b)
+instance (Inputable a, Inputable b, Inputable c) => Inputable (a, b, c)
+instance (Inputable a, Inputable b, Inputable c, Inputable d) => Inputable (a, b, c, d)
+instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e) => Inputable (a, b, c, d, e)
+instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f) => Inputable (a, b, c, d, e, f)
+-- instance (Input t) => Input (Maybe t) where
+-- instance (Input a, Input b) => Input (Either a b) where
 
 inputList :: (Input t) => InputAccess -> Int -> Comp [t]
-inputList acc len = inputs (replicate len undefined) acc
+inputList acc len = replicateM len (input acc)
 -- instance (Input t) => Input [t] where
 --   size = length
 -- 
