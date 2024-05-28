@@ -13,6 +13,7 @@ module Keelung
     keelung,
     -- interpret
     interpret,
+    interpretData,
     interpretEither,
     -- compile
     compile,
@@ -22,6 +23,7 @@ module Keelung
     rtsoptMemory,
     -- solve R1CS
     solveOutput,
+    solveOutputData,
     solveOutputEither,
     -- witness generation
     witness,
@@ -68,6 +70,10 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+-- import Data.Aeson qualified as JSON (Value(..))
+-- import Data.Aeson (ToJSON(..), FromJSON(..))
+-- import Data.Aeson.KeyMap (elems)
+-- import Data.Scientific (floatingOrInteger)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
@@ -133,6 +139,19 @@ rtsoptMemory :: Int -> Int -> Int -> [String]
 rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show a <> "M"]
 
 --------------------------------------------------------------------------------
+
+-- jsonInputs :: (ToJSON t) => t -> [Integer] 
+-- jsonInputs a = fromValue $ toJSON a
+--   where
+--     fromValue :: JSON.Value -> [Integer]
+--     fromValue (JSON.Object o) = mconcat $ map fromValue (elems o)
+--     fromValue (JSON.Array arr) = mconcat $ toList $ fmap fromValue arr
+--     fromValue (JSON.String _) = error "Cannot encode strings."
+--     fromValue (JSON.Number n) = case floatingOrInteger n :: Either Float Integer of
+--                                   (Right i) -> [ i ]
+--                                   (Left _) -> error "Cannot encode float points."
+--     fromValue (JSON.Bool b) = if b then [ 1 ] else [ 0 ]
+--     fromValue JSON.Null = []
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
 prove' ::
@@ -273,6 +292,10 @@ printErrorInstead (Right values) = return values
 interpret :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 interpret fieldType prog publicInput privateInput = interpretEither fieldType prog publicInput privateInput >>= printErrorInstead
 
+-- | Interpret a program where public and private inputs are provided as datatype encodable to JSON.
+interpretData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+interpretData fieldType prog pub prv = interpret fieldType prog (toInts pub) (toInts prv)
+
 -- | Interpret a program with public and private inputs
 interpretEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
 interpretEither fieldType prog publicInput privateInput =
@@ -287,6 +310,9 @@ interpretEither fieldType prog publicInput privateInput =
 -- | Solves the R1CS of a Keelung program with given inputs and outputs the result
 solveOutput :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 solveOutput fieldType prog publicInput privateInput = solveOutputEither fieldType prog publicInput privateInput >>= printErrorInstead
+
+solveOutputData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+solveOutputData fieldType prog pub prv = solveOutput fieldType prog (toInts pub) (toInts prv)
 
 -- | Solves the R1CS of a Keelung program with given inputs and outputs the result
 solveOutputEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])

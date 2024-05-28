@@ -35,10 +35,11 @@ module Keelung.Monad
 
     -- * Inputs
     Input (..),
-    Inputable (..),
-    Pub,
-    Prv,
-    getVar,
+    -- Inputable (..),
+    -- Pub,
+    -- Prv,
+    -- getVar,
+    Encodeable(..),
     Proper (..),
     freshVarField,
     freshVarBool,
@@ -101,9 +102,8 @@ import Keelung.Error
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Encode (encode', runHeapM, Encode(..))
+import Keelung.Syntax.Encode (encode', runHeapM)
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
-import Data.Kind
 
 --------------------------------------------------------------------------------
 
@@ -232,139 +232,236 @@ freshInputVar acc readType writeType n = do
 
 --------------------------------------------------------------------------------
 
--- -- | TODO: need a chosing scheme for input datatype?
--- --   pre-determine "shape" of type at compile time
--- --     -> less flexibility, better optimization
--- --   Is it possible to have any types as inputs?
--- class GInput (f :: Type -> Type) where
---   -- the first f x is for schema only, showing how
---   -- the input should be deconstructed when there are
---   -- more than one ways.
---   ginput :: f x -> InputAccess -> Comp (f x)
+---- // Generalized Datatype input with typed access info
+
+-- data KVar :: (InputAccess -> Type -> Type) where
+--   PubVar :: t -> KVar 'Public t
+--   PrvVar :: t -> KVar 'Private t
 -- 
--- instance GInput U1 where
---   ginput U1 _ = return U1
+-- type Pub t = KVar 'Public t
+-- type Prv t = KVar 'Private t
 -- 
--- instance (GInput a, GInput b) => GInput (a :+: b) where
---   ginput (L1 res) acc = L1 <$> ginput res acc
---   ginput (R1 res) acc = R1 <$> ginput res acc
+-- getVar :: KVar i t -> t
+-- getVar (PubVar a) = a
+-- getVar (PrvVar a) = a
+-- 
+-- -- | functors for KVar's representation
+-- data IsPub :: Type -> Type -> Type where IsPub :: t -> IsPub t a
+-- data IsPrv :: Type -> Type -> Type where IsPrv :: t -> IsPrv t a
+-- 
+-- instance Encode t => Encode (KVar i t) where
+--   encode (PubVar a) = encode a
+--   encode (PrvVar a) = encode a
+-- 
+-- instance Generic (KVar 'Public t) where
+--   type Rep (KVar 'Public t) = IsPub t
+--   from (PubVar t) = IsPub t
+--   to (IsPub t) = PubVar t
+-- 
+-- instance Generic (KVar 'Private t) where
+--   type Rep (KVar 'Private t) = IsPrv t
+--   from (PrvVar t) = IsPrv t
+--   to (IsPrv t) = PrvVar t
+-- 
+-- class GInputable f where
+--   ginput :: Comp (f x)
+--   encode :: f x -> [ Field ]
+--
+-- instance Inputable t => GInputable (IsPub t) where
+--   ginput = do
+--     a <- input' :: Comp t
+--     return (from $ PubVar a)
+-- 
+-- instance Inputable t => GInputable (IsPrv t) where
+--   ginput = do
+--     a <- input' :: Comp t
+--     return (from $ PrvVar a)
+-- 
+-- instance GInputable U1 where
+--   ginput = return U1
+-- 
+-- -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
 -- 
 -- -- flatten all elements into 1-d array
--- instance (GInput a, GInput b) => GInput (a :*: b) where
---   ginput (l :*: r) acc = do
---     a' <- ginput l acc
---     b' <- ginput r acc
+-- instance (GInputable a, GInputable b) => GInputable (a :*: b) where
+--   ginput = do
+--     a' <- ginput
+--     b' <- ginput
 --     return (a' :*: b')
 -- 
--- instance (GInput a) => GInput (M1 i c a) where
---   ginput (M1 x) acc = ginput x acc >>= \y -> return (M1 y)
+-- instance (GInputable a) => GInputable (M1 i c a) where
+--   ginput = M1 <$> ginput
 -- 
--- instance (Input a) => GInput (K1 i a) where
---   ginput (K1 x) acc = inputs x acc >>= \y -> return (K1 y)
+-- instance (Inputable a) => GInputable (K1 i a) where
+--   ginput = K1 <$> input'
 -- 
--- | Typeclass for operations on base types
+-- -- | class for types that are "inputable", i.e., products that contains only base types.
+-- --   Conditions for inputables:
+-- --   1. Only product types allowed
+-- --   2. Every base field must contains accessibility info
+-- class Inputable a where
+--   input' :: Comp a
+--   default input' :: (Generic a, GInputable (Rep a)) => Comp a
+--   input' = to <$> ginput
+-- 
+-- instance (Input a) => Inputable (KVar 'Public a) where
+--   input' = PubVar <$> input Public
+-- 
+-- instance (Input a) => Inputable (KVar 'Private a) where
+--   input' = PrvVar <$> input Private
+-- 
+-- ----
+-- 
+-- class Erasable a where
+--   type Erased a
+--   type Erased a = a
+--   erase :: a -> Erased a 
+--   default erase :: (Generic a, Generic (Erased a),
+--                     GErasable (Rep a), GErasable (Rep (Erased a)),
+--                     GErased (Rep a) ~ Rep (Erased a))
+--                        => a -> Erased a
+--   erase = to . gerase . from
+-- 
+-- class GErasable f where
+--   type GErased f :: Type -> Type
+--   type GErased f = f
+--   gerase :: f x -> GErased f x
+-- 
+-- instance GErasable U1 where
+--   type GErased U1 = U1
+--   gerase U1 = U1
+-- 
+-- instance (GErasable a, GErasable b) => GErasable (a :*: b) where
+--   type GErased (a :*: b) = GErased a :*: GErased b
+--   gerase (a :*: b) = gerase a :*: gerase b
+-- 
+-- instance (GErasable a) => GErasable (M1 i c a) where
+--   type GErased (M1 i c a) = M1 i c (GErased a)
+--   gerase (M1 a) = M1 (gerase a)
+-- 
+-- instance (Erasable a) => GErasable (K1 i a) where
+--   type GErased (K1 i a) = K1 i (Erased a)
+--   gerase (K1 a) = K1 (erase a)
+-- 
+-- -- Erase Access info from the datatype
+-- instance (Generic a) => Erasable (KVar i a) where
+--   type Erased (KVar i a) = a
+--   erase = getVar
+-- 
+-- -- Instances of these base types assure termination.
+-- instance Erasable Field where
+--   erase = id
+-- 
+-- instance Erasable Boolean where
+--   erase = id
+-- 
+-- instance (KnownNat w) => Erasable (UInt w) where
+--   erase = id
+-- 
+-- type Erasables :: [k] -> Constraint
+-- type family Erasables ks where
+--   Erasables '[] = ()
+--   Erasables (k:ks) = Erasable k & Erasables ks
+-- 
+-- -- Generic instances
+-- instance Erasable () where
+-- 
+-- instance (Erasable a) => Erasable (Proxy a) where
+--   type Erased (Proxy a) = Proxy (Erased a)
+-- 
+-- instance (Erasables [a, b, Erased a, Erased b]) => Erasable (a, b) where
+--   type Erased (a, b) = (Erased a, Erased b)
+-- 
+-- instance (Erasables [a, b, c, Erased a, Erased b, Erased c]) => Erasable (a, b, c) where
+--   type Erased (a, b, c) = (Erased a, Erased b, Erased c)
+-- 
+-- instance (Erasables [a, b, c, d, Erased a, Erased b, Erased c, Erased d]) => Erasable (a, b, c, d) where
+--   type Erased (a, b, c, d) = (Erased a, Erased b, Erased c, Erased d)
+-- 
+-- instance (Erasables [a, b, c, d, e, Erased a, Erased b, Erased c, Erased d, Erased e]) => Erasable (a, b, c, d, e) where
+--   type Erased (a, b, c, d, e) = (Erased a, Erased b, Erased c, Erased d, Erased e)
+-- 
+-- instance (Erasables [a, b, c, d, e, f, Erased a, Erased b, Erased c, Erased d, Erased e, Erased f]) => Erasable (a, b, c, d, e, f) where
+--   type Erased (a, b, c, d, e, f) = (Erased a, Erased b, Erased c, Erased d, Erased e, Erased f)
+-- 
+-- infolessField :: Field
+-- infolessField =
+--   let kf = (PubVar 1, PrvVar 2) :: (Pub Field, Prv Field)
+--    in fst (erase kf)
+-- 
+-- instance Inputable ()
+-- instance (Inputable a) => Inputable (Proxy a)
+-- instance (Inputable a, Inputable b) => Inputable (a, b)
+-- instance (Inputable a, Inputable b, Inputable c) => Inputable (a, b, c)
+-- instance (Inputable a, Inputable b, Inputable c, Inputable d) => Inputable (a, b, c, d)
+-- instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e) => Inputable (a, b, c, d, e)
+-- instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f) => Inputable (a, b, c, d, e, f)
+
+----
+
+class GEncodeable f where
+  ginput  :: InputAccess -> Comp (f x)
+  gtoInts :: f x -> [ Integer ]
+
+instance GEncodeable U1 where
+  ginput _ = return U1
+  gtoInts U1 = []
+
+-- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
+
+-- flatten all elements into 1-d array
+instance (GEncodeable a, GEncodeable b) => GEncodeable (a :*: b) where
+  ginput acc = do
+    a' <- ginput acc
+    b' <- ginput acc
+    return (a' :*: b')
+  gtoInts (a :*: b) = gtoInts a ++ gtoInts b
+
+instance (GEncodeable a) => GEncodeable (M1 i c a) where
+  ginput acc = M1 <$> ginput acc
+  gtoInts (M1 a) = gtoInts a
+
+instance (Encodeable a) => GEncodeable (K1 i a) where
+  ginput acc = K1 <$> inputEncode acc
+  gtoInts (K1 a) = toInts a
+
+class Encodeable a where
+  inputEncode :: InputAccess -> Comp a
+  default inputEncode :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp a
+  inputEncode acc = to <$> ginput acc
+  toInts    :: a -> [ Integer ]
+  default toInts :: (Generic a, GEncodeable (Rep a)) => a -> [ Integer ]
+  toInts a = gtoInts (from a)
+
+instance Encodeable Field where
+  inputEncode = inputField
+  toInts (Integer i) = [ i ]
+  toInts _ = error "Input datatype contains non-constant! Use `Interger i` to construct a field with interger `i` in the datatype."
+
+instance Encodeable Boolean where
+  inputEncode = inputBool
+  toInts (Boolean b) = [ if b then 1 else 0 ]
+  toInts _ = error "Input datatype contains non-constant! Use `Boolean b` to construct a boolean `b` in the datatype."
+
+instance (KnownNat w) => Encodeable (UInt w) where
+  inputEncode = inputUInt
+  toInts (UInt i) = [ i ]
+  toInts _ = error "Input datatype contains non-constant! Use `UInt i` to construct a unsigned integer with interger `i` in the datatype."
+
+instance Encodeable ()
+instance (Encodeable a) => Encodeable (Proxy a)
+instance (Encodeable a, Encodeable b) => Encodeable (a, b)
+instance (Encodeable a, Encodeable b, Encodeable c) => Encodeable (a, b, c)
+instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d) => Encodeable (a, b, c, d)
+instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e) => Encodeable (a, b, c, d, e)
+instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e, Encodeable f) => Encodeable (a, b, c, d, e, f)
+instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e, Encodeable f, Encodeable g) => Encodeable (a, b, c, d, e, f, g)
+
 class Input t where
   -- | Request a fresh input variable
   --
   --   @since 0.1.0.0
   input :: InputAccess -> Comp t
-
--- input :: (Input t) => InputAccess -> Comp t
--- input = inputs (error "This type needs a dummy value to represent its input structure.")
-
----- // Experimenting Generalized Datatype as Inputs
-
-data KVar :: (InputAccess -> Type -> Type) where
-  PubVar :: t -> KVar 'Public t
-  PrvVar :: t -> KVar 'Private t
-
-type Pub t = KVar 'Public t
-type Prv t = KVar 'Private t
-
-getVar :: KVar i t -> t
-getVar (PubVar a) = a
-getVar (PrvVar a) = a
-
--- | functors for KVar's representation
-data IsPub :: Type -> Type -> Type where IsPub :: t -> IsPub t a
-data IsPrv :: Type -> Type -> Type where IsPrv :: t -> IsPrv t a
-
-instance Encode t => Encode (KVar i t) where
-  encode (PubVar a) = encode a
-  encode (PrvVar a) = encode a
-
-instance Generic (KVar 'Public t) where
-  type Rep (KVar 'Public t) = IsPub t
-  from (PubVar t) = IsPub t
-  to (IsPub t) = PubVar t
-
-instance Generic (KVar 'Private t) where
-  type Rep (KVar 'Private t) = IsPrv t
-  from (PrvVar t) = IsPrv t
-  to (IsPrv t) = PrvVar t
-
-class GInputable f where
-  ginput :: Comp (f x)
-
-instance Inputable t => GInputable (IsPub t) where
-  ginput = do
-    a <- input' :: Comp t
-    return (from $ PubVar a)
-
-instance Inputable t => GInputable (IsPrv t) where
-  ginput = do
-    a <- input' :: Comp t
-    return (from $ PrvVar a)
-
-instance GInputable U1 where
-  ginput = return U1
-
--- flatten all elements into 1-d array
-instance (GInputable a, GInputable b) => GInputable (a :*: b) where
-  ginput = do
-    a' <- ginput
-    b' <- ginput
-    return (a' :*: b')
-
-instance (GInputable a) => GInputable (M1 i c a) where
-  ginput = M1 <$> ginput
-
-instance (Inputable a) => GInputable (K1 i a) where
-  ginput = K1 <$> input'
-
--- | class for types that are "inputable", i.e., products that contains only base types.
---   Conditions for inputables:
---   1. Only product types allowed
---   2. Every base field must contains accessibility info
-class Inputable a where
-  input' :: Comp a
-  default input' :: (Generic a, GInputable (Rep a)) => Comp a
-  input' = to <$> ginput
-
-instance Inputable (KVar 'Public Field) where
-  input' = PubVar <$> inputField Public
-
-instance Inputable (KVar 'Private Field) where
-  input' = PrvVar <$> inputField Public
-
-instance Inputable (KVar 'Public Boolean) where
-  input' = PubVar <$> inputBool Public
-
-instance Inputable (KVar 'Private Boolean) where
-  input' = PrvVar <$> inputBool Private
-
-instance (KnownNat w) => Inputable (KVar 'Public (UInt w)) where
-  input' = PubVar <$> inputUInt Public
-
-instance (KnownNat w) => Inputable (KVar 'Private (UInt w)) where
-  input' = PrvVar <$> inputUInt Private
-
-----
-
-
--- | TODO: modify input to not have a choosing scheme - users can decide how it's constructed.
---   FOR NOW Encoding is not one-to-one, must be fixed before Decoding is possible.
--- decodeInput :: [Field] -> t
 
 class Proper t where
   -- | Request a fresh variable
@@ -372,92 +469,39 @@ class Proper t where
   --   @since 0.8.4.0
   freshVar :: Comp t
 
-  -- | Request a list of fresh input variables
-  --   default implementation simply applies `replicateM` on `input`
-  -- inputList :: InputAccess -> Int -> Comp [t]
-  -- inputList acc size = replicateM size $ input _ acc
-
   -- | Conditional clause
   --
   --   @since 0.1.0.0
   cond :: Boolean -> t -> t -> t
 
-
 instance Input Field where
   input = inputField
 
-  -- \| Specialized implementation for Field
-  -- inputList acc len = do
-  --   start <- freshInputVar acc ReadField WriteField len
-  --   return $ case acc of
-  --     Public -> map VarFI [start .. start + len - 1]
-  --     Private -> map VarFP [start .. start + len - 1]
-
 instance Proper Field where
-  freshVar = VarF <$> freshVarF
 
   cond = IfF
+  freshVar = VarF <$> freshVarF
 
 instance Input Boolean where
   input = inputBool
 
 instance Proper Boolean where
-  -- \| Specialized implementation for Boolean
-  -- inputList acc len = do
-  --   start <- freshInputVar acc ReadBool WriteBool len
-  --   return $ case acc of
-  --     Public -> map VarBI [start .. start + len - 1]
-  --     Private -> map VarBP [start .. start + len - 1]
-
-  freshVar = VarB <$> freshVarB
 
   cond = IfB
+  freshVar = VarB <$> freshVarB
 
 instance (KnownNat w) => Input (UInt w) where
   input = inputUInt
 
 instance (KnownNat w) => Proper (UInt w) where
-  -- \| Specialized implementation for UInt
-  -- inputList acc len = do
-  --   start <- freshInputVar acc (ReadUInt width) (WriteUInt width) len
-  --   return $ case acc of
-  --     Public -> map VarUI [start .. start + len - 1]
-  --     Private -> map VarUP [start .. start + len - 1]
-  --   where
-  --     width = fromIntegral (natVal (Proxy :: Proxy w))
 
+  cond = IfU
   freshVar = VarU <$> freshVarU width
     where
       width = fromIntegral (natVal (Proxy :: Proxy w))
 
-  cond = IfU
-
-instance Inputable ()
--- instance (Inputable a) => Inputable [a]
-instance (Inputable a) => Inputable (Proxy a)
-instance (Inputable a, Inputable b) => Inputable (a, b)
-instance (Inputable a, Inputable b, Inputable c) => Inputable (a, b, c)
-instance (Inputable a, Inputable b, Inputable c, Inputable d) => Inputable (a, b, c, d)
-instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e) => Inputable (a, b, c, d, e)
-instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f) => Inputable (a, b, c, d, e, f)
--- instance (Input t) => Input (Maybe t) where
--- instance (Input a, Input b) => Input (Either a b) where
-
 inputList :: (Input t) => InputAccess -> Int -> Comp [t]
 inputList acc len = replicateM len (input acc)
--- instance (Input t) => Input [t] where
---   size = length
--- 
---   input len acc = inputList acc len
--- 
---   inputList = inputList
--- 
---   freshVars = _
--- 
---   cond c = zipWith (cond c)
--- 
--- instance Input a => Input (Maybe a) where
---   size = _
 
 -- | Requests a fresh 'Field' input variable
 inputField :: InputAccess -> Comp Field

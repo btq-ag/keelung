@@ -37,6 +37,8 @@ dependencies:
   - QuickCheck
   - vector
   - wl-pprint-text
+    #  - aeson
+    #  - scientific
 
 library:
   source-dirs: src
