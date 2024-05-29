@@ -13,7 +13,7 @@ module Keelung
     keelung,
     -- interpret
     interpret,
-    interpretData,
+    --interpretData,
     interpretEither,
     -- compile
     compile,
@@ -23,7 +23,7 @@ module Keelung
     rtsoptMemory,
     -- solve R1CS
     solveOutput,
-    solveOutputData,
+    --solveOutputData,
     solveOutputEither,
     -- witness generation
     witness,
@@ -293,8 +293,8 @@ interpret :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [
 interpret fieldType prog publicInput privateInput = interpretEither fieldType prog publicInput privateInput >>= printErrorInstead
 
 -- | Interpret a program where public and private inputs are provided as datatype encodable to JSON.
-interpretData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
-interpretData fieldType prog pub prv = interpret fieldType prog (toInts pub) (toInts prv)
+-- interpretData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+-- interpretData fieldType prog pub prv = interpret fieldType prog (toInts pub) (toInts prv)
 
 -- | Interpret a program with public and private inputs
 interpretEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
@@ -311,8 +311,8 @@ interpretEither fieldType prog publicInput privateInput =
 solveOutput :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 solveOutput fieldType prog publicInput privateInput = solveOutputEither fieldType prog publicInput privateInput >>= printErrorInstead
 
-solveOutputData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
-solveOutputData fieldType prog pub prv = solveOutput fieldType prog (toInts pub) (toInts prv)
+-- solveOutputData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+-- solveOutputData fieldType prog pub prv = solveOutput fieldType prog (toInts pub) (toInts prv)
 
 -- | Solves the R1CS of a Keelung program with given inputs and outputs the result
 solveOutputEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
