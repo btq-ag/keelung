@@ -27,8 +27,12 @@ module Keelung.Syntax
     aesMul,
     slice,
     join,
-    mulD,
+    mul,
     mulV,
+    add,
+    addV,
+    divU,
+    modU,
     Var,
     Width,
   )
@@ -128,6 +132,7 @@ data UInt w where
   VarUP :: Var -> UInt w
   -- | Arithmetic operations
   AddU :: UInt w -> UInt w -> UInt w
+  AddV :: (KnownNat w) => [UInt w] -> UInt v
   SubU :: UInt w -> UInt w -> UInt w
   MulU :: UInt w -> UInt w -> UInt w
   MulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
@@ -137,6 +142,9 @@ data UInt w where
   CLMulU :: UInt w -> UInt w -> UInt w
   -- | Modular multiplicative inverse
   MMIU :: UInt w -> Integer -> UInt w
+  -- | Division / Modulus
+  DivU :: UInt w -> UInt w -> UInt w
+  ModU :: UInt w -> UInt w -> UInt w
   -- | Conditionals
   IfU :: Boolean -> UInt w -> UInt w -> UInt w
   -- | Bitwise operations
@@ -182,23 +190,26 @@ instance Ord (UInt (w :: Nat)) where
       tag (VarUP _) = 3
       tag (BtoU _) = 4
       tag (AddU _ _) = 5
-      tag (SubU _ _) = 6
-      tag (MulU _ _) = 7
-      tag (MulD _ _) = 7
-      tag (MulV _ _) = 7
-      tag (AESMulU _ _) = 8
-      tag (CLMulU _ _) = 9
-      tag (MMIU _ _) = 10
-      tag (AndU _ _) = 11
-      tag (OrU _ _) = 12
-      tag (XorU _ _) = 13
-      tag (NotU _) = 14
-      tag (RoLU {}) = 15
-      tag (ShLU {}) = 16
-      tag (SetU {}) = 17
-      tag (IfU {}) = 18
-      tag (SliceU {}) = 19
-      tag (JoinU {}) = 20
+      tag (AddV _) = 6
+      tag (SubU _ _) = 7
+      tag (MulU _ _) = 8
+      tag (MulD _ _) = 9
+      tag (MulV _ _) = 10
+      tag (AESMulU _ _) = 11
+      tag (CLMulU _ _) = 12
+      tag (MMIU _ _) = 13
+      tag (DivU _ _) = 14
+      tag (ModU _ _) = 15
+      tag (AndU _ _) = 16
+      tag (OrU _ _) = 17
+      tag (XorU _ _) = 18
+      tag (NotU _) = 19
+      tag (RoLU {}) = 20
+      tag (ShLU {}) = 21
+      tag (SetU {}) = 22
+      tag (IfU {}) = 23
+      tag (SliceU {}) = 24
+      tag (JoinU {}) = 25
 
 instance (KnownNat w) => Show (UInt w) where
   showsPrec prec expr = case expr of
@@ -207,6 +218,7 @@ instance (KnownNat w) => Show (UInt w) where
     VarUI var -> showString "$UI" . showString (toSubscript width) . shows var
     VarUP var -> showString "$UP" . showString (toSubscript width) . shows var
     AddU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    AddV xs -> showParen (prec > 6) $ showsPrec 6 xs
     SubU x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     MulD x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -214,6 +226,8 @@ instance (KnownNat w) => Show (UInt w) where
     AESMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
     CLMulU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    ModU x y -> showParen (prec > 7) $ showsPrec 7 x . showString " % " . showsPrec 8 y
     AndU x y -> showParen (prec > 5) $ showsPrec 5 x . showString " ∧ " . showsPrec 6 y
     OrU x y -> showParen (prec > 4) $ showsPrec 4 x . showString " ∨ " . showsPrec 5 y
     XorU x y -> showParen (prec > 3) $ showsPrec 3 x . showString " ⊕ " . showsPrec 4 y
@@ -487,18 +501,108 @@ slice x (i, j)
 join :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
 join = JoinU
 
--- | UInt multiplication with output that is twice the width of the inputs.
---   Since the ordinary `(*)` operator truncates the output to the width of the inputs, you may use this function to get the full output.
---   @since 0.23.0
-mulD :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
-mulD = MulD
+-- | UInt multiplication that produces an output that is twice the width of the inputs.
+--   The standard `(*)` operator truncates the output to the width of the inputs. Use `mulD` to obtain the full output.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 16)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `mul` y)
+--   @
+--
+-- | @since 0.23.0
+mul :: (KnownNat w) => UInt w -> UInt w -> UInt (w GHC.TypeNats.* 2)
+mul = MulD
 
--- | UInt multiplication with variable-width output, where the width is determined by the type signature.
---   The output will be truncated if the width is less than the double of the width of the inputs.
---   The output will be zero-extended if the width is greater than the double of the width of the inputs.
+-- | UInt multiplication with variable-width output.
+--   The output width is determined by the type signature.
+--   If the output width is less than twice the width of the inputs, the output will be truncated.
+--   If the output width is greater than twice the width of the inputs, the output will be zero-extended.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 12)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `mulV` y)
+--   @
+--
 --   @since 0.23.0
 mulV :: (KnownNat w, KnownNat v) => UInt w -> UInt w -> UInt v
 mulV = MulV
+
+-- | UInt additoin that produces an output with carry.
+--   The standard `(+)` operator discards the carry. Use `add` to preserve the carry.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 9)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return (x `add` y)
+--   @
+--
+-- | @since 0.23.0
+add :: (KnownNat w) => UInt w -> UInt w -> UInt (w + 1)
+add x y = AddV [x, y]
+
+-- | Batch addition of UInts with variable-width output.
+--   You can choose how many bits of carry you want to keep by declaring the width of the output in the type signature.
+--   This function allows for adding multiple UInts together in a batch.
+--
+--   /Example/
+--
+--   @
+-- example :: Comp (UInt 16)
+-- example = do
+--     x <- input Public :: Comp (UInt 8)
+--     y <- input Public
+--     return $ addV [x, y]
+--   @
+--
+--   @since 0.23.0
+addV :: (KnownNat w, KnownNat v) => [UInt w] -> UInt v
+addV = AddV
+
+-- | Division of Unsigned integers.
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input Public
+--     divisor <- input Public
+--     return $ dividend `divU` divisor
+--   @
+--
+--   @since 0.24.0
+divU :: UInt w -> UInt w -> UInt w
+divU = DivU
+
+-- | Modulus of Unsigned integers.
+--
+--   /Example/
+--
+--   @
+-- program :: Comp (UInt 32)
+-- program = do
+--     dividend <- input Public
+--     divisor <- input Public
+--     return $ dividend `modU` divisor
+--   @
+--
+--   @since 0.24.0
+modU :: UInt w -> UInt w -> UInt w
+modU = ModU
 
 --------------------------------------------------------------------------------
 

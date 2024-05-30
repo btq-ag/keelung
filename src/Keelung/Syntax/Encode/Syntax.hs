@@ -137,20 +137,22 @@ data UInt
     VarUP Width Var
   | -- | Addition
     AddU Width UInt UInt
+  | -- | Addition
+    AddV Width [UInt]
   | -- | Subtraction
     SubU Width UInt UInt
   | -- | Multiplication
     MulU Width UInt UInt
-  | -- | Double-width Multiplication
-    MulD Width UInt UInt
-  | -- | Variable-width Multiplication
-    MulV Width UInt UInt
   | -- | Hardcoded GF(256) Multiplication for AES
     AESMulU Width UInt UInt
   | -- | Carry-less Multiplication
     CLMulU Width UInt UInt
   | -- | Modular multiplicative inverse
     MMIU Width UInt Integer
+  | -- | Division
+    DivU Width UInt UInt
+  | -- | Modulo
+    ModU Width UInt UInt
   | -- | Bitwise conjunction
     AndU Width UInt UInt
   | -- | Bitwise disjunction
@@ -184,13 +186,14 @@ instance Show UInt where
     VarUI w var -> showString "$UI" . showString (toSubscript w) . shows var
     VarUP w var -> showString "$UP" . showString (toSubscript w) . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    AddV _ xs -> showParen (prec > 6) $ showsPrec 6 xs
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    MulD _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
-    MulV _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
     AESMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
     CLMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    ModU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " % " . showsPrec 8 y
     AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y

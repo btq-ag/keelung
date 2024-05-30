@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | Module for encoding Keelung syntax
@@ -77,14 +76,17 @@ instance (KnownNat w) => Encode' (Syntax.UInt w) UInt where
     Syntax.VarU var -> return $ VarU (widthOf expr) var
     Syntax.VarUI var -> return $ VarUI (widthOf expr) var
     Syntax.VarUP var -> return $ VarUP (widthOf expr) var
-    Syntax.AddU x y -> AddU (widthOf x) <$> encode' x <*> encode' y
+    Syntax.AddU x y -> AddU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.AddV xs -> AddV (widthOf expr) <$> mapM encode' xs
     Syntax.SubU x y -> SubU (widthOf x) <$> encode' x <*> encode' y
-    Syntax.MulU x y -> MulU (widthOf x) <$> encode' x <*> encode' y
-    Syntax.MulD x y -> MulD (widthOf expr) <$> encode' x <*> encode' y
-    Syntax.MulV x y -> MulV (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulU x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulD x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.MulV x y -> MulU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.AESMulU x y -> AESMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.CLMulU x y -> CLMulU (widthOf x) <$> encode' x <*> encode' y
     Syntax.MMIU x p -> MMIU (widthOf x) <$> encode' x <*> pure p
+    Syntax.DivU x y -> DivU (widthOf expr) <$> encode' x <*> encode' y
+    Syntax.ModU x y -> ModU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.AndU x y -> AndU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.OrU x y -> OrU (widthOf expr) <$> encode' x <*> encode' y
     Syntax.XorU x y -> XorU (widthOf expr) <$> encode' x <*> encode' y
