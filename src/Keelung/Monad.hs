@@ -8,8 +8,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE LambdaCase #-}
@@ -107,7 +105,6 @@ import Keelung.Syntax
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode (encode', runHeapM)
 import Keelung.Syntax.Encode.Syntax qualified as Encoding
-import Data.Kind
 
 --------------------------------------------------------------------------------
 
@@ -236,250 +233,78 @@ freshInputVar acc readType writeType n = do
 
 --------------------------------------------------------------------------------
 
----- // Generalized Datatype input with typed access info
-
--- data KVar :: (InputAccess -> Type -> Type) where
---   PubVar :: t -> KVar 'Public t
---   PrvVar :: t -> KVar 'Private t
--- 
--- type Pub t = KVar 'Public t
--- type Prv t = KVar 'Private t
--- 
--- getVar :: KVar i t -> t
--- getVar (PubVar a) = a
--- getVar (PrvVar a) = a
--- 
--- -- | functors for KVar's representation
--- data IsPub :: Type -> Type -> Type where IsPub :: t -> IsPub t a
--- data IsPrv :: Type -> Type -> Type where IsPrv :: t -> IsPrv t a
--- 
--- instance Encode t => Encode (KVar i t) where
---   encode (PubVar a) = encode a
---   encode (PrvVar a) = encode a
--- 
--- instance Generic (KVar 'Public t) where
---   type Rep (KVar 'Public t) = IsPub t
---   from (PubVar t) = IsPub t
---   to (IsPub t) = PubVar t
--- 
--- instance Generic (KVar 'Private t) where
---   type Rep (KVar 'Private t) = IsPrv t
---   from (PrvVar t) = IsPrv t
---   to (IsPrv t) = PrvVar t
--- 
--- class GInputable f where
---   ginput :: Comp (f x)
---   encode :: f x -> [ Field ]
---
--- instance Inputable t => GInputable (IsPub t) where
---   ginput = do
---     a <- input' :: Comp t
---     return (from $ PubVar a)
--- 
--- instance Inputable t => GInputable (IsPrv t) where
---   ginput = do
---     a <- input' :: Comp t
---     return (from $ PrvVar a)
--- 
--- instance GInputable U1 where
---   ginput = return U1
--- 
--- -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
--- 
--- -- flatten all elements into 1-d array
--- instance (GInputable a, GInputable b) => GInputable (a :*: b) where
---   ginput = do
---     a' <- ginput
---     b' <- ginput
---     return (a' :*: b')
--- 
--- instance (GInputable a) => GInputable (M1 i c a) where
---   ginput = M1 <$> ginput
--- 
--- instance (Inputable a) => GInputable (K1 i a) where
---   ginput = K1 <$> input'
--- 
--- -- | class for types that are "inputable", i.e., products that contains only base types.
--- --   Conditions for inputables:
--- --   1. Only product types allowed
--- --   2. Every base field must contains accessibility info
--- class Inputable a where
---   input' :: Comp a
---   default input' :: (Generic a, GInputable (Rep a)) => Comp a
---   input' = to <$> ginput
--- 
--- instance (Input a) => Inputable (KVar 'Public a) where
---   input' = PubVar <$> input Public
--- 
--- instance (Input a) => Inputable (KVar 'Private a) where
---   input' = PrvVar <$> input Private
--- 
--- ----
--- 
--- class Erasable a where
---   type Erased a
---   type Erased a = a
---   erase :: a -> Erased a 
---   default erase :: (Generic a, Generic (Erased a),
---                     GErasable (Rep a), GErasable (Rep (Erased a)),
---                     GErased (Rep a) ~ Rep (Erased a))
---                        => a -> Erased a
---   erase = to . gerase . from
--- 
--- class GErasable f where
---   type GErased f :: Type -> Type
---   type GErased f = f
---   gerase :: f x -> GErased f x
--- 
--- instance GErasable U1 where
---   type GErased U1 = U1
---   gerase U1 = U1
--- 
--- instance (GErasable a, GErasable b) => GErasable (a :*: b) where
---   type GErased (a :*: b) = GErased a :*: GErased b
---   gerase (a :*: b) = gerase a :*: gerase b
--- 
--- instance (GErasable a) => GErasable (M1 i c a) where
---   type GErased (M1 i c a) = M1 i c (GErased a)
---   gerase (M1 a) = M1 (gerase a)
--- 
--- instance (Erasable a) => GErasable (K1 i a) where
---   type GErased (K1 i a) = K1 i (Erased a)
---   gerase (K1 a) = K1 (erase a)
--- 
--- -- Erase Access info from the datatype
--- instance (Generic a) => Erasable (KVar i a) where
---   type Erased (KVar i a) = a
---   erase = getVar
--- 
--- -- Instances of these base types assure termination.
--- instance Erasable Field where
---   erase = id
--- 
--- instance Erasable Boolean where
---   erase = id
--- 
--- instance (KnownNat w) => Erasable (UInt w) where
---   erase = id
--- 
--- type Erasables :: [k] -> Constraint
--- type family Erasables ks where
---   Erasables '[] = ()
---   Erasables (k:ks) = Erasable k & Erasables ks
--- 
--- -- Generic instances
--- instance Erasable () where
--- 
--- instance (Erasable a) => Erasable (Proxy a) where
---   type Erased (Proxy a) = Proxy (Erased a)
--- 
--- instance (Erasables [a, b, Erased a, Erased b]) => Erasable (a, b) where
---   type Erased (a, b) = (Erased a, Erased b)
--- 
--- instance (Erasables [a, b, c, Erased a, Erased b, Erased c]) => Erasable (a, b, c) where
---   type Erased (a, b, c) = (Erased a, Erased b, Erased c)
--- 
--- instance (Erasables [a, b, c, d, Erased a, Erased b, Erased c, Erased d]) => Erasable (a, b, c, d) where
---   type Erased (a, b, c, d) = (Erased a, Erased b, Erased c, Erased d)
--- 
--- instance (Erasables [a, b, c, d, e, Erased a, Erased b, Erased c, Erased d, Erased e]) => Erasable (a, b, c, d, e) where
---   type Erased (a, b, c, d, e) = (Erased a, Erased b, Erased c, Erased d, Erased e)
--- 
--- instance (Erasables [a, b, c, d, e, f, Erased a, Erased b, Erased c, Erased d, Erased e, Erased f]) => Erasable (a, b, c, d, e, f) where
---   type Erased (a, b, c, d, e, f) = (Erased a, Erased b, Erased c, Erased d, Erased e, Erased f)
--- 
--- infolessField :: Field
--- infolessField =
---   let kf = (PubVar 1, PrvVar 2) :: (Pub Field, Prv Field)
---    in fst (erase kf)
--- 
--- instance Inputable ()
--- instance (Inputable a) => Inputable (Proxy a)
--- instance (Inputable a, Inputable b) => Inputable (a, b)
--- instance (Inputable a, Inputable b, Inputable c) => Inputable (a, b, c)
--- instance (Inputable a, Inputable b, Inputable c, Inputable d) => Inputable (a, b, c, d)
--- instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e) => Inputable (a, b, c, d, e)
--- instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f) => Inputable (a, b, c, d, e, f)
-
-----
 -- Problem: Generic instances for base types are wrong.
 -- Solution 1: redefine Generic instances
 -- Solution 2: check if a representation is a base type
 
 -- just gives pure inner value, while ginput performs input at the same time
 class GEncodeable f where
-  ginput  :: InputAccess -> Comp (f x, f x -> [ Integer ])
+  ginput :: InputAccess -> Comp (f x)
+  gtoInts :: f x -> [ Integer ]
 
--- instance GEncodeable f => GEncodeable (D1 ('MetaData "Field" r1 r2 r3) f) where
---   just = M1 just
---   ginput acc = do
---     f <- inputField acc
---     case f of
---       (Integer i) -> return (M1 just, [ i ])
---       _ -> error "Bruh"
--- 
--- instance GEncodeable f => GEncodeable (D1 ('MetaData "Boolean" r1 r2 r3) f) where
---   just = M1 just
---   ginput acc = do
---     a <- inputBool acc
---     case a of
---       (Boolean b) -> return (M1 just, [ if b then 1 else 0 ])
---       _ -> error "Bruh"
+instance {-# OVERLAPS #-} GEncodeable (Rec0 Field) where
+  ginput acc = K1 <$> inputField acc
+  gtoInts (K1 f) = toInts f
 
--- instance GEncodeable f => GEncodeable (D1 ('MetaData "UInt" r1 r2 r3) f) where
---   just = M1 just
---   ginput acc = do
---     i <- inputUInt acc
---     case i of
---       (UInt j) -> return (M1 just, [ j ])
---       _ -> error "Bruh"
+instance {-# OVERLAPS #-} GEncodeable (Rec0 Boolean) where
+  ginput acc = K1 <$> inputBool acc
+  gtoInts (K1 b) = toInts b
+
+instance {-# OVERLAPS #-} KnownNat w => GEncodeable (Rec0 (UInt w)) where
+  ginput acc = K1 <$> inputUInt acc
+  gtoInts (K1 i) = toInts i
 
 -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
 
 -- flatten all elements into 1-d array
 instance GEncodeable U1 where
-  ginput _ = return (U1, const [])
+  ginput _ = return U1
+  gtoInts = const []
 
 instance (GEncodeable a, GEncodeable b) => GEncodeable (a :*: b) where
   ginput acc = do
-    (a', af) <- ginput acc
-    (b', bf) <- ginput acc
-    return (a' :*: b', \(x :*: y) -> af x ++ bf y)
+    a' <- ginput acc
+    b' <- ginput acc
+    return (a' :*: b')
+  gtoInts (x :*: y) = gtoInts x ++ gtoInts y
 
 instance (GEncodeable a) => GEncodeable (M1 i c a) where
   ginput acc = do
-    (a, af) <- ginput acc 
-    return (M1 a, af . unM1)
+    a <- ginput acc 
+    return (M1 a)
+  gtoInts (M1 a) = gtoInts a
 
 instance (Encodeable a) => GEncodeable (K1 i a) where
   ginput acc = do
-    (a, af) <- inputData acc
-    return (K1 a, \(K1 k) -> af k)
+    a <- inputData acc
+    return (K1 a)
+  gtoInts (K1 k) = toInts k
 
 class Encodeable a where
-  inputData :: InputAccess -> Comp (a, a -> [ Integer ])
-  default inputData :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp (a, a -> [ Integer ])
-  inputData acc = do
-    (a, af) <- ginput acc
-    return (to a, af . from)
+  inputData :: InputAccess -> Comp a
+  toInts :: a -> [ Integer ]
+  default inputData :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp a
+  inputData acc = to <$> ginput acc
+  default toInts :: (Generic a, GEncodeable (Rep a)) => a -> [ Integer ]
+  toInts = gtoInts . from
  
 instance Encodeable Field where
-  inputData acc = inputField acc >>= \f ->
-    return (f, \case
+  inputData = inputField
+  toInts = \case
       (Integer i) -> [ i ]
-      _ -> [])
+      _ -> error "toInts should not be used here."
 
 instance Encodeable Boolean where
-  inputData acc = inputBool acc >>= \a ->
-    return (a, \case
+  inputData = inputBool
+  toInts = \case
       (Boolean b) -> [ if b then 1 else 0 ]
-      _ -> [])
+      _ -> error "toInts should not be used here."
 
 instance (KnownNat w) => Encodeable (UInt w) where
-  inputData acc = inputUInt acc >>= \i ->
-    return (i, \case
+  inputData = inputUInt 
+  toInts = \case
       (UInt j) -> [ j ]
-      _ -> [])
+      _ -> error "toInts should not be used here."
  
 instance Encodeable ()
 instance (Encodeable a) => Encodeable (Proxy a)
