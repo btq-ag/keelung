@@ -275,9 +275,7 @@ instance (GEncodeable a) => GEncodeable (M1 i c a) where
   gtoInts (M1 a) = gtoInts a
 
 instance (Encodeable a) => GEncodeable (K1 i a) where
-  ginput acc = do
-    a <- inputData acc
-    return (K1 a)
+  ginput acc = K1 <$> inputData acc
   gtoInts (K1 k) = toInts k
 
 class Encodeable a where

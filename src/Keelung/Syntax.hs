@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Syntax of the Keelung language
 module Keelung.Syntax
@@ -36,7 +37,7 @@ where
 import Data.Data
 import Data.Kind (Type)
 import GHC.TypeNats
-import GHC.Generics (Generic)
+import GHC.Generics hiding (UInt, prec)
 
 --------------------------------------------------------------------------------
 
@@ -150,6 +151,11 @@ data UInt w where
   BtoU :: Boolean -> UInt w
   SliceU :: (KnownNat v) => UInt v -> Int -> Int -> UInt w
   JoinU :: (KnownNat u, KnownNat v) => UInt u -> UInt v -> UInt (u + v)
+
+instance (KnownNat w) => Generic (UInt w) where
+  type Rep (UInt w) = Rec0 (UInt w)
+  from = K1
+  to = unK1
 
 -- | Equality on Unsigned integers
 instance Eq (UInt (w :: Nat)) where
