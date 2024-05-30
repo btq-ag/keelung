@@ -40,10 +40,7 @@ module Keelung.Monad
     -- * Inputs
     Input (..),
     -- Inputable (..),
-    -- Pub,
-    -- Prv,
-    -- getVar,
-    Encodeable(..),
+    Inputable(..),
     Proper (..),
     freshVarField,
     freshVarBool,
@@ -246,80 +243,80 @@ freshInputVar acc readType writeType n = do
 -- Solution 2: check if a representation is a base type
 
 -- just gives pure inner value, while ginput performs input at the same time
-class GEncodeable f where
+class GInputable f where
   ginput :: InputAccess -> Comp (f x)
   gtoInts :: f x -> [ Integer ]
 
-instance {-# OVERLAPS #-} GEncodeable (Rec0 Field) where
+instance {-# OVERLAPS #-} GInputable (Rec0 Field) where
   ginput acc = K1 <$> inputField acc
   gtoInts (K1 f) = toInts f
 
-instance {-# OVERLAPS #-} GEncodeable (Rec0 Boolean) where
+instance {-# OVERLAPS #-} GInputable (Rec0 Boolean) where
   ginput acc = K1 <$> inputBool acc
   gtoInts (K1 b) = toInts b
 
-instance {-# OVERLAPS #-} KnownNat w => GEncodeable (Rec0 (UInt w)) where
+instance {-# OVERLAPS #-} KnownNat w => GInputable (Rec0 (UInt w)) where
   ginput acc = K1 <$> inputUInt acc
   gtoInts (K1 i) = toInts i
 
 -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
 
 -- flatten all elements into 1-d array
-instance GEncodeable U1 where
+instance GInputable U1 where
   ginput _ = return U1
   gtoInts = const []
 
-instance (GEncodeable a, GEncodeable b) => GEncodeable (a :*: b) where
+instance (GInputable a, GInputable b) => GInputable (a :*: b) where
   ginput acc = do
     a' <- ginput acc
     b' <- ginput acc
     return (a' :*: b')
   gtoInts (x :*: y) = gtoInts x ++ gtoInts y
 
-instance (GEncodeable a) => GEncodeable (M1 i c a) where
+instance (GInputable a) => GInputable (M1 i c a) where
   ginput acc = do
     a <- ginput acc 
     return (M1 a)
   gtoInts (M1 a) = gtoInts a
 
-instance (Encodeable a) => GEncodeable (K1 i a) where
+instance (Inputable a) => GInputable (K1 i a) where
   ginput acc = K1 <$> inputData acc
   gtoInts (K1 k) = toInts k
 
-class Encodeable a where
+class Inputable a where
   inputData :: InputAccess -> Comp a
   toInts :: a -> [ Integer ]
-  default inputData :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp a
+  default inputData :: (Generic a, GInputable (Rep a)) => InputAccess -> Comp a
   inputData acc = to <$> ginput acc
-  default toInts :: (Generic a, GEncodeable (Rep a)) => a -> [ Integer ]
+  default toInts :: (Generic a, GInputable (Rep a)) => a -> [ Integer ]
   toInts = gtoInts . from
  
-instance Encodeable Field where
+instance Inputable Field where
   inputData = inputField
   toInts = \case
       (Integer i) -> [ i ]
       _ -> error "toInts should not be used here."
 
-instance Encodeable Boolean where
+instance Inputable Boolean where
   inputData = inputBool
   toInts = \case
       (Boolean b) -> [ if b then 1 else 0 ]
       _ -> error "toInts should not be used here."
 
-instance (KnownNat w) => Encodeable (UInt w) where
+instance (KnownNat w) => Inputable (UInt w) where
   inputData = inputUInt 
   toInts = \case
       (UInt j) -> [ j ]
       _ -> error "toInts should not be used here."
  
-instance Encodeable ()
-instance (Encodeable a) => Encodeable (Proxy a)
-instance (Encodeable a, Encodeable b) => Encodeable (a, b)
-instance (Encodeable a, Encodeable b, Encodeable c) => Encodeable (a, b, c)
-instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d) => Encodeable (a, b, c, d)
-instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e) => Encodeable (a, b, c, d, e)
-instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e, Encodeable f) => Encodeable (a, b, c, d, e, f)
-instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d, Encodeable e, Encodeable f, Encodeable g) => Encodeable (a, b, c, d, e, f, g)
+instance Inputable ()
+instance (Inputable a) => Inputable (Proxy a)
+instance (Inputable a, Inputable b) => Inputable (a, b)
+instance (Inputable a, Inputable b, Inputable c) => Inputable (a, b, c)
+instance (Inputable a, Inputable b, Inputable c, Inputable d) => Inputable (a, b, c, d)
+instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e) => Inputable (a, b, c, d, e)
+instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f) => Inputable (a, b, c, d, e, f)
+instance (Inputable a, Inputable b, Inputable c, Inputable d, Inputable e, Inputable f, Inputable g) => Inputable (a, b, c, d, e, f, g)
 
 class Input t where
   -- | Request a fresh input variable

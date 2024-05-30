@@ -197,7 +197,7 @@ prove f p i o = do
   Path.createDirectoryIfMissing True "aurora"
   prove' "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof" f p i o
 
-proveData :: (Encode t, Encodeable a1, Encodeable a2) => FieldType -> Comp t -> a1 -> a2 -> IO ()
+proveData :: (Encode t, Inputable a1, Inputable a2) => FieldType -> Comp t -> a1 -> a2 -> IO ()
 proveData f p i o = prove f p (toInts i) (toInts o)
 
 -- | Generate and verify a proof given circuit, witness, paratemer, and proof
@@ -296,7 +296,7 @@ interpret :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [
 interpret fieldType prog publicInput privateInput = interpretEither fieldType prog publicInput privateInput >>= printErrorInstead
 
 -- | Interpret a program where public and private inputs are provided as datatype encodable to JSON.
-interpretData :: (Encode t, Encodeable a, Encodeable b) => FieldType -> Comp t -> a -> b -> IO [Integer]
+interpretData :: (Encode t, Inputable a, Inputable b) => FieldType -> Comp t -> a -> b -> IO [Integer]
 interpretData fieldType prog pub prv = interpret fieldType prog (toInts pub) (toInts prv)
 
 -- | Interpret a program with public and private inputs
@@ -307,7 +307,7 @@ interpretEither fieldType prog publicInput privateInput =
         elab <- liftEither (elaborateAndEncode prog)
         callKeelungc ["protocol", "interpret"] (fieldType, elab, publicInput, privateInput)
     )
-interpretDataEither :: (Encode t, Encodeable a, Encodeable b) => FieldType -> Comp t -> a -> b -> IO (Either Error [Integer])
+interpretDataEither :: (Encode t, Inputable a, Inputable b) => FieldType -> Comp t -> a -> b -> IO (Either Error [Integer])
 interpretDataEither fieldType prog publicInput privateInput = interpretEither fieldType prog (toInts publicInput) (toInts privateInput)
 
 --------------------------------------------------------------------------------
@@ -316,7 +316,7 @@ interpretDataEither fieldType prog publicInput privateInput = interpretEither fi
 solveOutput :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
 solveOutput fieldType prog publicInput privateInput = solveOutputEither fieldType prog publicInput privateInput >>= printErrorInstead
 
-solveOutputData :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+solveOutputData :: (Encode t, Inputable d, Inputable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
 solveOutputData fieldType prog pub prv = solveOutput fieldType prog (toInts pub) (toInts prv)
 
 -- | Solves the R1CS of a Keelung program with given inputs and outputs the result
@@ -328,7 +328,7 @@ solveOutputEither fieldType prog publicInput privateInput =
         callKeelungc ["protocol", "solve"] (fieldType, elab, publicInput, privateInput)
     )
 
-solveOutputDataEither :: (Encode t, Encodeable d, Encodeable e) => FieldType -> Comp t -> d -> e -> IO (Either Error [Integer])
+solveOutputDataEither :: (Encode t, Inputable d, Inputable e) => FieldType -> Comp t -> d -> e -> IO (Either Error [Integer])
 solveOutputDataEither fieldType prog pub prv = solveOutputEither fieldType prog (toInts pub) (toInts prv)
 
 --------------------------------------------------------------------------------
