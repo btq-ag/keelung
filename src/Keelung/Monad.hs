@@ -408,25 +408,23 @@ freshInputVar acc readType writeType n = do
 
 -- just gives pure inner value, while ginput performs input at the same time
 class GEncodeable f where
-  just    :: f x
-  ginput  :: InputAccess -> Comp (f x, [ Integer ])
-  -- gtoInts :: f x -> [ Integer ]
+  ginput  :: InputAccess -> Comp (f x, f x -> [ Integer ])
 
-instance GEncodeable f => GEncodeable (D1 ('MetaData "Field" r1 r2 r3) f) where
-  just = M1 just
-  ginput acc = do
-    f <- inputField acc
-    case f of
-      (Integer i) -> return (M1 just, [ i ])
-      _ -> error "Bruh"
-
-instance GEncodeable f => GEncodeable (D1 ('MetaData "Boolean" r1 r2 r3) f) where
-  just = M1 just
-  ginput acc = do
-    a <- inputBool acc
-    case a of
-      (Boolean b) -> return (M1 just, [ if b then 1 else 0 ])
-      _ -> error "Bruh"
+-- instance GEncodeable f => GEncodeable (D1 ('MetaData "Field" r1 r2 r3) f) where
+--   just = M1 just
+--   ginput acc = do
+--     f <- inputField acc
+--     case f of
+--       (Integer i) -> return (M1 just, [ i ])
+--       _ -> error "Bruh"
+-- 
+-- instance GEncodeable f => GEncodeable (D1 ('MetaData "Boolean" r1 r2 r3) f) where
+--   just = M1 just
+--   ginput acc = do
+--     a <- inputBool acc
+--     case a of
+--       (Boolean b) -> return (M1 just, [ if b then 1 else 0 ])
+--       _ -> error "Bruh"
 
 -- instance GEncodeable f => GEncodeable (D1 ('MetaData "UInt" r1 r2 r3) f) where
 --   just = M1 just
@@ -440,61 +438,51 @@ instance GEncodeable f => GEncodeable (D1 ('MetaData "Boolean" r1 r2 r3) f) wher
 
 -- flatten all elements into 1-d array
 instance GEncodeable U1 where
-  just = U1
-  ginput _ = return (U1, [])
+  ginput _ = return (U1, const [])
 
 instance (GEncodeable a, GEncodeable b) => GEncodeable (a :*: b) where
-  just = just :*: just
   ginput acc = do
-    (a', as) <- ginput acc
-    (b', bs) <- ginput acc
-    return (a' :*: b', as ++ bs)
+    (a', af) <- ginput acc
+    (b', bf) <- ginput acc
+    return (a' :*: b', \(x :*: y) -> af x ++ bf y)
 
 instance (GEncodeable a) => GEncodeable (M1 i c a) where
-  just = just
   ginput acc = do
-    (a, as) <- ginput acc 
-    return (M1 a, as)
+    (a, af) <- ginput acc 
+    return (M1 a, af . unM1)
 
 instance (Encodeable a) => GEncodeable (K1 i a) where
-  just = just
   ginput acc = do
-    (a, as) <- inputData acc
-    return (K1 a, as)
+    (a, af) <- inputData acc
+    return (K1 a, \(K1 k) -> af k)
 
 class Encodeable a where
-  inputData :: InputAccess -> Comp (a, [ Integer ])
-  default inputData :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp (a, [ Integer ])
+  inputData :: InputAccess -> Comp (a, a -> [ Integer ])
+  default inputData :: (Generic a, GEncodeable (Rep a)) => InputAccess -> Comp (a, a -> [ Integer ])
   inputData acc = do
-    (a, as) <- (ginput acc :: Comp (Rep a x , [ Integer ]))
-    return (to a, as)
-  -- toInts    :: a -> [ Integer ]
-  -- default toInts :: (Generic a, GEncodeable (Rep a)) => a -> [ Integer ]
-  -- toInts = gtoInts . from
-
+    (a, af) <- ginput acc
+    return (to a, af . from)
+ 
 instance Encodeable Field where
-  inputData acc = inputField acc >>= \case 
-    f@(Integer i) -> return (f, [ i ])
-    _ -> error "Bruh"
-  -- toInts (Integer i) = [ i ]
-  -- toInts _ = error "Input datatype contains non-constant! Use `Interger i` to construct a field with interger `i` in the datatype."
+  inputData acc = inputField acc >>= \f ->
+    return (f, \case
+      (Integer i) -> [ i ]
+      _ -> [])
 
 instance Encodeable Boolean where
-  inputData acc = inputBool acc >>= \case
-    b@(Boolean c) -> return (b, [ if c then 1 else 0 ])
-    _ -> error "Bruh"
-  -- toInts (Boolean b) = [ if b then 1 else 0 ]
-  -- toInts _ = error "Input datatype contains non-constant! Use `Boolean b` to construct a boolean `b` in the datatype."
+  inputData acc = inputBool acc >>= \a ->
+    return (a, \case
+      (Boolean b) -> [ if b then 1 else 0 ]
+      _ -> [])
 
 instance (KnownNat w) => Encodeable (UInt w) where
-  inputData acc = inputUInt acc >>= \case
-    i@(UInt j) -> return (i, [ j ])
-    _ -> error "Bruh"
-  -- toInts (UInt i) = [ i ]
-  -- toInts _ = error "Input datatype contains non-constant! Use `UInt i` to construct a unsigned integer with interger `i` in the datatype."
-
+  inputData acc = inputUInt acc >>= \i ->
+    return (i, \case
+      (UInt j) -> [ j ]
+      _ -> [])
+ 
 instance Encodeable ()
--- instance (Encodeable a) => Encodeable (Proxy a)
+instance (Encodeable a) => Encodeable (Proxy a)
 instance (Encodeable a, Encodeable b) => Encodeable (a, b)
 instance (Encodeable a, Encodeable b, Encodeable c) => Encodeable (a, b, c)
 instance (Encodeable a, Encodeable b, Encodeable c, Encodeable d) => Encodeable (a, b, c, d)
