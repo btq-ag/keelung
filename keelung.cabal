@@ -77,7 +77,6 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.Monad
       Test.VarLayout
       Keelung
       Keelung.CircuitFormat
