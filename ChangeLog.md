@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.24.0]
+
+### Added
+
+* `divU` operater for unsigned integer division.
+* `modU` operater for unsigned integer modulo.
+
+## [v0.23.0]
+
+### Added
+
+* `add` operater for adding two `UInt`s and resulting in a longer `UInt` with carry.
+* `addV` operater for adding multiple `UInt`s at once with arbitrary carry.
+* `mul` operater for multiplying two `UInt`s and resulting in a double-length `UInt` with full product.
+* `mulV` operater for multiplying two `UInt`s and with arbitrary carry.
+
 ## [v0.22.0]
 
 ### Added
