@@ -37,7 +37,7 @@ dependencies:
   - QuickCheck
   - vector
   - wl-pprint-text
-    #  - aeson
+  - aeson
     #  - scientific
 
 library:

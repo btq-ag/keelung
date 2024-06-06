@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -46,6 +47,9 @@ module Keelung
     interpretDataEither,
     solveOutputDataEither,
     solveOutputData,
+    stringToJsonInputs,
+    jsonFileInputs,
+    jsonInputs,
   )
 where
 
@@ -70,10 +74,10 @@ import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
+import Data.Aeson
 -- import Data.Aeson qualified as JSON (Value(..))
 -- import Data.Aeson (ToJSON(..), FromJSON(..))
 -- import Data.Aeson.KeyMap (elems)
--- import Data.Scientific (floatingOrInteger)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
@@ -140,18 +144,21 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 
 --------------------------------------------------------------------------------
 
--- jsonInputs :: (ToJSON t) => t -> [Integer] 
--- jsonInputs a = fromValue $ toJSON a
---   where
---     fromValue :: JSON.Value -> [Integer]
---     fromValue (JSON.Object o) = mconcat $ map fromValue (elems o)
---     fromValue (JSON.Array arr) = mconcat $ toList $ fmap fromValue arr
---     fromValue (JSON.String _) = error "Cannot encode strings."
---     fromValue (JSON.Number n) = case floatingOrInteger n :: Either Float Integer of
---                                   (Right i) -> [ i ]
---                                   (Left _) -> error "Cannot encode float points."
---     fromValue (JSON.Bool b) = if b then [ 1 ] else [ 0 ]
---     fromValue JSON.Null = []
+stringToJsonInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> BS.ByteString -> BS.ByteString -> IO ()
+stringToJsonInputs (f :: t -> t -> IO ()) a b = let a' = decodeStrict a :: Maybe t
+                                                    b' = decodeStrict b :: Maybe t
+                                                in case (a', b') of
+                                                 (Just i, Just j) -> f i j
+                                                 (_, _) -> error "failed to decode JSON"
+
+jsonFileInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> FilePath -> FilePath -> IO ()
+jsonFileInputs f a b = do a' <- readFile a
+                          b' <- readFile b
+                          stringToJsonInputs f (BS.pack a') (BS.pack b')
+
+-- Default method of JSON inputs
+jsonInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> IO ()
+jsonInputs f = jsonFileInputs f "public.json" "private.json"
 
 -- | Generate a proof given circuit, inputs (witness), paratemer, and proof
 prove' ::
