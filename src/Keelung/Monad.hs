@@ -41,6 +41,7 @@ module Keelung.Monad
     Input (..),
     -- Inputable (..),
     Inputable(..),
+    neqData,
     Proper (..),
     freshVarField,
     freshVarBool,
@@ -248,24 +249,28 @@ class GInputable f where
   gcond :: Boolean -> f x -> f x -> f x
   gfreshVar :: Comp (f x)
   gtoInts :: f x -> [ Integer ]
+  geq :: f x -> f x -> Boolean
 
 instance {-# OVERLAPS #-} GInputable (Rec0 Field) where
   ginput acc = K1 <$> inputField acc
   gcond b (K1 x) (K1 y) = K1 (IfF b x y)
   gfreshVar = K1 . VarF <$> freshVarF
   gtoInts (K1 f) = toInts f
+  geq (K1 a) (K1 b) = eq a b
 
 instance {-# OVERLAPS #-} GInputable (Rec0 Boolean) where
   ginput acc = K1 <$> inputBool acc
   gcond b (K1 x) (K1 y) = K1 (IfB b x y)
   gfreshVar = K1 . VarB <$> freshVarF
   gtoInts (K1 b) = toInts b
+  geq (K1 a) (K1 b) = eq a b
 
 instance {-# OVERLAPS #-} KnownNat w => GInputable (Rec0 (UInt w)) where
   ginput acc = K1 <$> inputUInt acc
   gcond b (K1 x) (K1 y) = K1 (IfU b x y)
   gfreshVar = K1 . VarU <$> freshVarF
   gtoInts (K1 i) = toInts i
+  geq (K1 a) (K1 b) = eq a b
 
 -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
 
@@ -275,6 +280,7 @@ instance GInputable U1 where
   gcond _ U1 U1 = U1
   gfreshVar = return U1
   gtoInts = const []
+  geq U1 U1 = Boolean True
 
 instance (GInputable a, GInputable b) => GInputable (a :*: b) where
   ginput acc = do
@@ -286,6 +292,7 @@ instance (GInputable a, GInputable b) => GInputable (a :*: b) where
                  b <- gfreshVar
                  return (a :*: b)
   gtoInts (x :*: y) = gtoInts x ++ gtoInts y
+  geq (x1 :*: y1) (x2 :*: y2) = geq x1 x2 `And` geq y1 y2
 
 instance (GInputable a) => GInputable (M1 i c a) where
   ginput acc = do
@@ -294,18 +301,21 @@ instance (GInputable a) => GInputable (M1 i c a) where
   gcond b (M1 x) (M1 y) = M1 $ gcond b x y
   gfreshVar = M1 <$> gfreshVar
   gtoInts (M1 a) = gtoInts a
+  geq (M1 a) (M1 b) = geq a b
 
 instance (Inputable a) => GInputable (K1 i a) where
   ginput acc = K1 <$> inputData acc
   gcond b (K1 x) (K1 y) = K1 $ condData b x y
   gfreshVar = K1 <$> freshData
   gtoInts (K1 k) = toInts k
+  geq (K1 a) (K1 b) = eqData a b
 
 class Inputable a where
   inputData :: InputAccess -> Comp a
   condData  :: Boolean -> a -> a -> a
   freshData :: Comp a
   toInts :: a -> [ Integer ]
+  eqData :: a -> a -> Boolean
   default inputData :: (Generic a, GInputable (Rep a)) => InputAccess -> Comp a
   inputData acc = to <$> ginput acc
   default condData :: (Generic a, GInputable (Rep a)) => Boolean -> a -> a -> a
@@ -314,6 +324,11 @@ class Inputable a where
   freshData = to <$> gfreshVar
   default toInts :: (Generic a, GInputable (Rep a)) => a -> [ Integer ]
   toInts = gtoInts . from
+  default eqData :: (Generic a, GInputable (Rep a)) => a -> a -> Boolean
+  eqData x y = geq (from x) (from y)
+
+neqData :: Inputable a => a -> a -> Boolean
+neqData a b = Not (eqData a b)
  
 instance Inputable Field where
   inputData = inputField
@@ -322,6 +337,7 @@ instance Inputable Field where
   toInts = \case
       (Integer i) -> [ i ]
       _ -> error "toInts should not be used here."
+  eqData = eq
 
 instance Inputable Boolean where
   inputData = inputBool
@@ -330,6 +346,7 @@ instance Inputable Boolean where
   toInts = \case
       (Boolean b) -> [ if b then 1 else 0 ]
       _ -> error "toInts should not be used here."
+  eqData = eq
 
 instance (KnownNat w) => Inputable (UInt w) where
   inputData = inputUInt 
@@ -340,6 +357,7 @@ instance (KnownNat w) => Inputable (UInt w) where
   toInts = \case
       (UInt j) -> [ j ]
       _ -> error "toInts should not be used here."
+  eqData = eq
  
 instance Inputable ()
 instance (Inputable a) => Inputable (Proxy a)
