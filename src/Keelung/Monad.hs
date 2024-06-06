@@ -245,18 +245,26 @@ freshInputVar acc readType writeType n = do
 -- just gives pure inner value, while ginput performs input at the same time
 class GInputable f where
   ginput :: InputAccess -> Comp (f x)
+  gcond :: Boolean -> f x -> f x -> f x
+  gfreshVar :: Comp (f x)
   gtoInts :: f x -> [ Integer ]
 
 instance {-# OVERLAPS #-} GInputable (Rec0 Field) where
   ginput acc = K1 <$> inputField acc
+  gcond b (K1 x) (K1 y) = K1 (IfF b x y)
+  gfreshVar = K1 . VarF <$> freshVarF
   gtoInts (K1 f) = toInts f
 
 instance {-# OVERLAPS #-} GInputable (Rec0 Boolean) where
   ginput acc = K1 <$> inputBool acc
+  gcond b (K1 x) (K1 y) = K1 (IfB b x y)
+  gfreshVar = K1 . VarB <$> freshVarF
   gtoInts (K1 b) = toInts b
 
 instance {-# OVERLAPS #-} KnownNat w => GInputable (Rec0 (UInt w)) where
   ginput acc = K1 <$> inputUInt acc
+  gcond b (K1 x) (K1 y) = K1 (IfU b x y)
+  gfreshVar = K1 . VarU <$> freshVarF
   gtoInts (K1 i) = toInts i
 
 -- instance of (a :+: b) is deliberatly missing so the size of type is deterministic.
@@ -264,6 +272,8 @@ instance {-# OVERLAPS #-} KnownNat w => GInputable (Rec0 (UInt w)) where
 -- flatten all elements into 1-d array
 instance GInputable U1 where
   ginput _ = return U1
+  gcond _ U1 U1 = U1
+  gfreshVar = return U1
   gtoInts = const []
 
 instance (GInputable a, GInputable b) => GInputable (a :*: b) where
@@ -271,40 +281,62 @@ instance (GInputable a, GInputable b) => GInputable (a :*: b) where
     a' <- ginput acc
     b' <- ginput acc
     return (a' :*: b')
+  gcond b (x1 :*: x2) (y1 :*: y2) = gcond b x1 y1 :*: gcond b x2 y2
+  gfreshVar = do a <- gfreshVar 
+                 b <- gfreshVar
+                 return (a :*: b)
   gtoInts (x :*: y) = gtoInts x ++ gtoInts y
 
 instance (GInputable a) => GInputable (M1 i c a) where
   ginput acc = do
     a <- ginput acc 
     return (M1 a)
+  gcond b (M1 x) (M1 y) = M1 $ gcond b x y
+  gfreshVar = M1 <$> gfreshVar
   gtoInts (M1 a) = gtoInts a
 
 instance (Inputable a) => GInputable (K1 i a) where
   ginput acc = K1 <$> inputData acc
+  gcond b (K1 x) (K1 y) = K1 $ condData b x y
+  gfreshVar = K1 <$> freshData
   gtoInts (K1 k) = toInts k
 
 class Inputable a where
   inputData :: InputAccess -> Comp a
+  condData  :: Boolean -> a -> a -> a
+  freshData :: Comp a
   toInts :: a -> [ Integer ]
   default inputData :: (Generic a, GInputable (Rep a)) => InputAccess -> Comp a
   inputData acc = to <$> ginput acc
+  default condData :: (Generic a, GInputable (Rep a)) => Boolean -> a -> a -> a
+  condData b x y = to $ gcond b (from x) (from y)
+  default freshData :: (Generic a, GInputable (Rep a)) => Comp a
+  freshData = to <$> gfreshVar
   default toInts :: (Generic a, GInputable (Rep a)) => a -> [ Integer ]
   toInts = gtoInts . from
  
 instance Inputable Field where
   inputData = inputField
+  condData = IfF
+  freshData = VarF <$> freshVarF
   toInts = \case
       (Integer i) -> [ i ]
       _ -> error "toInts should not be used here."
 
 instance Inputable Boolean where
   inputData = inputBool
+  condData = IfB
+  freshData = VarB <$> freshVarB
   toInts = \case
       (Boolean b) -> [ if b then 1 else 0 ]
       _ -> error "toInts should not be used here."
 
 instance (KnownNat w) => Inputable (UInt w) where
   inputData = inputUInt 
+  condData = IfU
+  freshData = VarU <$> freshVarU width
+    where
+      width = fromIntegral (natVal (Proxy :: Proxy w))
   toInts = \case
       (UInt j) -> [ j ]
       _ -> error "toInts should not be used here."
