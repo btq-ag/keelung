@@ -81,7 +81,7 @@ import Data.Aeson
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 24)
+keelungCompilerVersion = (0, 25)
 
 -- | Patch version of this library
 compilerPatchVersion :: Int
