@@ -38,7 +38,7 @@ dependencies:
   - vector
   - wl-pprint-text
   - aeson
-    #  - scientific
+  - attoparsec
 
 library:
   source-dirs: src
