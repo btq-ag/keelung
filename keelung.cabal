@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           keelung
-version:        0.13.1
+version:        0.24.0
 synopsis:       DSL for creating zero-knowledge proofs
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung#readme>
 category:       Cryptography
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.CircuitFormat
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
       Keelung.Data.Bits
@@ -39,6 +40,7 @@ library
       Keelung.Field
       Keelung.Heap
       Keelung.Monad
+      Keelung.Options
       Keelung.Prof
       Keelung.Syntax
       Keelung.Syntax.Counters
@@ -53,6 +55,7 @@ library
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       QuickCheck
+    , aeson
     , array
     , base >=4.7 && <5
     , bytestring
@@ -63,6 +66,7 @@ library
     , galois-field
     , groups
     , mtl
+    , optparse-applicative
     , process
     , random
     , semirings
@@ -74,8 +78,10 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.Monad
       Test.VarLayout
       Keelung
+      Keelung.CircuitFormat
       Keelung.Constraint.R1C
       Keelung.Constraint.R1CS
       Keelung.Data.Bits
@@ -87,6 +93,7 @@ test-suite keelung-test
       Keelung.Field
       Keelung.Heap
       Keelung.Monad
+      Keelung.Options
       Keelung.Prof
       Keelung.Syntax
       Keelung.Syntax.Counters
@@ -102,6 +109,7 @@ test-suite keelung-test
   build-depends:
       HUnit
     , QuickCheck
+    , aeson
     , array
     , base >=4.7 && <5
     , bytestring
@@ -115,6 +123,7 @@ test-suite keelung-test
     , hspec-expectations-lifted
     , keelung
     , mtl
+    , optparse-applicative
     , process
     , quickcheck-transformer
     , random

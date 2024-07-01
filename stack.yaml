@@ -22,8 +22,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/7.yaml
+resolver: lts-20.26
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -48,7 +47,6 @@ packages:
 extra-deps: 
 - git: https://github.com/btq-ag/galois-field.git
   commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
-
 # Override default flag values for local packages and extra-deps
 # flags: {}
 

@@ -6,6 +6,7 @@
 module Keelung.Data.Polynomial
   ( Poly,
     buildEither,
+    buildWithIntMap,
     singleVar,
     bind,
     vars,
@@ -96,8 +97,8 @@ buildEither c xs =
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
-buildEither' :: (Num n, Eq n) => n -> IntMap n -> Either n (Poly n)
-buildEither' c xs =
+buildWithIntMap :: (Num n, Eq n) => n -> IntMap n -> Either n (Poly n)
+buildWithIntMap c xs =
   let xs' = IntMap.filter (0 /=) xs
    in if IntMap.null xs'
         then Left c
@@ -162,7 +163,7 @@ delete x (Poly c xs) = buildMaybe c (IntMap.delete x xs)
 
 -- | Merge two polynomials.
 merge :: (Num n, Eq n) => Poly n -> Poly n -> Either n (Poly n)
-merge (Poly c xs) (Poly d ys) = case buildEither' (c + d) (IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys) of
+merge (Poly c xs) (Poly d ys) = case buildWithIntMap (c + d) (IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys) of
   Left n -> Left n
   Right xs' -> Right xs'
 
@@ -183,7 +184,7 @@ substWithIntMap (Poly c xs) bindings =
           )
           (c, mempty, False)
           xs
-   in (buildEither' c' xs', changed)
+   in (buildWithIntMap c' xs', changed)
 
 addConstant :: Num n => n -> Poly n -> Poly n
 addConstant d (Poly c xs) = Poly (c + d) xs

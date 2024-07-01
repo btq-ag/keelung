@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
@@ -10,32 +9,47 @@ module Keelung
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
-    -- run,
+    keelung,
+    -- interpret
+    interpret,
+    --interpretData,
+    interpretEither,
+    -- compile
     compile,
     compileO0,
     compileWithOpts,
     rtsoptProf,
     rtsoptMemory,
-    generate,
-    generateDefault,
+    -- solve R1CS
+    solveOutput,
+    --solveOutputData,
+    solveOutputEither,
+    -- witness generation
+    witness,
+    witness',
+    -- proof generation
+    prove,
+    prove',
+    -- proof verification
     verify,
-    verifyDefault,
-    genCircuit,
+    verify',
+    -- genCircuit,
     genCircuitBin,
-    genCircuitDefault,
-    genWitness,
-    genWitnessDefault,
+    genWtns,
+    -- genCircuitDefault,
     genInputs,
     genInputsDefault,
-    interpret_,
-    interpret,
-    -- gf181,
-    -- bn128,
-    -- b64,
-    elaborateAndEncode,
     Encode,
     GaloisField,
-    keelungVersion
+    keelungVersion,
+    proveData,
+    interpretData,
+    interpretDataEither,
+    solveOutputDataEither,
+    solveOutputData,
+    stringToJsonInputs,
+    jsonFileInputs,
+    jsonInputs,
   )
 where
 
@@ -52,54 +66,70 @@ import Keelung.Error
 import Keelung.Field
 import Keelung.Heap
 import Keelung.Monad
+import Keelung.Options
 import Keelung.Syntax
 import Keelung.Syntax.Encode
-import Keelung.Syntax.Encode.Syntax qualified as Encoding
 import System.Directory qualified as Path
 import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
-
+import Data.Aeson
+-- import Data.Aeson qualified as JSON (Value(..))
+-- import Data.Aeson (ToJSON(..), FromJSON(..))
+-- import Data.Aeson.KeyMap (elems)
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 13)
+keelungCompilerVersion = (0, 25)
 
+-- | Patch version of this library
 compilerPatchVersion :: Int
-compilerPatchVersion = 1
+compilerPatchVersion = 0
 
+-- | The version of this library in String
 keelungVersion :: String
-keelungVersion = unwords [show (fst keelungCompilerVersion), ".", show (snd keelungCompilerVersion), ".", show compilerPatchVersion]
+keelungVersion = intercalate "." [show (fst keelungCompilerVersion), show (snd keelungCompilerVersion), show compilerPatchVersion]
+
+--------------------------------------------------------------------------------
+
+-- | Entry point for the Keelung command line interface
+keelung :: (Encode t) => Comp t -> IO ()
+keelung program = do
+  -- replace with beefier option parser
+  options <- getOptions
+  case options of
+    Compile fieldType -> compile fieldType program >>= printResult
+    Interpret fieldType publicInputs privateInputs -> interpret fieldType program publicInputs privateInputs >>= print
+    Witness fieldType publicInputs privateInputs outputFilePath -> witness' outputFilePath fieldType program publicInputs privateInputs >>= print
+    Prove fieldType publicInputs privateInputs circuitPath witnessPath proofPath ->
+      prove' circuitPath witnessPath "aurora/parameter.json" proofPath fieldType program publicInputs privateInputs
+    Verify circuitPath witnessPath proofPath ->
+      verify' circuitPath witnessPath "aurora/parameter.json" proofPath
+    Version -> putStrLn keelungVersion
+  where
+    printResult (Left err) = print err
+    printResult (Right result) = print result
 
 --------------------------------------------------------------------------------
 
 -- | Compile a program to a 'R1CS' constraint system.
-compile :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compile :: (Encode t) => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compile = compileWithOpts 1 [] []
 
 -- | Compile a program to a 'R1CS' constraint system with optimization level 0.
-compileO0 :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileO0 :: (Encode t) => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileO0 = compileWithOpts 0 [] []
 
--- -- | Compile a program to a 'R1CS' constraint system with optimization level 2.
--- compileOld :: Encode t => FieldType -> Comp t -> IO (Either Error (R1CS Integer))
--- compileOld = compileWithOpts 2 [] []
-
 -- | Compile a program to a 'R1CS' constraint system with optimization level and RTS options as arguments.
-compileWithOpts :: Encode t => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
+compileWithOpts :: (Encode t) => Int -> [String] -> [String] -> FieldType -> Comp t -> IO (Either Error (R1CS Integer))
 compileWithOpts level opts rtsopts fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
-  let opts' = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
-  wrapper opts' (fieldType, elab) :: M (R1CS Integer)
+  let options = "protocol" : optOptimize level : opts <> ["+RTS"] <> rtsopts <> ["-RTS"]
+  callKeelungc options (fieldType, elab) :: M (R1CS Integer)
   where
     optOptimize :: Int -> String
     optOptimize i = "O" <> show i
-
--- echo :: Comp Field
--- echo = do 
---   x <- input Public 
---   return $ recip x
 
 -- | Default RTS options for profiling
 rtsoptProf :: [String]
@@ -114,44 +144,25 @@ rtsoptMemory m h a = ["-M" <> show m <> "G", "-H" <> show h <> "G", "-A" <> show
 
 --------------------------------------------------------------------------------
 
--- | Generate a proof given circuit, inputs (witness), paratemer, and proof
-generate_ ::
-  (Serialize n, Integral n, Encode t) =>
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FilePath ->
-  FieldType ->
-  Comp t ->
-  [n] ->
-  [n] ->
-  IO (Either Error (FilePath, String))
-generate_ circuit witness _inputs param proofPath fieldType prog publicInput privateInput = runM $ do
-  (cmd, args) <- findAuroraProver
-  _ <- genCircuit circuit fieldType prog
-  _ <- genWitness_ witness fieldType prog publicInput privateInput -- Should generate public as well as private inputs
-  genParameters param
-  -- genInputs inputs publicInput -- Should generate public inputs only for verifier
-  lift $ do
-    let arguments =
-          args
-            ++ [ "--r1cs_filepath",
-                 circuit,
-                 "--input_filepath",
-                 witness,
-                 "--parameter_filepath",
-                 param,
-                 "--output_filepath",
-                 proofPath
-               ]
-    msg <- Process.readProcess cmd arguments mempty
-    return (proofPath, msg)
+stringToJsonInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> BS.ByteString -> BS.ByteString -> IO ()
+stringToJsonInputs (f :: t -> t -> IO ()) a b = let a' = decodeStrict a :: Maybe t
+                                                    b' = decodeStrict b :: Maybe t
+                                                in case (a', b') of
+                                                 (Just i, Just j) -> f i j
+                                                 (_, _) -> error "failed to decode JSON"
 
--- | Generate a proof
-generate ::
-  Encode t =>
-  FilePath ->
+jsonFileInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> FilePath -> FilePath -> IO ()
+jsonFileInputs f a b = do a' <- readFile a
+                          b' <- readFile b
+                          stringToJsonInputs f (BS.pack a') (BS.pack b')
+
+-- Default method of JSON inputs
+jsonInputs :: (FromJSON t, Inputable t) => (t -> t -> IO ()) -> IO ()
+jsonInputs f = jsonFileInputs f "public.json" "private.json"
+
+-- | Generate a proof given circuit, inputs (witness), paratemer, and proof
+prove' ::
+  (Encode t) =>
   FilePath ->
   FilePath ->
   FilePath ->
@@ -161,147 +172,177 @@ generate ::
   [Integer] ->
   [Integer] ->
   IO ()
-generate circuit witness inputs param proof fieldType prog publicInput privateInput = do
-  result <- generate_ circuit witness inputs param proof fieldType prog publicInput privateInput
+prove' circuitPath witnessPath paramPath proofPath fieldType prog publicInput privateInput = do
+  result <- runM $ do
+    (cmd, args) <- findAuroraProver
+    _ <- genCircuit circuitPath fieldType prog
+    _ <- genWitness_ witnessPath fieldType prog publicInput privateInput -- Should generate public as well as private inputs
+    -- _ <- genWitness_ witnessPath fieldType prog publicInput privateInput -- Should generate public as well as private inputs
+    genParameters paramPath
+    -- genInputs inputs publicInput -- Should generate public inputs only for verifier
+    lift $ do
+      let arguments =
+            args
+              ++ [ "--r1cs_filepath",
+                   circuitPath,
+                   "--input_filepath",
+                   witnessPath,
+                   "--parameter_filepath",
+                   paramPath,
+                   "--output_filepath",
+                   proofPath
+                 ]
+      -- print $ "Running: " ++ cmd ++ " " ++ unwords arguments
+      msg <- Process.readProcess cmd arguments mempty
+      return (proofPath, msg)
   case result of
     Left err -> print err
     Right (_, msg) -> putStr msg
 
-generateDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-generateDefault fieldType prog publicInput privateInput = do
+prove :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+prove f p i o = do
   Path.createDirectoryIfMissing True "aurora"
-  generate "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/inputs.jsonl" "aurora/parameter.json" "aurora/proof" fieldType prog publicInput privateInput
+  prove' "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof" f p i o
 
--- | Generate and verify a proof given circuit, inputs (witness), paratemer, and proof
-verify_ :: FilePath -> FilePath -> FilePath -> FilePath -> IO (Either Error String)
-verify_ circuit inputs param proof = runM $ do
-  (cmd, args) <- findAuroraVerifier
-  genParameters param
-  lift $ do
-    let arguments =
-          args
-            ++ [ "--r1cs_filepath",
-                 circuit,
-                 "--input_filepath",
-                 inputs,
-                 "--parameter_filepath",
-                 param,
-                 "--proof_filepath",
-                 proof
-               ]
-    Process.readProcess cmd arguments mempty
+proveData :: (Encode t, Inputable a1, Inputable a2) => FieldType -> Comp t -> a1 -> a2 -> IO ()
+proveData f p i o = prove f p (toInts i) (toInts o)
 
--- | Verify a proof
-verify :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
-verify circuit inputs param proof = do
-  result <- verify_ circuit inputs param proof
+-- | Generate and verify a proof given circuit, witness, paratemer, and proof
+verify' :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
+verify' circuitPath witnessPath paramPath proofPath = do
+  result <- runM $ do
+    (cmd, args) <- findAuroraVerifier
+    genParameters proofPath
+    lift $ do
+      let arguments =
+            args
+              ++ [ "--r1cs_filepath",
+                   circuitPath,
+                   "--input_filepath",
+                   witnessPath,
+                   "--parameter_filepath",
+                   paramPath,
+                   "--proof_filepath",
+                   proofPath
+                 ]
+      Process.readProcess cmd arguments mempty
   case result of
     Left err -> print err
     Right msg -> putStr msg
 
 -- TODO: Verify inputs.jsonl instead
-verifyDefault :: IO ()
-verifyDefault = verify "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
+verify :: IO ()
+verify = verify' "aurora/circuit.jsonl" "aurora/witness.jsonl" "aurora/parameter.json" "aurora/proof"
 
 -- | Compile a program as R1CS and write it to circuit.jsonl.
-genCircuit :: Encode t => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
-genCircuit fp fieldType prog = do
+genCircuit :: (Encode t) => FilePath -> FieldType -> Comp t -> M (R1CS Integer)
+genCircuit filePath fieldType prog = do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
-  -- case fieldType of
-  --   GF181 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS GF181))
-  --   BN128 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS BN128))
-  --   B64 -> convertFieldElement (wrapper ["protocol", "toJSON", "--filepath", fp] (fieldType, elab) :: M (R1CS B64))
+  r1cs <- callKeelungc ["protocol", "toJSON", "--filepath", filePath] (fieldType, elab) :: M (R1CS Integer)
+  liftIO $ putStrLn $ "Generated circuit file at: " <> filePath
+  return r1cs
 
-genCircuitBin :: Encode t => FilePath -> FieldType -> Comp t -> IO (Either Error String)
-genCircuitBin fp fieldType prog = runM $ do
+genCircuitBin :: (Encode t) => FilePath -> FieldType -> Comp t -> IO (Either Error String)
+genCircuitBin filePath fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
-  _ <- wrapper ["protocol", "genCircuitBin", "--filepath", fp] (fieldType, elab) :: M (R1CS Integer)
+  _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", filePath] (fieldType, elab) :: M (R1CS Integer)
+  liftIO $ putStrLn $ "Generated binary circuit file at: " <> filePath
   return "Success"
 
-genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
-genCircuitDefault = genCircuit "aurora/circuit.jsonl"
+-- genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
+-- genCircuitDefault = genCircuit "aurora/circuit.jsonl"
 
 -- | Generate witnesses for a program with inputs and write them to witness.jsonl.
-genWitness_ :: (Serialize n, Integral n, Encode t) => FilePath -> FieldType -> Comp t -> [n] -> [n] -> M [n]
-genWitness_ fp fieldType prog publicInput privateInput = do
+genWitness_ :: (Encode t) => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> M [Integer]
+genWitness_ filePath fieldType prog publicInput privateInput = do
   elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "genWitness", "--filepath", fp] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
+  output <- callKeelungc ["protocol", "genWitness", "--filepath", filePath] (fieldType, elab, publicInput, privateInput)
+  liftIO $ putStrLn $ "Generated witness file at: " <> filePath
+  return output
+
+-- | Generate witnesses for a program with inputs and write them to witness.jsonl.
+genWtns :: (Encode t) => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error String)
+genWtns filePath fieldType prog publicInput privateInput = runM $ do
+  elab <- liftEither (elaborateAndEncode prog)
+  _ <- callKeelungc ["protocol", "genWtns", "--filepath", filePath] (fieldType, elab, publicInput, privateInput) :: M [Integer]
+  liftIO $ putStrLn $ "Generated wtns file at: " <> filePath
+  return "Success"
 
 -- | Generate parameters for a program and write them to parameter.json.
 genParameters :: FilePath -> M ()
-genParameters fp = lift $ BS.writeFile fp "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
+genParameters filePath = do
+  lift $ BS.writeFile filePath "{\"security_level\": 128, \"heuristic_ldt_reducer_soundness\": true, \"heuristic_fri_soundness\": true, \"bcs_hash_type\": \"blake2b_type\", \"make_zk\": false, \"parallel\": true, \"field_size\": 181, \"is_multiplicative\": true}"
+  liftIO $ putStrLn $ "Generated parameter file at: " <> filePath
 
 -- | For generating witness.jsonl
-genWitness :: Encode t => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-genWitness fp fieldType prog publicInput privateInput = runM (genWitness_ fp fieldType prog publicInput privateInput) >>= printErrorInstead
+witness' :: (Encode t) => FilePath -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+witness' fp fieldType prog publicInput privateInput = runM (genWitness_ fp fieldType prog publicInput privateInput) >>= printErrorInstead
 
-genWitnessDefault :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-genWitnessDefault = genWitness "aurora/witness.jsonl"
+witness :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+witness = witness' "aurora/witness.jsonl"
 
 -- | For generating inputs.jsonl
-genInputs :: (Integral n) => FilePath -> [n] -> M ()
+genInputs :: FilePath -> [Integer] -> M ()
 genInputs fp inputs = do
-  let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show . toInteger) inputs
+  let inputs' = intercalate "," $ map ((\x -> "\"" ++ x ++ "\"") . show) inputs
   lift $ BS.writeFile fp $ fromString $ "{\"inputs\":[" ++ inputs' ++ "]}"
 
-genInputsDefault :: (Integral n) => [n] -> M ()
+genInputsDefault :: [Integer] -> M ()
 genInputsDefault = genInputs "inputs.jsonl"
 
 --------------------------------------------------------------------------------
 
--- | Interpret a program
-interpret_ :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
-interpret_ fieldType prog publicInput privateInput = runM $ do
-  elab <- liftEither (elaborateAndEncode prog)
-  wrapper ["protocol", "interpret"] (fieldType, elab, map toInteger publicInput, map toInteger privateInput)
-
-printErrorInstead :: Show e => Either e [a] -> IO [a]
+printErrorInstead :: (Show e) => Either e [a] -> IO [a]
 printErrorInstead (Left err) = do
   print err
   return []
 printErrorInstead (Right values) = return values
 
 -- | Interpret a program with public and private inputs
--- run :: Encode t => Comp t -> [Integer] -> [Integer] -> IO [Integer]
--- run prog publicInput privateInput = interpret_ GF181 prog publicInput privateInput >>= printErrorInstead
+interpret :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+interpret fieldType prog publicInput privateInput = interpretEither fieldType prog publicInput privateInput >>= printErrorInstead
+
+-- | Interpret a program where public and private inputs are provided as datatype encodable to JSON.
+interpretData :: (Encode t, Inputable a, Inputable b) => FieldType -> Comp t -> a -> b -> IO [Integer]
+interpretData fieldType prog pub prv = interpret fieldType prog (toInts pub) (toInts prv)
 
 -- | Interpret a program with public and private inputs
-interpret :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
-interpret fieldType prog publicInput privateInput = interpret_ fieldType prog publicInput privateInput >>= printErrorInstead
+interpretEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
+interpretEither fieldType prog publicInput privateInput =
+  runM
+    ( do
+        elab <- liftEither (elaborateAndEncode prog)
+        callKeelungc ["protocol", "interpret"] (fieldType, elab, publicInput, privateInput)
+    )
+interpretDataEither :: (Encode t, Inputable a, Inputable b) => FieldType -> Comp t -> a -> b -> IO (Either Error [Integer])
+interpretDataEither fieldType prog publicInput privateInput = interpretEither fieldType prog (toInts publicInput) (toInts privateInput)
 
 --------------------------------------------------------------------------------
 
--- | Elaborate a program and encode it
-elaborateAndEncode :: Encode t => Comp t -> Either Error Encoding.Elaborated
-elaborateAndEncode prog = encodeElaborated <$> elaborate prog
-  where
-    encodeElaborated :: Encode t => Elaborated t -> Encoding.Elaborated
-    encodeElaborated (Elaborated expr comp) = runHeapM (compHeap comp) $ do
-      let Computation counters _addrSize _heap assertions sideEffects = comp
-       in Encoding.Elaborated
-            <$> encode expr
-            <*> ( Encoding.Computation
-                    counters
-                    <$> mapM encode assertions
-                    <*> mapM encodeSideEffect sideEffects
-                )
+-- | Solves the R1CS of a Keelung program with given inputs and outputs the result
+solveOutput :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO [Integer]
+solveOutput fieldType prog publicInput privateInput = solveOutputEither fieldType prog publicInput privateInput >>= printErrorInstead
 
-    encodeSideEffect :: SideEffect -> HeapM Encoding.SideEffect
-    encodeSideEffect (AssignmentF var field) = Encoding.AssignmentF var <$> encode' field
-    encodeSideEffect (AssignmentB var bool) = Encoding.AssignmentB var <$> encode' bool
-    encodeSideEffect (AssignmentU width var uint) = return $ Encoding.AssignmentU width var uint
-    encodeSideEffect (DivMod width a b q r) = return $ Encoding.DivMod width a b q r
-    encodeSideEffect (AssertLTE width a b) = return $ Encoding.AssertLTE width a b
-    encodeSideEffect (AssertLT width a b) = return $ Encoding.AssertLT width a b
-    encodeSideEffect (AssertGTE width a b) = return $ Encoding.AssertGTE width a b
-    encodeSideEffect (AssertGT width a b) = return $ Encoding.AssertGT width a b
+solveOutputData :: (Encode t, Inputable d, Inputable e) => FieldType -> Comp t -> d -> e -> IO [Integer]
+solveOutputData fieldType prog pub prv = solveOutput fieldType prog (toInts pub) (toInts prv)
+
+-- | Solves the R1CS of a Keelung program with given inputs and outputs the result
+solveOutputEither :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO (Either Error [Integer])
+solveOutputEither fieldType prog publicInput privateInput =
+  runM
+    ( do
+        elab <- liftEither (elaborateAndEncode prog)
+        callKeelungc ["protocol", "solve"] (fieldType, elab, publicInput, privateInput)
+    )
+
+solveOutputDataEither :: (Encode t, Inputable d, Inputable e) => FieldType -> Comp t -> d -> e -> IO (Either Error [Integer])
+solveOutputDataEither fieldType prog pub prv = solveOutputEither fieldType prog (toInts pub) (toInts prv)
 
 --------------------------------------------------------------------------------
 
 -- | Internal function for handling data serialization
-wrapper :: (Serialize a, Serialize b) => [String] -> a -> M b
-wrapper args' payload = do
+callKeelungc :: (Serialize a, Serialize b) => [String] -> a -> M b
+callKeelungc args' payload = do
   (cmd, args) <- findKeelungc
   version <- readKeelungVersion cmd args
   checkCompilerVersion version
@@ -429,13 +470,9 @@ runM = runExceptT
 catchIOError :: Error -> IO a -> M a
 catchIOError err f = lift (IO.catchIOError (Right <$> f) (const (return (Left err)))) >>= liftEither
 
--- | Prettify and convert all field elements to 'Integer' in a 'R1CS'
--- convertFieldElement :: (GaloisField a, Integral a) => M (R1CS a) -> M (R1CS Integer)
--- convertFieldElement = fmap (fmap (toInteger . N))
-
 --------------------------------------------------------------------------------
 
-instance Encode a => Show (Comp a) where
+instance (Encode a) => Show (Comp a) where
   show prog = case elaborateAndEncode prog of
     Left err -> show err
     Right elaborated -> show elaborated

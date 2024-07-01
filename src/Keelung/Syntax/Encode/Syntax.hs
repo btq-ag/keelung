@@ -7,10 +7,12 @@ module Keelung.Syntax.Encode.Syntax where
 import Control.DeepSeq (NFData)
 import Data.Array.Unboxed (Array)
 import Data.Foldable (toList)
+-- import Keelung.Data.Struct
+
+import Data.IntMap (IntMap)
 import Data.Sequence (Seq)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
--- import Keelung.Data.Struct
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters (Counters)
 
@@ -137,12 +139,22 @@ data UInt
     VarUP Width Var
   | -- | Addition
     AddU Width UInt UInt
+  | -- | Addition
+    AddV Width [UInt]
   | -- | Subtraction
     SubU Width UInt UInt
   | -- | Multiplication
     MulU Width UInt UInt
+  | -- | Hardcoded GF(256) Multiplication for AES
+    AESMulU Width UInt UInt
+  | -- | Carry-less Multiplication
+    CLMulU Width UInt UInt
   | -- | Modular multiplicative inverse
     MMIU Width UInt Integer
+  | -- | Division
+    DivU Width UInt UInt
+  | -- | Modulo
+    ModU Width UInt UInt
   | -- | Bitwise conjunction
     AndU Width UInt UInt
   | -- | Bitwise disjunction
@@ -161,6 +173,10 @@ data UInt
     IfU Width Boolean UInt UInt
   | -- | Conversion from Boolean to Unsigned integer
     BtoU Width Boolean
+  | -- | Slice of an Unsigned integer
+    SliceU Width UInt Int Int
+  | -- | Joining of two Unsigned integers
+    JoinU Width UInt UInt
   deriving (Generic, Eq, NFData)
 
 instance Serialize UInt
@@ -172,9 +188,14 @@ instance Show UInt where
     VarUI w var -> showString "$UI" . showString (toSubscript w) . shows var
     VarUP w var -> showString "$UP" . showString (toSubscript w) . shows var
     AddU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
+    AddV _ xs -> showParen (prec > 6) $ showsPrec 6 xs
     SubU _ x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     MulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
+    AESMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " AES* " . showsPrec 8 y
+    CLMulU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " .*. " . showsPrec 8 y
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " / " . showsPrec 8 y
+    ModU _ x y -> showParen (prec > 7) $ showsPrec 7 x . showString " % " . showsPrec 8 y
     AndU _ x y -> showParen (prec > 3) $ showsPrec 4 x . showString " ∧ " . showsPrec 3 y
     OrU _ x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     XorU _ x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
@@ -184,6 +205,8 @@ instance Show UInt where
     SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . shows i . showString "] := " . showsPrec 9 b
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoU _ x -> showString "B→U " . showsPrec prec x
+    SliceU _ x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . shows i . showString ":" . shows j . showString "]"
+    JoinU _ x y -> showParen (prec > 8) $ showsPrec 9 x . showString " ++ " . showsPrec 9 y
     where
       toSubscript :: Int -> String
       toSubscript = map go . show
@@ -260,7 +283,7 @@ instance Show Elaborated where
           then ""
           else "\n  Other side effects: \n" <> unlines (map (("    " <>) . show) (toList sideEffects))
 
-      prettyList2 :: Show a => Int -> [a] -> String
+      prettyList2 :: (Show a) => Int -> [a] -> String
       prettyList2 n list = case list of
         [] -> "    []"
         [x] -> "    [" <> show x <> "]"
@@ -279,6 +302,8 @@ data Computation = Computation
     compCounters :: !Counters,
     -- Assertions are expressions that are expected to be true
     compAssertions :: [Expr],
+    -- Hints for the constraint solver
+    compHints :: Hints,
     -- Store side effects of the computation in a sequence so that we can simulate them during interpretation
     compSideEffects :: Seq SideEffect
   }
@@ -288,11 +313,27 @@ instance Serialize Computation
 
 --------------------------------------------------------------------------------
 
+-- | Data structure for storing hints
+data Hints = Hints
+  { hintsF :: IntMap (Field, [Boolean]),
+    hintsB :: IntMap (Boolean, [Boolean]),
+    hintsU :: IntMap (IntMap (UInt, [Boolean]))
+  }
+  deriving (Show, Generic, NFData)
+
+instance Serialize Hints
+
+--------------------------------------------------------------------------------
+
 data SideEffect
   = AssignmentF Var Field
   | AssignmentB Var Boolean
   | AssignmentU Width Var UInt
+  | ToUInt Width Var Var
+  | ToField Width Var Var
+  | BitsToUInt Width Var [Boolean]
   | DivMod Width UInt UInt UInt UInt
+  | CLDivMod Width UInt UInt UInt UInt
   | AssertLTE Width UInt Integer
   | AssertLT Width UInt Integer
   | AssertGTE Width UInt Integer
@@ -305,7 +346,11 @@ instance Show SideEffect where
   show (AssignmentF var val) = show (VarF var) <> " := " <> show val
   show (AssignmentB var val) = show (VarB var) <> " := " <> show val
   show (AssignmentU w var val) = show (VarU w var) <> " := " <> show val
+  show (ToUInt w x y) = show (VarU w x) <> " <- " <> show (VarF y)
+  show (ToField w x y) = show (VarU w x) <> " -> " <> show (VarF y)
+  show (BitsToUInt w x vals) = show (VarU w x) <> " <- " <> show vals
   show (DivMod _ x y q r) = show x <> " = " <> show q <> " * " <> show y <> " + " <> show r
+  show (CLDivMod _ x y q r) = show x <> " = " <> show q <> " .*. " <> show y <> " .^. " <> show r
   show (AssertLTE _ x n) = "assert " <> show x <> " ≤ " <> show n
   show (AssertLT _ x n) = "assert " <> show x <> " < " <> show n
   show (AssertGTE _ x n) = "assert " <> show x <> " ≥ " <> show n

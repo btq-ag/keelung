@@ -20,10 +20,11 @@ tests :: SpecWith ()
 tests = do
   describe "Variable indexing 0" $ do
     --
-    --                F   B   BR  U
-    --       output   3   0   0   0
-    --        input   2   1   0   0
-    -- intermediate   0   0   20  5
+    --                F   B   U4
+    --       output   3   0   0
+    --    pub input   2   1   0
+    --   priv input   0   0   0
+    -- intermediate   0   0   5
     --
     let counters =
           ( addCount (PublicInput, WriteBool) 1
@@ -32,18 +33,23 @@ tests = do
               . addCount (Intermediate, WriteUInt 4) 5
           )
             mempty
-    it "reindex" $ do
-      reindex counters Output ReadField 0 `shouldBe` 0
-      reindex counters Output ReadField 1 `shouldBe` 1
-      reindex counters Output ReadField 2 `shouldBe` 2
-      reindex counters PublicInput ReadField 0 `shouldBe` 3
-      reindex counters PublicInput ReadField 1 `shouldBe` 4
-      reindex counters PublicInput ReadBool 0 `shouldBe` 5
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 6
-      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 10
-      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 14
-      reindex counters Intermediate (ReadUInt 4) 3 `shouldBe` 18
-      reindex counters Intermediate (ReadUInt 4) 4 `shouldBe` 22
+    it "getOffset" $ do
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 3
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 3
+      getOffset counters (Output, ReadUInt 4) `shouldBe` 3
+      getOffset counters (PublicInput, ReadField) `shouldBe` 3
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 5
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 6
+      getOffset counters (PublicInput, ReadUInt 4) `shouldBe` 6
+      getOffset counters (PrivateInput, ReadField) `shouldBe` 6
+      getOffset counters (PrivateInput, ReadBool) `shouldBe` 6
+      getOffset counters (PrivateInput, ReadAllUInts) `shouldBe` 6
+      getOffset counters (PrivateInput, ReadUInt 4) `shouldBe` 6
+      getOffset counters (Intermediate, ReadField) `shouldBe` 6
+      getOffset counters (Intermediate, ReadBool) `shouldBe` 6
+      getOffset counters (Intermediate, ReadAllUInts) `shouldBe` 6
+      getOffset counters (Intermediate, ReadUInt 4) `shouldBe` 6
 
     it "getCount" $ do
       getCount counters (Output, ReadField) `shouldBe` 3
@@ -57,28 +63,34 @@ tests = do
 
   describe "Variable indexing 1" $ do
     --
-    --                F   B   BR  U
-    --       output   0   6   0   0
-    --        input   0   0   4   1
-    -- intermediate   0   0   0   0
+    --                F   B   U4
+    --       output   0   6   0
+    --    pub input   0   0   1
+    --   priv input   0   0   0
+    -- intermediate   0   0   0
     --
-    -- bitTestVarUI :: Comp (Arr Boolean)
-    -- bitTestVarUI = do
-    --   x <- inputUInt @4
-    --   return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
     let counters =
           ( addCount (PublicInput, WriteUInt 4) 1
               . addCount (Output, WriteBool) 6
           )
             mempty
-    it "reindex" $ do
-      reindex counters Output ReadBool 0 `shouldBe` 0
-      reindex counters Output ReadBool 1 `shouldBe` 1
-      reindex counters Output ReadBool 2 `shouldBe` 2
-      reindex counters Output ReadBool 3 `shouldBe` 3
-      reindex counters Output ReadBool 4 `shouldBe` 4
-      reindex counters Output ReadBool 5 `shouldBe` 5
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 6
+    it "getOffset" $ do
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 0
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 6
+      getOffset counters (Output, ReadUInt 4) `shouldBe` 6
+      getOffset counters (PublicInput, ReadField) `shouldBe` 6
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 6
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 6
+      getOffset counters (PublicInput, ReadUInt 4) `shouldBe` 6
+      getOffset counters (PrivateInput, ReadField) `shouldBe` 10
+      getOffset counters (PrivateInput, ReadBool) `shouldBe` 10
+      getOffset counters (PrivateInput, ReadAllUInts) `shouldBe` 10
+      getOffset counters (PrivateInput, ReadUInt 4) `shouldBe` 10
+      getOffset counters (Intermediate, ReadField) `shouldBe` 10
+      getOffset counters (Intermediate, ReadBool) `shouldBe` 10
+      getOffset counters (Intermediate, ReadAllUInts) `shouldBe` 10
+      getOffset counters (Intermediate, ReadUInt 4) `shouldBe` 10
 
     it "getCount" $ do
       getCount counters (Output, ReadField) `shouldBe` 0
@@ -95,98 +107,118 @@ tests = do
 
   describe "Variable indexing 2" $ do
     --
-    --                F   B   BR  U
-    --       output   0   0   4   1
-    --        input   0   0   8   2
-    -- intermediate   0   0   4   1
+    --                F   B   U4  U6
+    --       output   0   0   1   0
+    --    pub input   0   0   2   1
+    --   priv input   0   0   0   2
+    -- intermediate   0   0   1   3
     --
     let counters =
           ( addCount (Output, WriteUInt 4) 1
               . addCount (PublicInput, WriteUInt 4) 2
               . addCount (Intermediate, WriteUInt 4) 1
+              . addCount (Intermediate, WriteUInt 6) 1
+              . addCount (Intermediate, WriteUInt 6) 3
+              . addCount (PrivateInput, WriteUInt 6) 2
+              . addCount (PublicInput, WriteUInt 6) 1
           )
             mempty
-    it "reindex" $ do
-      reindex counters Output (ReadUInt 4) 0 `shouldBe` 0
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 4
-      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 8
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 12
+
+    it "getOffset" $ do
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 0
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 0
+      getOffset counters (Output, ReadUInt 4) `shouldBe` 0
+      getOffset counters (Output, ReadUInt 6) `shouldBe` 4
+      getOffset counters (PublicInput, ReadField) `shouldBe` 4
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 4
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 4
+      getOffset counters (PublicInput, ReadUInt 4) `shouldBe` 4
+      getOffset counters (PublicInput, ReadUInt 6) `shouldBe` 12
+      getOffset counters (PrivateInput, ReadField) `shouldBe` 18
+      getOffset counters (PrivateInput, ReadBool) `shouldBe` 18
+      getOffset counters (PrivateInput, ReadAllUInts) `shouldBe` 18
+      getOffset counters (PrivateInput, ReadUInt 4) `shouldBe` 18
+      getOffset counters (PrivateInput, ReadUInt 6) `shouldBe` 18
+      getOffset counters (Intermediate, ReadField) `shouldBe` 30
+      getOffset counters (Intermediate, ReadBool) `shouldBe` 30
+      getOffset counters (Intermediate, ReadAllUInts) `shouldBe` 30
+      getOffset counters (Intermediate, ReadUInt 4) `shouldBe` 30
+      getOffset counters (Intermediate, ReadUInt 6) `shouldBe` 34
 
   describe "Variable indexing 3" $ do
     --
-    --                F   B   BR  U4  U5  U8
-    --       output   0   0   0   0   0   0
-    --        input   0   0   0   0   0   0
-    -- intermediate   0   0   21  4   1   1
-    --
-    let counters =
-          ( addCount (Intermediate, WriteUInt 4) 2
-              . addCount (Intermediate, WriteUInt 5) 1
-              . addCount (Intermediate, WriteUInt 8) 1
-          )
-            mempty
-    it "reindex" $ do
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 0
-      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 4
-      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 8
-      reindex counters Intermediate (ReadUInt 8) 0 `shouldBe` 13
-
-  describe "Variable indexing 4" $ do
-    --
-    --                F   B   BR  U4  U5
-    --       output   0   0   4   1   0
-    --        input   0   0   12  3   0
-    -- intermediate   0   0   0   3   4
+    --                F   B   U4  U5
+    --       output   0   0   1   0
+    --    pub input   0   0   3   0
+    --   priv input   0   0   0   4
+    -- intermediate   0   0   3   0
     --
     let counters =
           ( addCount (Intermediate, WriteUInt 4) 3
-              . addCount (Intermediate, WriteUInt 5) 4
+              . addCount (PrivateInput, WriteUInt 5) 4
               . addCount (Output, WriteUInt 4) 1
               . addCount (PublicInput, WriteUInt 4) 3
           )
             mempty
-    it "reindex" $ do
-      reindex counters Output (ReadUInt 4) 0 `shouldBe` 0
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 4
-      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 8
-      reindex counters PublicInput (ReadUInt 4) 2 `shouldBe` 12
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 16
-      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 20
-      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 24
-      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 28
-      reindex counters Intermediate (ReadUInt 5) 1 `shouldBe` 33
-      reindex counters Intermediate (ReadUInt 5) 2 `shouldBe` 38
-      reindex counters Intermediate (ReadUInt 5) 3 `shouldBe` 43
+    it "getOffset" $ do 
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 0
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 0
+      getOffset counters (Output, ReadUInt 4) `shouldBe` 0
+      getOffset counters (Output, ReadUInt 5) `shouldBe` 4
+      getOffset counters (PublicInput, ReadField) `shouldBe` 4
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 4
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 4
+      getOffset counters (PublicInput, ReadUInt 4) `shouldBe` 4
+      getOffset counters (PublicInput, ReadUInt 5) `shouldBe` 16
+      getOffset counters (PrivateInput, ReadField) `shouldBe` 16
+      getOffset counters (PrivateInput, ReadBool) `shouldBe` 16
+      getOffset counters (PrivateInput, ReadAllUInts) `shouldBe` 16
+      getOffset counters (PrivateInput, ReadUInt 4) `shouldBe` 16
+      getOffset counters (PrivateInput, ReadUInt 5) `shouldBe` 16
+      getOffset counters (Intermediate, ReadField) `shouldBe` 36
+      getOffset counters (Intermediate, ReadBool) `shouldBe` 36
+      getOffset counters (Intermediate, ReadAllUInts) `shouldBe` 36
+      getOffset counters (Intermediate, ReadUInt 4) `shouldBe` 36
+      getOffset counters (Intermediate, ReadUInt 5) `shouldBe` 48
 
   describe "Layout 0" $ do
-    --                F   B   BR  U
-    --       output   1   0   0   0
-    --        input   3   0   0   0
-    -- intermediate   0   0   0   0
+    --                F   B   U
+    --       output   1   0   0
+    --    pub input   3   0   0
+    --   priv input   0   0   0
+    -- intermediate   0   0   0
     let program = do
           x <- inputField Public
           y <- inputField Public
           z <- inputField Public
           return $ x + y + z
 
-    it "reindex" $ do
+    it "getOffset" $ do 
       counters <- execute program
-      reindex counters Output ReadField 0 `shouldBe` 0
-      reindex counters PublicInput ReadField 0 `shouldBe` 1
-      reindex counters PublicInput ReadField 1 `shouldBe` 2
-      reindex counters PublicInput ReadField 2 `shouldBe` 3
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 1
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 1
+      getOffset counters (PublicInput, ReadField) `shouldBe` 1
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 4
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 4
 
   describe "Layout 1" $ do
-    --                F   B   BR  U
-    --       output   1   0   0   0
-    --        input   1   1   0   0
-    -- intermediate   0   0   0   0
+    --                F   B   U
+    --       output   1   0   0
+    --    pub input   1   1   0
+    -- intermediate   0   0   0
     let program = do
           x <- inputField Public
           y <- inputBool Public
           return $ cond y x 0
-    it "reindex" $ do
+    it "getOffset" $ do
       counters <- execute program
-      reindex counters Output ReadField 0 `shouldBe` 0
-      reindex counters PublicInput ReadField 0 `shouldBe` 1
-      reindex counters PublicInput ReadBool 0 `shouldBe` 2
+      getOffset counters (Output, ReadField) `shouldBe` 0
+      getOffset counters (Output, ReadBool) `shouldBe` 1
+      getOffset counters (Output, ReadAllUInts) `shouldBe` 1
+      getOffset counters (PublicInput, ReadField) `shouldBe` 1
+      getOffset counters (PublicInput, ReadBool) `shouldBe` 2
+      getOffset counters (PublicInput, ReadAllUInts) `shouldBe` 3
+

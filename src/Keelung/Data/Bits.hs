@@ -11,9 +11,6 @@ import Keelung.Syntax
 
 -- | Bitwise operations on Keelung values
 class Bits a where
-  -- {-# MINIMAL bitWidth #-}
-  -- bitWidth :: a -> Int
-
   -- | Bitwise \"and\"
   (.&.) :: a -> a -> a
 
@@ -69,6 +66,14 @@ infixl 8 .>>.
 (.<<.) = shiftL
 
 infixl 8 .<<.
+
+-- | Synonym for 'rotate'
+rotateL :: Bits a => a -> Int -> a
+rotateL = rotate
+
+-- | Opposite of 'rotateL'
+rotateR :: Bits a => a -> Int -> a
+rotateR x i = rotateL x (-i)
 
 instance Bits Boolean where
   (.&.) = And

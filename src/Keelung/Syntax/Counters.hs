@@ -8,6 +8,8 @@
 
 module Keelung.Syntax.Counters
   ( Counters (..),
+    PinnedCounter (..),
+    IntermediateCounter (..),
     getTotalCount,
     -- | for constraint generation
     getBooleanConstraintCount,
@@ -21,9 +23,8 @@ module Keelung.Syntax.Counters
     prettyBooleanConstraints,
     -- | for reading the counts and ranges of variables
     Category (..),
-    ReadCounters,
+    ReadCounters (..),
     ReadType (..),
-    getCount,
     Ranges,
     getRanges,
     getRange,
@@ -31,21 +32,22 @@ module Keelung.Syntax.Counters
     -- | for writing the counts and ranges of variables
     WriteType (..),
     addCount,
+    setCount,
+    setCountOfIntermediateUIntBits,
     -- | other helpers
-    reindex,
-    inRanges,
     getUIntMap,
+    tempSetFlag,
   )
 where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Data.Struct (Struct (..))
 
 ------------------------------------------------------------------------------
 
@@ -61,56 +63,90 @@ import Keelung.Data.Struct (Struct (..))
 
 ------------------------------------------------------------------------------
 
-type Var = Int
-
 type Width = Int
 
 ------------------------------------------------------------------------------
 
-type SmallCounters = Struct Int Int Int
+-- | Counters for keeping track of the counts of "pinned" variables
+--   Pinned variables include: output variables, public input variables, private input variables
+data PinnedCounter = PinnedCounter
+  { fP :: Int, -- number of field variables
+    bP :: Int, -- number of Boolean variables
+    uP :: IntMap Int -- number of unsigned integer variables of each width (not the number of bits)
+  }
+  deriving (Generic, NFData, Eq, Show)
 
-binRepSize :: IntMap Int -> Int
-binRepSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
+instance Serialize PinnedCounter
 
-smallCounterSize :: SmallCounters -> Int
-smallCounterSize (Struct f b u) =
-  f + b + binRepSize u
+instance Monoid PinnedCounter where
+  mempty = PinnedCounter 0 0 mempty
+
+-- | How to combine two PinnedCounter
+instance Semigroup PinnedCounter where
+  PinnedCounter f1 b1 u1 <> PinnedCounter f2 b2 u2 =
+    PinnedCounter (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
+
+------------------------------------------------------------------------------
+
+-- | Counters for keeping track of the counts of "intermediate" variables
+data IntermediateCounter = IntermediateCounter
+  { fX :: Int, -- number of field variables
+    bX :: Int, -- number of Boolean variables
+    uX :: IntMap Int -- number of unsigned integer BIT variables of each width
+  }
+  deriving (Generic, NFData, Eq, Show)
+
+instance Serialize IntermediateCounter
+
+instance Monoid IntermediateCounter where
+  mempty = IntermediateCounter 0 0 mempty
+
+-- | How to combine two IntermediateCounters
+instance Semigroup IntermediateCounter where
+  IntermediateCounter f1 b1 u1 <> IntermediateCounter f2 b2 u2 =
+    IntermediateCounter (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
 
 --------------------------------------------------------------------------------
 
 data Counters = Counters
-  { countOutput :: !SmallCounters, -- counters for output variables
-    countPublicInput :: !SmallCounters, -- counters for public input variables
-    countPrivateInput :: !SmallCounters, -- counters for private input variables
-    countIntermediate :: !SmallCounters, -- counters for intermediate variables
+  { countOutput :: !PinnedCounter, -- counters for output variables
+    countPublicInput :: !PinnedCounter, -- counters for public input variables
+    countPrivateInput :: !PinnedCounter, -- counters for private input variables
+    countIntermediate :: !IntermediateCounter, -- counters for intermediate variables
     countPublicInputSequence :: !(Seq WriteType), -- Sequence of public input variables
-    countPrivateInputSequence :: !(Seq WriteType) -- Sequence of private input variables
+    countPrivateInputSequence :: !(Seq WriteType), -- Sequence of private input variables
+    countUseNewLinker :: !Bool
   }
   deriving (Generic, NFData, Eq, Show)
 
 instance Serialize Counters
 
 instance Semigroup Counters where
-  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 =
+  Counters cOut1 cPubIn1 cPrivIn1 cInt1 cPubInSeq1 cPrivInSeq1 flag1 <> Counters cOut2 cPubIn2 cPrivIn2 cInt2 cPubInSeq2 cPrivInSeq2 flag2 =
     Counters
-      (addSmallCounters cOut1 cOut2)
-      (addSmallCounters cPubIn1 cPubIn2)
-      (addSmallCounters cPrivIn1 cPrivIn2)
-      (addSmallCounters cInt1 cInt2)
+      (cOut1 <> cOut2)
+      (cPubIn1 <> cPubIn2)
+      (cPrivIn1 <> cPrivIn2)
+      (cInt1 <> cInt2)
       (cPubInSeq1 <> cPubInSeq2)
       (cPrivInSeq1 <> cPrivInSeq2)
-    where
-      addSmallCounters :: SmallCounters -> SmallCounters -> SmallCounters
-      addSmallCounters (Struct f1 b1 u1) (Struct f2 b2 u2) =
-        Struct (f1 + f2) (b1 + b2) (IntMap.unionWith (+) u1 u2)
+      (flag1 || flag2)
 
 instance Monoid Counters where
-  mempty = Counters (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) (Struct 0 0 mempty) mempty mempty
+  mempty = Counters mempty mempty mempty mempty mempty mempty False
 
 -- | Total count of variables
 getTotalCount :: Counters -> Int
-getTotalCount (Counters o i1 i2 x _ _) =
-  smallCounterSize o + smallCounterSize i1 + smallCounterSize i2 + smallCounterSize x
+getTotalCount (Counters o i1 i2 x _ _ useNewLinker) =
+  pinnedSize o + pinnedSize i1 + pinnedSize i2 + intermediateSize x
+  where
+    pinnedSize :: PinnedCounter -> Int
+    pinnedSize (PinnedCounter f b u) =
+      f + b + pinnedUIntSize u
+
+    intermediateSize :: IntermediateCounter -> Int
+    intermediateSize (IntermediateCounter f b u) =
+      f + b + if useNewLinker then newIntermediateUIntSize u else oldIntermediateUIntSize u
 
 -- | For parsing raw inputs
 getPublicInputSequence :: Counters -> Seq WriteType
@@ -118,15 +154,6 @@ getPublicInputSequence = countPublicInputSequence
 
 getPrivateInputSequence :: Counters -> Seq WriteType
 getPrivateInputSequence = countPrivateInputSequence
-
---------------------------------------------------------------------------------
-
--- | Re-index variables of different sorts and types
-reindex :: Counters -> Category -> ReadType -> Var -> Var
-reindex counters category typ index =
-  getOffset counters (category, typ) + case typ of
-    ReadUInt width -> index * width
-    _ -> index
 
 --------------------------------------------------------------------------------
 
@@ -146,13 +173,11 @@ booleanConstraintCategories =
     (Intermediate, ReadAllUInts)
   ]
 
--- [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts)]
-
 getBooleanConstraintCount :: Counters -> Int
 getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
 
-getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
+getBooleanConstraintRanges :: Counters -> Ranges
+getBooleanConstraintRanges counters = getRanges counters booleanConstraintCategories
 
 --------------------------------------------------------------------------------
 
@@ -194,7 +219,7 @@ prettyVariables counters =
             <> otherVars
             <> "\n"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints :: (Show constraint) => Counters -> Seq constraint -> String
 prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints
@@ -218,7 +243,7 @@ prettyConstraints counters cs =
           "    Ordinary constraints ("
             <> show ordinaryConstraintSize
             <> "):\n\n"
-            <> unlines (map (\x -> "      " <> show x) cs)
+            <> unlines (map (\x -> "      " <> show x) (toList cs))
             <> "\n"
 
     -- Boolean constraints
@@ -234,7 +259,7 @@ prettyConstraints counters cs =
 
 prettyBooleanConstraints :: Counters -> [String]
 prettyBooleanConstraints counters =
-  concatMap showSegment (getBooleanConstraintRanges counters)
+  IntMap.toList (getBooleanConstraintRanges counters) >>= showSegment
   where
     showSegment :: (Int, Int) -> [String]
     showSegment (start, count) =
@@ -298,63 +323,158 @@ instance ReadCounters Category where
 
 -- | Access Counters of a given type in a given category.
 instance ReadCounters (Category, ReadType) where
-  getCount counters (category, typ) =
-    let selector = case category of
-          Output -> countOutput
-          PublicInput -> countPublicInput
-          PrivateInput -> countPrivateInput
-          Intermediate -> countIntermediate
-     in case typ of
-          ReadField -> structF (selector counters)
-          ReadBool -> structB (selector counters)
-          ReadAllUInts -> binRepSize (structU (selector counters))
-          ReadUInt w -> case IntMap.lookup w (structU (selector counters)) of
-            Nothing -> 0
-            Just n -> n
+  getCount counters (Output, typ) = case typ of
+    ReadField -> fP (countOutput counters)
+    ReadBool -> bP (countOutput counters)
+    ReadAllUInts -> pinnedUIntSize (uP (countOutput counters))
+    ReadUInt w -> case IntMap.lookup w (uP (countOutput counters)) of
+      Nothing -> 0
+      Just n -> n
+  getCount counters (PublicInput, typ) = case typ of
+    ReadField -> fP (countPublicInput counters)
+    ReadBool -> bP (countPublicInput counters)
+    ReadAllUInts -> pinnedUIntSize (uP (countPublicInput counters))
+    ReadUInt w -> case IntMap.lookup w (uP (countPublicInput counters)) of
+      Nothing -> 0
+      Just n -> n
+  getCount counters (PrivateInput, typ) = case typ of
+    ReadField -> fP (countPrivateInput counters)
+    ReadBool -> bP (countPrivateInput counters)
+    ReadAllUInts -> pinnedUIntSize (uP (countPrivateInput counters))
+    ReadUInt w -> case IntMap.lookup w (uP (countPrivateInput counters)) of
+      Nothing -> 0
+      Just n -> n
+  getCount counters (Intermediate, typ) = case typ of
+    ReadField -> fX (countIntermediate counters)
+    ReadBool -> bX (countIntermediate counters)
+    ReadAllUInts ->
+      if countUseNewLinker counters
+        then newIntermediateUIntSize (uX (countIntermediate counters))
+        else oldIntermediateUIntSize (uX (countIntermediate counters))
+    ReadUInt w -> case IntMap.lookup w (uX (countIntermediate counters)) of
+      Nothing -> 0
+      Just n -> n
 
-  getOffset counters (category, typ) =
-    let selector = case category of
-          Output -> countOutput
-          PublicInput -> countPublicInput
-          PrivateInput -> countPrivateInput
-          Intermediate -> countIntermediate
-     in getOffset counters category + case typ of
-          ReadField -> 0
-          ReadBool -> structF (selector counters)
-          ReadAllUInts -> structF (selector counters) + structB (selector counters)
-          ReadUInt w ->
-            structF (selector counters)
-              + structB (selector counters)
-              + sum
-                ( IntMap.mapWithKey
-                    ( \width count -> if w > width then count * width else 0
-                    )
-                    (structU (selector counters))
+  getOffset counters (Output, typ) = case typ of
+    ReadField -> 0
+    ReadBool -> fP (countOutput counters)
+    ReadAllUInts -> fP (countOutput counters) + bP (countOutput counters)
+    ReadUInt w ->
+      fP (countOutput counters)
+        + bP (countOutput counters)
+        + sum
+          ( IntMap.mapWithKey
+              ( \width count -> if w > width then count * width else 0
+              )
+              (uP (countOutput counters))
+          )
+  getOffset counters (PublicInput, typ) =
+    getOffset counters PublicInput + case typ of
+      ReadField -> 0
+      ReadBool -> fP (countPublicInput counters)
+      ReadAllUInts -> fP (countPublicInput counters) + bP (countPublicInput counters)
+      ReadUInt w ->
+        fP (countPublicInput counters)
+          + bP (countPublicInput counters)
+          + sum
+            ( IntMap.mapWithKey
+                ( \width count -> if w > width then count * width else 0
                 )
+                (uP (countPublicInput counters))
+            )
+  getOffset counters (PrivateInput, typ) =
+    getOffset counters PrivateInput + case typ of
+      ReadField -> 0
+      ReadBool -> fP (countPrivateInput counters)
+      ReadAllUInts -> fP (countPrivateInput counters) + bP (countPrivateInput counters)
+      ReadUInt w ->
+        fP (countPrivateInput counters)
+          + bP (countPrivateInput counters)
+          + sum
+            ( IntMap.mapWithKey
+                ( \width count -> if w > width then count * width else 0
+                )
+                (uP (countPrivateInput counters))
+            )
+  getOffset counters (Intermediate, typ) =
+    getOffset counters Intermediate + case typ of
+      ReadField -> 0
+      ReadBool -> fX (countIntermediate counters)
+      ReadAllUInts ->
+        fX (countIntermediate counters)
+          + bX (countIntermediate counters)
+      ReadUInt w ->
+        fX (countIntermediate counters)
+          + bX (countIntermediate counters)
+          + sum
+            ( IntMap.mapWithKey
+                ( \width count ->
+                    if w > width
+                      then
+                        ( if countUseNewLinker counters
+                            then count
+                            else count * width
+                        )
+                      else 0
+                )
+                (uX (countIntermediate counters))
+            )
 
 addCount :: (Category, WriteType) -> Int -> Counters -> Counters
 addCount (category, typ) n counters =
   -- (Counters o i1 i2 x s1 s2 r)
   case category of
-    Output -> counters {countOutput = adjustSmallCounters (countOutput counters)}
-    PublicInput -> counters {countPublicInput = adjustSmallCounters (countPublicInput counters), countPublicInputSequence = countPublicInputSequence counters <> newInputSequence}
-    PrivateInput -> counters {countPrivateInput = adjustSmallCounters (countPrivateInput counters), countPrivateInputSequence = countPrivateInputSequence counters <> newInputSequence}
-    Intermediate -> counters {countIntermediate = adjustSmallCounters (countIntermediate counters)}
+    Output -> counters {countOutput = adjustPinned (countOutput counters)}
+    PublicInput -> counters {countPublicInput = adjustPinned (countPublicInput counters), countPublicInputSequence = countPublicInputSequence counters <> newInputSequence}
+    PrivateInput -> counters {countPrivateInput = adjustPinned (countPrivateInput counters), countPrivateInputSequence = countPrivateInputSequence counters <> newInputSequence}
+    Intermediate -> counters {countIntermediate = adjustIntermediate (countIntermediate counters)}
   where
-    adjustSmallCounters :: SmallCounters -> SmallCounters
-    adjustSmallCounters (Struct f b u) = case typ of
-      WriteField -> Struct (f + n) b u
-      WriteBool -> Struct f (b + n) u
-      WriteUInt w -> Struct f b (IntMap.insertWith (+) w n u)
+    adjustPinned :: PinnedCounter -> PinnedCounter
+    adjustPinned (PinnedCounter f b u) = case typ of
+      WriteField -> PinnedCounter (f + n) b u
+      WriteBool -> PinnedCounter f (b + n) u
+      WriteUInt w -> PinnedCounter f b (IntMap.insertWith (+) w n u)
+
+    adjustIntermediate :: IntermediateCounter -> IntermediateCounter
+    adjustIntermediate (IntermediateCounter f b u) = case typ of
+      WriteField -> IntermediateCounter (f + n) b u
+      WriteBool -> IntermediateCounter f (b + n) u
+      WriteUInt w -> IntermediateCounter f b (IntMap.insertWith (+) w n u)
 
     newInputSequence :: Seq WriteType
     newInputSequence = Seq.fromList $ replicate n typ
 
+setCount :: (Category, WriteType) -> Int -> Counters -> Counters
+setCount (category, typ) n counters =
+  case category of
+    Output -> counters {countOutput = setPinned (countOutput counters)}
+    PublicInput -> counters {countPublicInput = setPinned (countPublicInput counters), countPublicInputSequence = countPublicInputSequence counters <> newInputSequence}
+    PrivateInput -> counters {countPrivateInput = setPinned (countPrivateInput counters), countPrivateInputSequence = countPrivateInputSequence counters <> newInputSequence}
+    Intermediate -> counters {countIntermediate = setIntermediate (countIntermediate counters)}
+  where
+    setPinned :: PinnedCounter -> PinnedCounter
+    setPinned (PinnedCounter f b u) = case typ of
+      WriteField -> PinnedCounter n b u
+      WriteBool -> PinnedCounter f n u
+      WriteUInt w -> PinnedCounter f b (IntMap.insert w n u)
+
+    setIntermediate :: IntermediateCounter -> IntermediateCounter
+    setIntermediate (IntermediateCounter f b u) = case typ of
+      WriteField -> IntermediateCounter n b u
+      WriteBool -> IntermediateCounter f n u
+      WriteUInt w -> IntermediateCounter f b (IntMap.insert w n u)
+
+    newInputSequence :: Seq WriteType
+    newInputSequence = Seq.fromList $ replicate n typ
+
+setCountOfIntermediateUIntBits :: IntMap Int -> Counters -> Counters
+setCountOfIntermediateUIntBits counts counters = counters {countIntermediate = (countIntermediate counters) {uX = counts}}
+
 -- | Given a list of categories, get the ranges of variables in each category
-getRanges :: ReadCounters selector => Counters -> [selector] -> Ranges
+getRanges :: (ReadCounters selector) => Counters -> [selector] -> Ranges
 getRanges counters = buildRanges . map (\category -> (getOffset counters category, getCount counters category))
 
-getRange :: ReadCounters selector => Counters -> selector -> Range
+getRange :: (ReadCounters selector) => Counters -> selector -> Range
 getRange counters selector = (getOffset counters selector, getCount counters selector)
 
 enumerate :: Ranges -> [Int]
@@ -379,13 +499,20 @@ buildRanges = foldr build mempty
               else IntMap.insert start size ranges -- insert it as a new segment
           Nothing -> IntMap.insert start size ranges -- insert it as a new segment
 
-inRanges :: Ranges -> Int -> Bool
-inRanges ranges index = case IntMap.lookupLE index ranges of
-  Nothing -> False
-  Just (start, size) -> index < start + size
-
 getUIntMap :: Counters -> Category -> IntMap Int
-getUIntMap counters Output = structU (countOutput counters)
-getUIntMap counters PublicInput = structU (countPublicInput counters)
-getUIntMap counters PrivateInput = structU (countPrivateInput counters)
-getUIntMap counters Intermediate = structU (countIntermediate counters)
+getUIntMap counters Output = uP (countOutput counters)
+getUIntMap counters PublicInput = uP (countPublicInput counters)
+getUIntMap counters PrivateInput = uP (countPrivateInput counters)
+getUIntMap counters Intermediate = uX (countIntermediate counters)
+
+pinnedUIntSize :: IntMap Int -> Int
+pinnedUIntSize = IntMap.foldlWithKey' (\acc width size -> acc + width * size) 0
+
+oldIntermediateUIntSize :: IntMap Int -> Int
+oldIntermediateUIntSize = pinnedUIntSize
+
+newIntermediateUIntSize :: IntMap Int -> Int
+newIntermediateUIntSize = sum
+
+tempSetFlag :: Counters -> Bool -> Counters
+tempSetFlag counters flag = counters {countUseNewLinker = flag}

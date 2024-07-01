@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.24.0]
+
+### Added
+
+* `divU` operater for unsigned integer division.
+* `modU` operater for unsigned integer modulo.
+
+## [v0.23.0]
+
+### Added
+
+* `add` operater for adding two `UInt`s and resulting in a longer `UInt` with carry.
+* `addV` operater for adding multiple `UInt`s at once with arbitrary carry.
+* `mul` operater for multiplying two `UInt`s and resulting in a double-length `UInt` with full product.
+* `mulV` operater for multiplying two `UInt`s and with arbitrary carry.
+
+## [v0.22.0]
+
+### Added
+
+* `slice` operater for splicing a `UInt` into a smaller `UInt`.
+* `join` operator for concatenating two `UInt`s.
+* `solveOutput` and `solveOutputEither` for accessing the R1CS solver.
+
+### Changed
+
+* Lists in fields of the `R1CS` data structure is now represented as `Data.Sequence`s.
+
+## [v0.21.0]
+
+### Added
+
+* `fromBools` and `fromField` for replacing `pack` and `toUInt` in the future.
+
+### Changed
+
+* Unsigned integers used to be see as a whole, that means if any of the bits was used, the whole integer will be retained. Now, the compiler will only retain the bits that are used.
+
 ## [v0.11.0]
 
 ### Added

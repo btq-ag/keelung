@@ -1,5 +1,5 @@
 name: keelung
-version: 0.13.1
+version: 0.25.0
 github: "btq-ag/keelung"
 license: Apache-2.0
 author: "BTQ AG"
@@ -30,12 +30,15 @@ dependencies:
   - galois-field
   - groups
   - mtl
+  - optparse-applicative
   - process
   - random
   - semirings
   - QuickCheck
   - vector
   - wl-pprint-text
+  - aeson
+    #  - scientific
 
 library:
   source-dirs: src
@@ -54,14 +57,13 @@ tests:
       - test/
       - src/
     dependencies:
-    - keelung
-    # - keelung-examples
-    - hspec
-    - hspec-expectations-lifted
-    - HUnit
-    - QuickCheck
-    - quickcheck-transformer
-
+      - keelung
+      # - keelung-examples
+      - hspec
+      - hspec-expectations-lifted
+      - HUnit
+      - QuickCheck
+      - quickcheck-transformer
 
     ghc-options:
       - -Wall
