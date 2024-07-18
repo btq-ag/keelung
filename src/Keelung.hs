@@ -9,6 +9,7 @@ module Keelung
     module Keelung.Heap,
     module Keelung.Monad,
     module Keelung.Data.Bits,
+    module Keelung.CircuitFormat,
     keelung,
     -- interpret
     interpret,
@@ -69,6 +70,7 @@ import Keelung.Monad
 import Keelung.Options
 import Keelung.Syntax
 import Keelung.Syntax.Encode
+import Keelung.CircuitFormat
 import System.Directory qualified as Path
 import System.IO.Error qualified as IO
 import System.Info qualified
