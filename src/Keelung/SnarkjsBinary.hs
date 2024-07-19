@@ -35,18 +35,19 @@ data R1CSBin = R1CSBin {
 }
 
 data Constraint = Constraint {
-    factorsA :: IntMap Integer,
-    factorsB :: IntMap Integer,
-    factorsC :: IntMap Integer
+    factorsA :: [(Int, Integer)],
+    factorsB :: [(Int, Integer)],
+    factorsC :: [(Int, Integer)]
 }
 
 instance Show Constraint where
     show (Constraint fAs fBs fCs) =
-        let showPoly s fs = if IntMap.empty == fs
-            then "0 (all factors of " ++ s ++ " are 0s)"
-            else let (lastK, _) = fromMaybe (error "impossible") $ IntMap.lookupLE (maxBound :: Int) fs
-                 in  IntMap.foldMapWithKey (\k v -> show v ++ "*" ++ s ++ "_" ++ show k ++ if k == lastK then "" else " + ") fs
-        in "  " ++ showPoly "a" fAs ++ "\n + " ++ showPoly "b" fBs ++ "\n = " ++ showPoly "c" fCs
+        let showPoly fs = if null fs
+            then "0 (all coeffs are 0s)"
+            else foldMap (\(k, v) -> (if (k, v) == head fs then "" else " + ") <> show v ++ "*w_" ++ show k) fs
+                 -- let (lastK, _) = fromMaybe (error "impossible") $ IntMap.lookupLE (maxBound :: Int) fs
+                 -- in  IntMap.foldMapWithKey (\k v -> show v ++ "*w_" ++ show k ++ if k == lastK then "" else " + ") fs
+        in "  " ++ showPoly fAs ++ "\n * " ++ showPoly fBs ++ "\n = " ++ showPoly fCs
 
 newtype R1csSection = R1csSection { unR1csSection :: (Int, BS.ByteString) }
   deriving Eq
@@ -78,7 +79,7 @@ parseR1csRaw = do
     _version <- takeInt 4
     nSecs   <- takeInt 4
     count nSecs $ do
-        sectionType <- takeInt 4 
+        sectionType <- takeInt 4
         sectionSize <- takeInt 8
         trace ("section type: " ++ show sectionType) (pure ())
         trace ("section size: " ++ show sectionSize) (pure ())
@@ -105,17 +106,17 @@ parseConstraint fieldSize = do
     bMap <- parsePoly fieldSize
     cMap <- parsePoly fieldSize
     return $ Constraint aMap bMap cMap
-    
 
-parsePoly :: Int -> Parser (IntMap Integer)
+
+parsePoly :: Int -> Parser [(Int, Integer)]
 parsePoly fieldSize = do
     n <- takeInt 4
-    factors <- count n $ do
+    count n $ do
         wireId <- takeInt 4
-        factor <- toIntegerLE <$> P.take fieldSize
-        trace ("wireId: " ++ show wireId ++ ", factor: " ++ show factor) (return ())
-        return (wireId, factor)
-    return $ foldl (\m (k, v) -> IntMap.insert k v m) IntMap.empty factors
+        coeff <- toIntegerLE <$> P.take fieldSize
+        trace ("wireId: " ++ show wireId ++ ", coefficient: " ++ show coeff) (return ())
+        return (wireId, coeff)
+    -- return $ foldl (\m (k, v) -> IntMap.insert k v m) IntMap.empty factors
 
 toIntegerLE :: BS.ByteString -> Integer
 toIntegerLE = BS.foldr (\ w i -> toInteger w + i * 256) 0
