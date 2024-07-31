@@ -43,7 +43,6 @@ library
       Keelung.Options
       Keelung.Prof
       Keelung.Snarkjs
-      Keelung.Snarkjs.Options
       Keelung.Syntax
       Keelung.Syntax.Counters
       Keelung.Syntax.Encode
@@ -100,7 +99,6 @@ test-suite keelung-test
       Keelung.Options
       Keelung.Prof
       Keelung.Snarkjs
-      Keelung.Snarkjs.Options
       Keelung.Syntax
       Keelung.Syntax.Counters
       Keelung.Syntax.Encode
