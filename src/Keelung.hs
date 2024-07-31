@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -51,6 +52,10 @@ module Keelung
     stringToJsonInputs,
     jsonFileInputs,
     jsonInputs,
+    setupSnarkjsPtau,
+    checkWtnsBySnarkjs,
+    genZkeyBySnarkjs,
+    proveBySnarkjs,
   )
 where
 
@@ -72,14 +77,13 @@ import Keelung.Syntax
 import Keelung.Syntax.Encode
 import Keelung.CircuitFormat
 import System.Directory qualified as Path
+--import System.FilePath qualified as FP
 import System.IO.Error qualified as IO
 import System.Info qualified
 import System.Process qualified as Process
 import Text.Read (readMaybe)
 import Data.Aeson
--- import Data.Aeson qualified as JSON (Value(..))
--- import Data.Aeson (ToJSON(..), FromJSON(..))
--- import Data.Aeson.KeyMap (elems)
+import GHC.IO.Exception (ExitCode(..))
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
 keelungCompilerVersion :: (Int, Int)
@@ -340,6 +344,41 @@ solveOutputEither fieldType prog publicInput privateInput =
 solveOutputDataEither :: (Encode t, Inputable d, Inputable e) => FieldType -> Comp t -> d -> e -> IO (Either Error [Integer])
 solveOutputDataEither fieldType prog pub prv = solveOutputEither fieldType prog (toInts pub) (toInts prv)
 
+setupSnarkjsPtau :: Integer -> String -> IO (Either Error String)
+setupSnarkjsPtau size entropy = runM $ do
+  let p = show size
+  lift $ Path.createDirectoryIfMissing True "snarkjs"
+  fp <- lift $ Path.makeAbsolute "snarkjs"
+  lift $ putStrLn "These generated files are for testings only and not production-ready.\nGenerating powersoftau files..."
+  let pot :: String -> String -> String
+      pot s i = fp <> "/pot" <> s <> "_" <> i <> ".ptau"
+  putStrLn <$> callSnarkjs ["powersoftau", "new", "bn128", p, pot p "0"] 
+  putStrLn <$> callSnarkjs ["powersoftau", "contribute", pot p "0", pot p "1", "-n=\"First Contribution\"", "-e=" <> entropy]
+  putStrLn <$> callSnarkjs ["powersoftau", "beacon", pot p "1", pot p "beacon", "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "10", "-n\"Beacon\"", "-e=" <> entropy]
+  putStrLn <$> callSnarkjs ["powersoftau", "prepare", "phase2", pot p "beacon", pot p "final"]
+  return $ "Successfully generated " <> pot p "final"
+  
+checkWtnsBySnarkjs :: FilePath -> FilePath -> IO (Either Error String)
+checkWtnsBySnarkjs r1cs wtns = runM $ callSnarkjs ["wtns", "check", r1cs, wtns] >> return "Success"
+
+data SnarkjsBackend = Groth16 | PLONK
+
+genZkeyBySnarkjs :: SnarkjsBackend -> FilePath -> FilePath -> IO (Either Error String)
+genZkeyBySnarkjs b r1cs ptau = runM $ do
+  let backend = case b of Groth16 -> "groth16";  PLONK -> "plonk";
+  fp <- lift $ Path.makeAbsolute r1cs
+  let parent = take (length fp - length r1cs) fp
+      name = take (length r1cs - 5) r1cs
+  callSnarkjs [backend, "setup", r1cs, ptau, parent <> name <> ".zkey"]
+                             
+proveBySnarkjs :: SnarkjsBackend -> String -> String -> IO (Either Error String)
+proveBySnarkjs b r1cs ptau = runM $ do
+  let backend = case b of Groth16 -> "groth16";  PLONK -> "plonk";
+  fp <- lift $ Path.makeAbsolute r1cs
+  let parent = take (length fp - length r1cs) fp
+      name = take (length r1cs - 5) r1cs
+  callSnarkjs [backend, "prove", parent <> name <> ".zkey", ptau, parent <> name <> ".wtns"]
+
 --------------------------------------------------------------------------------
 
 -- | Internal function for handling data serialization
@@ -354,6 +393,16 @@ callKeelungc args' payload = do
     Left err -> throwError (DecodeError err)
     Right (Left err) -> throwError (CompileError err)
     Right (Right x) -> return x
+
+callSnarkjs :: [String] -> M String
+callSnarkjs args' = do
+  (cmd, args) <- findSnarkjs
+  -- TODO: check for Snarkjs' version
+  (code, out, err) <- lift $ Process.readProcessWithExitCode cmd (args ++ args') [] 
+  if code /= ExitSuccess then
+    throwError (SnarkjsError (err <> "\n" <> out))
+  else
+    return out
 
 -- | Locate the Keelung compiler
 --      1. see if "keelungc" is in PATH
@@ -410,6 +459,15 @@ findAuroraVerifier = do
             -- insert "--platform=linux/amd64" when we are not on a x86 machine
             _ -> return ("docker", ["run", "-i", "--platform=linux/amd64", "--volume", filepath ++ ":/aurora", "btqag/aurora-verify"])
         else throwError CannotLocateVerifier
+  
+
+findSnarkjs :: M (String, [String])
+findSnarkjs = do
+  snarkJsExists <- checkCmd "snarkjs"
+  if snarkJsExists then
+    return ("snarkjs", [])
+  else
+    throwError CannotLocateSnarkjs
 
 -- | Check the version of the Keelung compiler
 readKeelungVersion :: FilePath -> [String] -> M (Int, Int, Int)

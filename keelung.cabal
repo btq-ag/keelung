@@ -42,7 +42,8 @@ library
       Keelung.Monad
       Keelung.Options
       Keelung.Prof
-      Keelung.SnarkjsBinary
+      Keelung.Snarkjs
+      Keelung.Snarkjs.Options
       Keelung.Syntax
       Keelung.Syntax.Counters
       Keelung.Syntax.Encode
@@ -81,6 +82,7 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.Monad
+      Test.Snarkjs
       Test.VarLayout
       Keelung
       Keelung.CircuitFormat
@@ -97,7 +99,8 @@ test-suite keelung-test
       Keelung.Monad
       Keelung.Options
       Keelung.Prof
-      Keelung.SnarkjsBinary
+      Keelung.Snarkjs
+      Keelung.Snarkjs.Options
       Keelung.Syntax
       Keelung.Syntax.Counters
       Keelung.Syntax.Encode

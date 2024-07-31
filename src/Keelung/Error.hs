@@ -19,10 +19,12 @@ data Error
   | CannotLocateKeelungC -- Cannot locate the Keelung compiler
   | CannotLocateProver -- Cannot locate the prover
   | CannotLocateVerifier -- Cannot locate the verifier
+  | CannotLocateSnarkjs -- Cannot locate Snarkjs when needed
   | CannotReadVersionError -- Cannot read the version of the Keelung compiler
   | VersionMismatchError Int Int Int -- The version of the Keelung compiler is not supported
   | ElabError ElabError
   | CompileError String
+  | SnarkjsError String
   deriving (Eq, Generic, NFData)
 
 instance Show Error where
@@ -30,6 +32,7 @@ instance Show Error where
   show CannotLocateKeelungC = "Cannot locate the Keelung compiler"
   show CannotLocateProver = "Cannot locate the prover"
   show CannotLocateVerifier = "Cannot locate the verifier"
+  show CannotLocateSnarkjs = "Cannot locate Snarkjs, please make sure it\'s installed in your $PATH."
   show CannotReadVersionError = "Cannot read the version of the Keelung compiler"
   show (VersionMismatchError major minor patch) =
     "The version of the Keelung compiler is not supported: \n"
@@ -41,6 +44,7 @@ instance Show Error where
       ++ show patch
   show (ElabError err) = "Elaboration Error: " ++ show err
   show (CompileError err) = "Compile Error: " ++ err
+  show (SnarkjsError err) = "Snarkjs Error: " ++ err
 
 instance Serialize Error
 
