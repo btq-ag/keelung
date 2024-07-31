@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 -- | Keelung is a DSL for building zero-knowledge proofs
 module Keelung
@@ -52,6 +51,7 @@ module Keelung
     stringToJsonInputs,
     jsonFileInputs,
     jsonInputs,
+    SnarkjsBackend(..),
     setupSnarkjsPtau,
     checkWtnsBySnarkjs,
     genZkeyBySnarkjs,
@@ -252,7 +252,7 @@ genCircuitBin :: (Encode t) => FilePath -> FieldType -> Comp t -> IO (Either Err
 genCircuitBin filePath fieldType prog = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
   _ <- callKeelungc ["protocol", "genCircuitBin", "--filepath", filePath] (fieldType, elab) :: M (R1CS Integer)
-  liftIO $ putStrLn $ "Generated binary circuit file at: " <> filePath
+  liftIO $ (\s -> putStrLn $ "Generated binary circuit file at: " <> s) =<< Path.makeAbsolute filePath
   return "Success"
 
 -- genCircuitDefault :: Encode t => FieldType -> Comp t -> M (R1CS Integer)
@@ -271,7 +271,7 @@ genWtns :: (Encode t) => FilePath -> FieldType -> Comp t -> [Integer] -> [Intege
 genWtns filePath fieldType prog publicInput privateInput = runM $ do
   elab <- liftEither (elaborateAndEncode prog)
   _ <- callKeelungc ["protocol", "genWtns", "--filepath", filePath] (fieldType, elab, publicInput, privateInput) :: M [Integer]
-  liftIO $ putStrLn $ "Generated wtns file at: " <> filePath
+  liftIO $ (\s -> putStrLn $ "Generated wtns file at: " <> s) =<< Path.makeAbsolute filePath
   return "Success"
 
 -- | Generate parameters for a program and write them to parameter.json.
@@ -352,11 +352,11 @@ setupSnarkjsPtau size entropy = runM $ do
   lift $ putStrLn "These generated files are for testings only and not production-ready.\nGenerating powersoftau files..."
   let pot :: String -> String -> String
       pot s i = fp <> "/pot" <> s <> "_" <> i <> ".ptau"
-  putStrLn <$> callSnarkjs ["powersoftau", "new", "bn128", p, pot p "0"] 
-  putStrLn <$> callSnarkjs ["powersoftau", "contribute", pot p "0", pot p "1", "-n=\"First Contribution\"", "-e=" <> entropy]
-  putStrLn <$> callSnarkjs ["powersoftau", "beacon", pot p "1", pot p "beacon", "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "10", "-n\"Beacon\"", "-e=" <> entropy]
-  putStrLn <$> callSnarkjs ["powersoftau", "prepare", "phase2", pot p "beacon", pot p "final"]
-  return $ "Successfully generated " <> pot p "final"
+  _ <- putStrLn <$> callSnarkjs ["powersoftau", "new", "bn128", p, pot p "0"] 
+  _ <- putStrLn <$> callSnarkjs ["powersoftau", "contribute", pot p "0", pot p "1", "-n=\"First Contribution\"", "-e=" <> entropy]
+  _ <- putStrLn <$> callSnarkjs ["powersoftau", "beacon", pot p "1", pot p "beacon", "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "10", "-n\"Beacon\"", "-e=" <> entropy]
+  _ <- putStrLn <$> callSnarkjs ["powersoftau", "prepare", "phase2", pot p "beacon", pot p "final"]
+  return $ "Generated .ptau file: " <> pot p "final"
   
 checkWtnsBySnarkjs :: FilePath -> FilePath -> IO (Either Error String)
 checkWtnsBySnarkjs r1cs wtns = runM $ callSnarkjs ["wtns", "check", r1cs, wtns] >> return "Success"
@@ -369,15 +369,13 @@ genZkeyBySnarkjs b r1cs ptau = runM $ do
   fp <- lift $ Path.makeAbsolute r1cs
   let parent = take (length fp - length r1cs) fp
       name = take (length r1cs - 5) r1cs
-  callSnarkjs [backend, "setup", r1cs, ptau, parent <> name <> ".zkey"]
+  _ <- callSnarkjs [backend, "setup", r1cs, ptau, parent <> name <> ".zkey"]
+  return $ "Generated .zkey file: " <> parent <> name <> ".zkey"
                              
 proveBySnarkjs :: SnarkjsBackend -> String -> String -> IO (Either Error String)
-proveBySnarkjs b r1cs ptau = runM $ do
+proveBySnarkjs b zkey wtns = runM $ do
   let backend = case b of Groth16 -> "groth16";  PLONK -> "plonk";
-  fp <- lift $ Path.makeAbsolute r1cs
-  let parent = take (length fp - length r1cs) fp
-      name = take (length r1cs - 5) r1cs
-  callSnarkjs [backend, "prove", parent <> name <> ".zkey", ptau, parent <> name <> ".wtns"]
+  callSnarkjs [backend, "prove", zkey, wtns]
 
 --------------------------------------------------------------------------------
 
@@ -399,10 +397,10 @@ callSnarkjs args' = do
   (cmd, args) <- findSnarkjs
   -- TODO: check for Snarkjs' version
   (code, out, err) <- lift $ Process.readProcessWithExitCode cmd (args ++ args') [] 
-  if code /= ExitSuccess then
-    throwError (SnarkjsError (err <> "\n" <> out))
-  else
+  if code == ExitSuccess || code == ExitFailure 99 then
     return out
+  else
+    throwError (SnarkjsError (err <> "\n" <> out))
 
 -- | Locate the Keelung compiler
 --      1. see if "keelungc" is in PATH
