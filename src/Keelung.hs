@@ -86,16 +86,12 @@ import Data.Aeson
 import GHC.IO.Exception (ExitCode(..))
 
 -- | IMPORTANT: The compatibale compiler version of this library, Make sure it's updated and matched accordingly.
-keelungCompilerVersion :: (Int, Int)
-keelungCompilerVersion = (0, 25)
-
--- | Patch version of this library
-compilerPatchVersion :: Int
-compilerPatchVersion = 0
+keelungCompilerVersion :: (Int, Int, Int)
+keelungCompilerVersion = (0, 26, 1)
 
 -- | The version of this library in String
 keelungVersion :: String
-keelungVersion = intercalate "." [show (fst keelungCompilerVersion), show (snd keelungCompilerVersion), show compilerPatchVersion]
+keelungVersion = (\(a,b,c) -> intercalate "." [show a, show b, show c]) keelungCompilerVersion
 
 --------------------------------------------------------------------------------
 
@@ -497,7 +493,8 @@ readKeelungVersion cmd args = do
 --   patch number can be different
 checkCompilerVersion :: (Int, Int, Int) -> M ()
 checkCompilerVersion (major, minor, patch) = do
-  if (major, minor) == keelungCompilerVersion && patch >= 0
+  let (compilerMajor, compilerMinor, compilerPatch) = keelungCompilerVersion
+  if (major, minor) == (compilerMajor, compilerMinor) && patch >= compilerPatch
     then return ()
     else throwError (VersionMismatchError major minor patch)
 
